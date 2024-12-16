@@ -261,7 +261,7 @@ wide_data <- aggregated_data %>%
   )
 
 # #------------------------------------------------------------------------------------------- KENYA TEST---
-# #--------------------------------------------------------- KENYA TEST DATA ONLY INCLUDES ANC, FACDEL & PNC
+# #--------------------------------------------------------- TEST KENYA DATA ONLY INCLUDES ANC, FACDEL & PNC
 
 
 ##Step 4: Calculate Consistency Ratios -------------------------------------------------------------------
@@ -415,63 +415,90 @@ print("Consistency analysis completed")
 # Step 1: Load Adjusted Data ----------------------------------------------------
 print("Step 1: Loading adjusted data from the outlier analysis...")
 data <- read.csv("data_output_part1.csv")  # Load the adjusted dataset from outlier analysis
-print(head(data))
-# Ensure 'date' is in Date format
-data <- data %>%
-  mutate(date = as.Date(date))
+final_consistency_data <- read.csv("data_output_part2.csv")  # Load consistency dataset
+geo_cols <- colnames(data)[grepl("^admin_area_", colnames(data))]  # Detect geo columns dynamically
 
-# Step 2: Create Panel Variable -------------------------------------------------
-print("Step 2: Creating panel variable...")
+# Step 2: Ensure 'date' is in Date format and create panel variable
+print("Ensuring 'date' is in Date format and creating panel variable...")
 data <- data %>%
-  mutate(panelvar = paste(indicator_common_id, facility_id, sep = "_"))
+  mutate(
+    date = as.Date(date),  # Convert 'date' to Date format
+    panelvar = paste(indicator_common_id, facility_id, sep = "_")  # Create unique panel variable
+  )
 
-# Step 3: Create Complete Time Series -------------------------------------------
-print("Step 3: Filling gaps in the time series...")
+# Step 3: Generate Completeness Indicator -------------------------------------
+print("Step 3: Creating completeness indicator...")
 data <- data %>%
   complete(
-    panelvar, 
+    panelvar,  # Use `panelvar` for grouping
     date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")
   ) %>%
-  fill(!!!syms(geo_cols), .direction = "downup") %>%  # Dynamically fill geographic columns
+  fill(!!!syms(geo_cols), .direction = "downup") %>%  # Fill geographic columns dynamically
   fill(indicator_common_id, .direction = "downup") %>%  # Fill missing indicators
-  mutate(year = year(date))  # Ensure year is derived correctly
+  mutate(completeness = ifelse(!is.na(count) & count > 0, 1, 0))  # Completeness is 1 if count > 0
 
-
-# Step 4: Create Completeness Indicator
-print("Step 4: Creating completeness indicator...")
-data <- data %>%
-  mutate(completeness = ifelse(!is.na(count) & count > 0, 1, 0))
-
-# Smoothing Reporting Time Frames
-print("Smoothing reporting time frames...")
+# Step 4: Smooth Reporting Time Frames ----------------------------------------
+print("Step 4: Smoothing reporting time frames...")
 data <- data %>%
   group_by(panelvar) %>%
   arrange(date) %>%
-  mutate(first_occurrence = cumsum(!is.na(completeness))) %>%
-  arrange(desc(date)) %>%
-  mutate(last_occurrence = rev(cumsum(rev(!is.na(completeness))))) %>%
   mutate(
+    first_occurrence = cumsum(!is.na(completeness)),
+    last_occurrence = rev(cumsum(rev(!is.na(completeness)))),
     num1 = row_number(),
     num2 = row_number(desc(date))
   ) %>%
   ungroup() %>%
   filter(
-    !(first_occurrence == 0 & num1 > 12),
-    !(last_occurrence == 0 & num2 > 12)
+    !(first_occurrence == 0 & num1 > 12),  # Drop records before the first occurrence
+    !(last_occurrence == 0 & num2 > 12)   # Drop records after the last occurrence
   )
 
-# Step 6: Calculate Completeness Metrics
-print("Step 6: Calculating completeness metrics...")
-completeness_summary <- data %>%
-  group_by(across(all_of(c(geo_cols, "indicator_common_id", "date")))) %>%
+# Step 5: Join Consistency Data -----------------------------------------------
+print("Step 5: Joining consistency data...")
+consistency_mapping <- tibble(
+  ratio_type = c("ratio_anc1", "ratio_penta1", "ratio_penta3", "ratio_delivery", "ratio_bcg", "ratio_pnc1"),
+  indicator_common_id = c("anc1", "penta1", "penta3", "delivery", "bcg", "pnc1")
+)
+
+final_consistency_data <- final_consistency_data %>%
+  inner_join(consistency_mapping, by = "ratio_type")  # Map `ratio_type` to `indicator_common_id`
+
+data <- data %>%
+  left_join(
+    final_consistency_data %>%
+      select(any_of(c(geo_cols, "year", "indicator_common_id", "sconsistency"))),
+    by = c(geo_cols, "year", "indicator_common_id")
+  )
+
+# Step 6: Apply DQA Rules -----------------------------------------------------
+print("Step 6: Applying DQA rules...")
+data <- data %>%
+  mutate(
+    temp = case_when(
+      indicator_common_id %in% c("opd", "penta1", "anc1") & outlier == 0 & completeness == 1 ~ 1,
+      indicator_common_id == "penta1" & sconsistency == 0 ~ 0,
+      indicator_common_id == "anc1" & sconsistency == 0 ~ 0,
+      TRUE ~ 0
+    )
+  )
+
+# Step 7: Summarize DQA Results -----------------------------------------------
+print("Step 7: Summarizing DQA results...")
+dqa_summary <- data %>%
+  group_by(across(all_of(c(geo_cols, "indicator_common_id", "year")))) %>%
   summarise(
-    completeness = mean(completeness, na.rm = TRUE),
-    total_volume = sum(count, na.rm = TRUE),
+    dqa = min(temp, na.rm = TRUE),  # Minimum DQA value (pass/fail)
     .groups = "drop"
   )
 
+data <- data %>%
+  left_join(dqa_summary, by = c(geo_cols, "indicator_common_id", "year"))
+
+
+
 # PART 3: VISUALISATION --------------------------------------------------------
-# Generate Completeness Heatmap ----------------------------------------
+# Generate Completeness Heatmap ------------------------------------------------
 print("Creating completeness heatmap...")
 completeness_summary <- data %>%
   group_by(across(all_of(geo_cols)), indicator_common_id) %>%
