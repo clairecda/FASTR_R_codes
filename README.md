@@ -1,8 +1,12 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # FASTR_R_codes
 =======
 # FASTR_Modules
 >>>>>>> 59806c2 (Initial commit)
+=======
+# FASTR_Modules
+>>>>>>> 96ea930e186e38fc48dd37a0870d309c8e95739a
 R scripts and test data for FASTR data quality assessment
 
 Description
