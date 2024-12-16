@@ -532,4 +532,6 @@ print(heatmap_plot)
 # PART 3: SAVE ALL OUTPUTS ----------------------------------------------------
 print("Saving all data outputs from Part 3...")
 write.csv(completeness_summary, "completeness_summary.csv", row.names = FALSE)
+write.csv(dqa_summary, "dqa_summary.csv", row.names = FALSE)
+write.csv(data, "data_output_part3.csv", row.names = FALSE)
 ggsave("completeness_heatmap.png", plot = heatmap_plot, width = 12, height = 8)
