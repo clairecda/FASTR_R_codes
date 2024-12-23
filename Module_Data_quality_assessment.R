@@ -2,7 +2,7 @@
 # Last edit: 2024 Dec 23
 
 
-#DATA: example_imported_data_bangladesh.csv
+#DATA: sierraleone_imported_dataset.csv
 
 
 # FILE: output_outliers.csv
@@ -390,11 +390,12 @@ dqa_analysis <- function(completeness_data, consistency_data, geo_cols) {
 
 
 # Main Execution --------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
+# Main Execution --------------------------------------------------------------
 
-# Execute functions
+
 print("Running outlier analysis...")
 outlier_data <- outlier_analysis(data, geo_cols)
 print("Running consistency analysis...")
@@ -403,27 +404,6 @@ print("Running completeness analysis...")
 completeness_results <- completeness_analysis(outlier_data$outlier_data, geo_cols)
 print("Running DQA analysis...")
 dqa_results <- dqa_analysis( completeness_results$long_format, consistency_data, geo_cols)
-
-
-# Save Outputs
-print("Saving all data outputs from outlier analysis...")
-write.csv(outlier_data$outlier_data, "output_outliers.csv", row.names = FALSE)
-write.csv(outlier_data$top_outliers_data, "top_outliers_data.csv", row.names = FALSE)
-write.csv(outlier_data$volume_increase_data, "volume_increase_data.csv", row.names = FALSE)
-
-print("Saving all data outputs from consistency analysis...")
-write.csv(consistency_data, "output_consistency.csv", row.names = FALSE)
-
-print("Saving all data outputs from conpleteness analysis...")
-write.csv(completeness_results$summary, "completeness_summary.csv", row.names = FALSE)
-write.csv(completeness_results$long_format, "completeness_long_format.csv", row.names = FALSE)
-write.csv(completeness_results$aggregate, "completeness_aggregate.csv", row.names = FALSE)
-
-print("Saving all data outputs from DQA analysis...")
-write.csv(dqa_results$dqa_data, "dqa_data.csv", row.names = FALSE)
-write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
-
-print("DQA analysis completed and outputs saved.")
 
 # Visualization  --------------------------------------------------------------
 #SETUP
@@ -476,13 +456,11 @@ print(bar_chart)
 
 # Completeness Heatmap (PART3)------------------------------------------------
 print("Creating completeness heatmap...")
-
-
 heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id, y = admin_area_2, fill = completeness_percentage)) +
   geom_tile(color = "white") +
   scale_fill_gradientn(
     colors = viz_colors,
-    values = rescale(c(0, 20, 40, 60, 100)),  # Adjust thresholds for your data
+    values = rescale(c(0, 25, 50, 90, 100)),  # Adjust thresholds for your data
     limits = c(0, 100),                       # Ensure the scale is [0, 100]
     name = "Completeness (%)"
   ) +
@@ -500,3 +478,23 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
 
 print(heatmap_plot)
 
+
+# Save Outputs
+print("Saving all data outputs from outlier analysis...")
+write.csv(outlier_data$outlier_data, "output_outliers.csv", row.names = FALSE)
+write.csv(outlier_data$top_outliers_data, "top_outliers_data.csv", row.names = FALSE)
+write.csv(outlier_data$volume_increase_data, "volume_increase_data.csv", row.names = FALSE)
+
+print("Saving all data outputs from consistency analysis...")
+write.csv(consistency_data, "output_consistency.csv", row.names = FALSE)
+
+print("Saving all data outputs from conpleteness analysis...")
+write.csv(completeness_results$summary, "completeness_summary.csv", row.names = FALSE)
+write.csv(completeness_results$long_format, "completeness_long_format.csv", row.names = FALSE)
+write.csv(completeness_results$aggregate, "completeness_aggregate.csv", row.names = FALSE)
+
+print("Saving all data outputs from DQA analysis...")
+write.csv(dqa_results$dqa_data, "dqa_data.csv", row.names = FALSE)
+write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
+
+print("DQA analysis completed and outputs saved.")
