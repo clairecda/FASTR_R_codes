@@ -522,7 +522,8 @@ write.csv(completeness_results$long_format, "completeness_long_format.csv", row.
 write.csv(completeness_results$aggregate, "completeness_aggregate.csv", row.names = FALSE)
 
 print("Saving all data outputs from DQA analysis...")
-write.csv(dqa_results$dqa_data, "dqa_data.csv", row.names = FALSE)
+write.csv(dqa_results$facility_dqa, "facility_dqa.csv", row.names = FALSE)
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
+write.csv(dqa_results$overall_dqa, "overall_dqa.csv", row.names = FALSE)
 
 print("DQA analysis completed and outputs saved.")
