@@ -7,6 +7,7 @@
 
 # FILE: output_outliers.csv
 # FILE: top_outliers_data.csv
+# FILE: volume_increase_data.csv
 # FILE: output_consistency.csv
 # FILE: completeness_summary.csv
 # FILE: completeness_long_format.csv
@@ -31,6 +32,9 @@ load_and_preprocess_data <- function(file_path) {
 }
 
 # PART 1 OUTLIERS
+library(dplyr)
+library(lubridate)
+
 outlier_analysis <- function(data, geo_cols) {
   print("Performing outlier analysis...")
   
@@ -90,7 +94,27 @@ outlier_analysis <- function(data, geo_cols) {
     slice_max(order_by = max_percent_change, n = 5, with_ties = FALSE) %>%
     ungroup()
   
-  return(list(outlier_data = data, top_outliers_data = top_outliers_data))
+  # Step 7: Calculate Monthly Volume Increase/Decrease
+  print("Calculating monthly volume changes...")
+  # Adjust the grouping columns as needed to match how your data references geography/date
+  volume_increase_data <- data %>%
+    group_by(
+      admin_area_1, 
+      indicator_common_id, 
+      month = floor_date(date, "month")
+    ) %>%
+    summarise(
+      total_volume = sum(count, na.rm = TRUE),
+      adjusted_volume = sum(count_adjust, na.rm = TRUE),
+      percent_change = 100 * (total_volume - adjusted_volume) / adjusted_volume,
+      .groups = "drop"
+    )
+  
+  return(list(
+    outlier_data = data,
+    top_outliers_data = top_outliers_data,
+    volume_increase_data = volume_increase_data
+  ))
 }
 
 # PART 2 CONSISTENCY
@@ -208,7 +232,7 @@ consistency_analysis <- function(data, geo_cols) {
 
   return(long_data)
 }
-
+# PART 3 COMPLETENESS
 completeness_analysis <- function(data, geo_cols) {
   print("Performing completeness analysis...")
   
@@ -275,71 +299,7 @@ completeness_analysis <- function(data, geo_cols) {
   return(list(summary = aggregate_data, long_format = long_format))
 }
 
-
-
-# PART 3 COMPLETENESS
-# completeness_analysis <- function(data, geo_cols) {
-#   print("Performing completeness analysis...")
-#   
-#   # Step 1: Ensure 'date' and 'year' columns exist
-#   data <- data %>%
-#     mutate(
-#       date = tryCatch(as.Date(date, format = "%Y-%m-%d"), error = function(e) NA),
-#       year = as.numeric(format(date, "%Y")),
-#       panelvar = paste(indicator_common_id, facility_id, sep = "_")
-#     ) %>%
-#     filter(!is.na(date), !is.na(panelvar))  # Filter rows with valid dates and panelvars
-#   
-#   # Step 2: Create completeness indicator
-#   data <- data %>%
-#     complete(
-#       panelvar, date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")
-#     ) %>%
-#     fill(!!!syms(geo_cols), .direction = "downup") %>%
-#     fill(indicator_common_id, .direction = "downup") %>%
-#     mutate(completeness = ifelse(!is.na(count) & count > 0, 1, 0))
-#   
-#   # Step 3: Smooth reporting time frames
-#   data <- data %>%
-#     group_by(panelvar) %>%
-#     arrange(date) %>%
-#     mutate(
-#       first_occurrence = cumsum(!is.na(completeness)),
-#       last_occurrence = rev(cumsum(rev(!is.na(completeness)))),
-#       num1 = row_number(),
-#       num2 = row_number(desc(date))
-#     ) %>%
-#     ungroup() %>%
-#     filter(
-#       !(first_occurrence == 0 & num1 > 12),  # Keep first 12 incomplete months
-#       !(last_occurrence == 0 & num2 > 12)   # Keep last 12 incomplete months
-#     )
-#   
-#   # Step 4: Aggregate completeness by admin area and indicator
-#   aggregate_data <- data %>%
-#     group_by(across(all_of(c(geo_cols, "year", "indicator_common_id")))) %>%
-#     summarise(
-#       total_facility_months = n(),
-#       reporting_facility_months = sum(completeness, na.rm = TRUE),
-#       completeness_percentage = (reporting_facility_months / total_facility_months) * 100,
-#       .groups = "drop"
-#     )
-#   
-#   # Prepare long format for DQA analysis
-#   long_format <- data %>%
-#     group_by(across(all_of(geo_cols)), indicator_common_id, year) %>%
-#     summarise(
-#       completeness_percentage = mean(completeness, na.rm = TRUE) * 100,
-#       total_facility_months = n(),
-#       reporting_facility_months = sum(completeness, na.rm = TRUE),
-#       .groups = "drop"
-#     )
-#   
-#   return(list(summary = aggregate_data, long_format = long_format))
-# }
-
-
-# PART 3 DQA
+# PART 4 DQA
 dqa_analysis <- function(completeness_data, consistency_data, geo_cols) {
   print("Performing DQA analysis...")
   
@@ -415,6 +375,7 @@ dqa_results <- dqa_analysis( completeness_results$long_format, consistency_data,
 print("Saving all data outputs from outlier analysis...")
 write.csv(outlier_data$outlier_data, "output_outliers.csv", row.names = FALSE)
 write.csv(outlier_data$top_outliers_data, "top_outliers_data.csv", row.names = FALSE)
+write.csv(outlier_data$volume_increase_data, "volume_increase_data.csv", row.names = FALSE)
 
 print("Saving all data outputs from consistency analysis...")
 write.csv(consistency_data, "output_consistency.csv", row.names = FALSE)
@@ -430,18 +391,36 @@ write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
 
 print("DQA analysis completed and outputs saved.")
 
-# Vizualisation  --------------------------------------------------------------
+# Visualization  --------------------------------------------------------------
 #SETUP
 viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
 
-# Generate Completeness Heatmap ------------------------------------------------
+# Outliers Heatmap (PART1)------------------------------------------------
+# Volume Increase Due to Outliers ------------------------
+print("this is still work_in_progress....")
+
+bar_chart <- ggplot(volume_increase_data, aes(x = month, y = percent_change, fill = admin_area_1)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~indicator_common_id, scales = "free_y") +
+  labs(
+    title = "Volume Change Due to Outliers",
+    x = "Month",
+    y = "% Change",
+    fill = "Administrative Area"
+  ) +
+  theme_minimal()
+print(bar_chart)
+
+
+# Completeness Heatmap (PART3)------------------------------------------------
 print("Creating completeness heatmap...")
+
 
 heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id, y = admin_area_2, fill = completeness_percentage)) +
   geom_tile(color = "white") +
   scale_fill_gradientn(
     colors = viz_colors,
-    values = rescale(c(0, 20, 50, 70, 100)),  # Adjust thresholds for your data
+    values = rescale(c(0, 20, 40, 60, 100)),  # Adjust thresholds for your data
     limits = c(0, 100),                       # Ensure the scale is [0, 100]
     name = "Completeness (%)"
   ) +
@@ -456,5 +435,6 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
     axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid = element_blank()
   )
+
 print(heatmap_plot)
 
