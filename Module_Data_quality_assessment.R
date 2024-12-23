@@ -32,9 +32,6 @@ load_and_preprocess_data <- function(file_path) {
 }
 
 # PART 1 OUTLIERS
-library(dplyr)
-library(lubridate)
-
 outlier_analysis <- function(data, geo_cols) {
   print("Performing outlier analysis...")
   
@@ -96,12 +93,11 @@ outlier_analysis <- function(data, geo_cols) {
   
   # Step 7: Calculate Monthly Volume Increase/Decrease
   print("Calculating monthly volume changes...")
-  # Adjust the grouping columns as needed to match how your data references geography/date
   volume_increase_data <- data %>%
     group_by(
       admin_area_1, 
       indicator_common_id, 
-      month = floor_date(date, "month")
+      month = floor_date(date, "month")  # Ensure 'date' column exists
     ) %>%
     summarise(
       total_volume = sum(count, na.rm = TRUE),
@@ -110,45 +106,71 @@ outlier_analysis <- function(data, geo_cols) {
       .groups = "drop"
     )
   
+  # Step 8: Create heatmap data dynamically with geographic flexibility
+  print("Creating heatmap data...")
+  heatmap_data <- data %>%
+    group_by(across(all_of(geo_cols)), indicator_common_id) %>%
+    summarise(
+      total_volume = sum(count, na.rm = TRUE),
+      adjusted_volume = sum(count_adjust, na.rm = TRUE),
+      percent_change = 100 * (total_volume - adjusted_volume) / adjusted_volume,
+      .groups = "drop"
+    ) %>%
+    pivot_wider(
+      id_cols = all_of(geo_cols),
+      names_from = indicator_common_id,
+      values_from = percent_change,
+      values_fill = 0
+    ) %>%
+    mutate(avg_indicators = rowMeans(select(., -all_of(geo_cols)), na.rm = TRUE)) %>%
+    select(all_of(geo_cols), avg_indicators, everything())
+  
+  # Return all relevant datasets
   return(list(
     outlier_data = data,
     top_outliers_data = top_outliers_data,
-    volume_increase_data = volume_increase_data
+    volume_increase_data = volume_increase_data,
+    heatmap_data = heatmap_data
   ))
 }
 
 # PART 2 CONSISTENCY
 consistency_analysis <- function(data, geo_cols) {
   print("Performing consistency analysis...")
-
-  # Step 1: Check Available Indicators
+  
+  # Step 1: Identify Available Indicators
   print("Checking available indicators...")
   indicators <- unique(data$indicator_common_id)
   print(paste("Available indicators:", paste(indicators, collapse = ", ")))
-
+  
+  # Define required pairs for consistency checks
   required_pairs <- list(
     anc = c("anc1", "anc4"),
     delivery = c("delivery", "bcg"),
     pnc = c("delivery", "pnc1")
   )
-
+  
+  # Filter out missing indicator pairs based on available data
   pairs_to_check <- list()
   for (key in names(required_pairs)) {
     if (all(required_pairs[[key]] %in% indicators)) {
       pairs_to_check[[key]] <- required_pairs[[key]]
+    } else {
+      print(paste("Skipping consistency check for", key, "due to missing indicators."))
     }
   }
-
+  
+  # If no valid pairs are available, return an empty data frame
   if (length(pairs_to_check) == 0) {
     print("No valid indicator pairs available for consistency analysis.")
     return(data.frame())
   }
-
+  
   # Step 2: Exclude Outliers
   print("Excluding outliers...")
   data <- data %>%
     mutate(volume = ifelse(outlier == 1, NA, count))
-
+  
   # Step 3: Aggregate Data
   date_summary <- data %>%
     group_by(indicator_common_id, year) %>%
@@ -157,7 +179,7 @@ consistency_analysis <- function(data, geo_cols) {
       date_max = max(date, na.rm = TRUE),
       .groups = "drop"
     )
-
+  
   aggregated_data <- data %>%
     group_by(across(all_of(c(geo_cols, "indicator_common_id", "year")))) %>%
     summarise(
@@ -166,13 +188,13 @@ consistency_analysis <- function(data, geo_cols) {
       .groups = "drop"
     ) %>%
     left_join(date_summary, by = c("indicator_common_id", "year"))
-
+  
   # Clean and prepare indicator types
   aggregated_data <- aggregated_data %>%
     mutate(indictemp = str_replace_all(indicator_common_id, " ", "_")) %>%
     filter(!str_detect(indictemp, "\\+")) %>%
     drop_na(any_of(tail(geo_cols, 1)))
-
+  
   # Step 4: Calculate Consistency Ratios
   print("Calculating consistency ratios...")
   wide_data <- aggregated_data %>%
@@ -183,15 +205,19 @@ consistency_analysis <- function(data, geo_cols) {
       names_sep = "_",
       values_fill = list(volume = 0, volIM = 0)
     )
-
+  
+  # Add consistency calculations dynamically based on pairs_to_check
   if (!is.null(pairs_to_check$anc)) {
     wide_data <- wide_data %>%
       mutate(
         ratio_anc1 = if_else(volume_anc4 > 0, volume_anc1 / volume_anc4, NA_real_),
         sratio_anc1 = if_else(!is.na(ratio_anc1) & ratio_anc1 > 1, 1, 0)
       )
+  } else {
+    wide_data <- wide_data %>%
+      mutate(sratio_anc1 = NA_real_)
   }
-
+  
   if (!is.null(pairs_to_check$delivery)) {
     wide_data <- wide_data %>%
       mutate(
@@ -200,8 +226,11 @@ consistency_analysis <- function(data, geo_cols) {
           !is.na(ratio_delivery) & ratio_delivery >= 0.7 & ratio_delivery <= 1.3, 1, 0
         )
       )
+  } else {
+    wide_data <- wide_data %>%
+      mutate(sratio_delivery = NA_real_)
   }
-
+  
   if (!is.null(pairs_to_check$pnc)) {
     wide_data <- wide_data %>%
       mutate(
@@ -210,8 +239,11 @@ consistency_analysis <- function(data, geo_cols) {
           !is.na(ratio_pnc1) & ratio_pnc1 >= 0.7 & ratio_pnc1 <= 1.3, 1, 0
         )
       )
+  } else {
+    wide_data <- wide_data %>%
+      mutate(sratio_pnc1 = NA_real_)
   }
-
+  
   # Reshape Data Back to Long Format
   print("Reshaping data back to long format...")
   long_data <- wide_data %>%
@@ -229,9 +261,11 @@ consistency_analysis <- function(data, geo_cols) {
       )
     ) %>%
     select(any_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
-
+  
   return(long_data)
 }
+
+
 # PART 3 COMPLETENESS
 completeness_analysis <- function(data, geo_cols) {
   print("Performing completeness analysis...")
@@ -356,7 +390,7 @@ dqa_analysis <- function(completeness_data, consistency_data, geo_cols) {
 
 
 # Main Execution --------------------------------------------------------------
-inputs <- load_and_preprocess_data("example_imported_data_bangladesh.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -396,10 +430,38 @@ print("DQA analysis completed and outputs saved.")
 viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
 
 # Outliers Heatmap (PART1)------------------------------------------------
-# Volume Increase Due to Outliers ------------------------
-print("this is still work_in_progress....")
+# Create the heatmap
+heatmap_outliers <- outlier_data$heatmap_data %>%
+  pivot_longer(
+    cols = -all_of(geo_cols), # Exclude all geographic columns dynamically
+    names_to = "indicator", 
+    values_to = "percent_change"
+  ) %>%
+  mutate(
+    indicator = factor(indicator, levels = c("avg_indicators", sort(setdiff(unique(indicator), "avg_indicators"))))
+  ) %>%
+  ggplot(aes(x = indicator, y = admin_area_2, fill = percent_change)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(
+    low = "#1a9641", mid = "#ffffbf", high = "#d7191c",
+    midpoint = 0, na.value = "grey50"
+  ) +
+  labs(
+    title = "Percent Change of Volume Due to Outliers",
+    x = "Indicator",
+    y = "Administrative Area",
+    fill = "% Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
+    panel.grid = element_blank() # Remove gridlines
+  )
+print(heatmap_outliers)
 
-bar_chart <- ggplot(volume_increase_data, aes(x = month, y = percent_change, fill = admin_area_1)) +
+
+# Volume Increase Due to Outliers ------------------------
+bar_chart <- ggplot(outlier_data$volume_increase_data, aes(x = month, y = percent_change, fill = admin_area_1)) +
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~indicator_common_id, scales = "free_y") +
   labs(
