@@ -2,18 +2,20 @@
 # Last edit: 2024 Dec 23
 
 
-#DATA: sierraleone_imported_dataset.csv
+#DATA: guinea_imported_dataset.csv
 
 
-# FILE: output_outliers.csv
-# FILE: top_outliers_data.csv
-# FILE: volume_increase_data.csv
-# FILE: output_consistency.csv
-# FILE: completeness_summary.csv
-# FILE: completeness_long_format.csv
-# FILE: completeness_aggregate.csv
-# FILE: dqa_data.csv
-# FILE: dqa_summary.csv
+# FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
+# FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
+# FILE: volume_increase_data.csv      # Monthly summary of volume changes due to outlier adjustments.
+# FILE: output_consistency.csv        # Results of consistency analysis, including ratio calculations and consistency flags.
+# FILE: completeness_summary.csv      # Aggregated completeness data at various geographic levels (e.g., national, regional).
+# FILE: completeness_long_format.csv  # Facility-level completeness data in a detailed long format, including reported and expected months.
+# FILE: completeness_aggregate.csv    # Aggregated completeness data summarizing facility-month reporting across geographic levels.
+# FILE: facility_dqa.csv              # Facility-level results from DQA analysis, including completeness, outlier, and consistency flags.
+# FILE: dqa_summary.csv               # Summary of DQA results by geography and indicator, with aggregated scores and flags.
+# FILE: overall_dqa.csv               # Geographic-level summary of overall data quality, including aggregated DQA scores and metrics.
+
 
 
 # Load Required Libraries -----------------------------------------------------
@@ -334,63 +336,90 @@ completeness_analysis <- function(data, geo_cols) {
 }
 
 # PART 4 DQA
-dqa_analysis <- function(completeness_data, consistency_data, geo_cols) {
+dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_cols) {
   print("Performing DQA analysis...")
   
-  # Step 1: Check if Consistency Data is Available
-  if (nrow(consistency_data) == 0) {
-    print("Skipping DQA analysis: Consistency analysis was not performed.")
-    return(list(
-      dqa_data = data.frame(),
-      dqa_summary = data.frame(message = "DQA analysis skipped: No consistency data available.")
-    ))
-  }
-  
-  # Step 2: Map Consistency Data to Indicators
-  consistency_mapping <- tibble(
+  # Step 1: Map ratio_type to indicator_common_id in consistency_data
+  ratio_mapping <- tibble(
     ratio_type = c("ratio_anc1", "ratio_delivery", "ratio_pnc1"),
     indicator_common_id = c("anc1", "delivery", "pnc1")
   )
   
   consistency_data <- consistency_data %>%
-    inner_join(consistency_mapping, by = "ratio_type")
+    left_join(ratio_mapping, by = "ratio_type")
   
-  # Step 3: Merge Completeness with Consistency
+  # Step 2: Deduplicate Input Data
+  completeness_data <- completeness_data %>%
+    distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
+  
+  consistency_data <- consistency_data %>%
+    distinct(across(all_of(c(geo_cols, "year", "indicator_common_id"))), .keep_all = TRUE)
+  
+  outlier_data <- outlier_data %>%
+    distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
+  
+  # Step 3: Merge Completeness, Consistency, and Outlier Data
+  print("Merging completeness, consistency, and outlier data...")
   merged_data <- completeness_data %>%
     left_join(
-      consistency_data %>%
-        select(any_of(c(geo_cols, "year", "indicator_common_id", "sconsistency"))),
+      outlier_data %>% select(all_of(geo_cols), facility_id, year, indicator_common_id, outlier_flag = outlier), 
+      by = c(geo_cols, "facility_id", "year", "indicator_common_id")
+    ) %>%
+    left_join(
+      consistency_data %>% select(all_of(geo_cols), year, indicator_common_id, sconsistency), 
       by = c(geo_cols, "year", "indicator_common_id")
     )
   
-  # Step 4: Apply DQA Rules
-  print("Applying DQA rules")
+  # Step 4: Calculate Facility-Level DQA Flags
+  print("Calculating facility-level DQA flags...")
   merged_data <- merged_data %>%
     mutate(
-      dqa_flag = case_when(
-        indicator_common_id %in% c("opd", "penta1", "anc1") & completeness_percentage == 100 ~ 1,
-        indicator_common_id == "penta1" & sconsistency == 0 ~ 0,
-        indicator_common_id == "anc1" & sconsistency == 0 ~ 0,
+      dqa_temp = case_when(
+        indicator_common_id %in% c("opd", "penta1", "anc1") & 
+          completeness_percentage == 100 & 
+          outlier_flag == 0 &
+          (is.na(sconsistency) | sconsistency == 1) ~ 1,
         TRUE ~ 0
       )
     )
   
-  # Step 5: Summarize DQA Results
-  print("Summarizing DQA results")
+  # Step 5: Aggregate DQA Results by Geography and Indicator
+  print("Aggregating DQA results...")
   dqa_summary <- merged_data %>%
-    group_by(across(all_of(geo_cols)), indicator_common_id) %>%
+    group_by(across(all_of(c(geo_cols, "year", "indicator_common_id")))) %>%
     summarise(
-      avg_dqa_flag = mean(dqa_flag, na.rm = TRUE),
-      total_flags = sum(dqa_flag, na.rm = TRUE),
+      dqa_score = mean(dqa_temp, na.rm = TRUE),
+      total_flags = sum(dqa_temp, na.rm = TRUE),
+      completeness_avg = mean(completeness_percentage, na.rm = TRUE),
+      outlier_count = sum(outlier_flag, na.rm = TRUE),
+      consistency_failures = sum(ifelse(is.na(sconsistency), 0, 1 - sconsistency), na.rm = TRUE),
       .groups = "drop"
     )
   
-  return(list(dqa_data = merged_data, dqa_summary = dqa_summary))
+  # Step 6: Calculate Overall Scores at Geographic Levels and Split by Year
+  print("Calculating overall scores at geographic levels by year...")
+  overall_dqa <- dqa_summary %>%
+    group_by(across(all_of(c(geo_cols, "year")))) %>%  # Include 'year' in grouping
+    summarise(
+      overall_dqa_score = mean(dqa_score, na.rm = TRUE),
+      total_indicators = n(),
+      completeness_avg = mean(completeness_avg, na.rm = TRUE),
+      total_outlier_count = sum(outlier_count, na.rm = TRUE),
+      total_consistency_failures = sum(consistency_failures, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # Return Results
+  return(list(
+    facility_dqa = merged_data,
+    dqa_summary = dqa_summary,
+    overall_dqa = overall_dqa
+  ))
 }
 
 
 # Main Execution --------------------------------------------------------------
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 # Main Execution --------------------------------------------------------------
@@ -403,8 +432,7 @@ consistency_data <- consistency_analysis(outlier_data$outlier_data, geo_cols)
 print("Running completeness analysis...")
 completeness_results <- completeness_analysis(outlier_data$outlier_data, geo_cols)
 print("Running DQA analysis...")
-dqa_results <- dqa_analysis( completeness_results$long_format, consistency_data, geo_cols)
-
+dqa_results <- dqa_analysis(completeness_data = completeness_results$long_format, consistency_data = consistency_data, outlier_data = outlier_data$outlier_data, geo_cols = geo_cols)
 # Visualization  --------------------------------------------------------------
 #SETUP
 viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
