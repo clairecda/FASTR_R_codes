@@ -205,21 +205,6 @@ generate_national_results <- function(cleaned_data) {
 
 
 # 5. Visualizations
-plot_control_chart <- function(data) {
-  ggplot(data, aes(x = date, y = total_volume)) +
-    geom_line(color = "black") +
-    geom_point(data = data %>% filter(tag == 1), aes(y = total_volume), color = "red") +
-    geom_hline(aes(yintercept = mean(total_volume, na.rm = TRUE)), linetype = "dashed", color = "blue") +
-    labs(
-      title = "Control Chart",
-      x = "Date",
-      y = "Volume",
-      caption = "Red points indicate anomalies"
-    ) +
-    theme_minimal()
-}
-
-
 plot_national_grid <- function(national_data) {
   # Create a combined grid plot for all indicators
   ggplot(national_data, aes(x = date, y = total_volume)) +
@@ -242,7 +227,7 @@ plot_national_grid <- function(national_data) {
 }
 
 # Main Script -----------------------------------------------------------------
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
