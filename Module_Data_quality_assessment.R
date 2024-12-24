@@ -1,9 +1,7 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2024 Dec 23
-
+# Last edit: 2024 Dec 24
 
 #DATA: guinea_imported_dataset.csv
-
 
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
 # FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
@@ -16,6 +14,9 @@
 # FILE: dqa_summary.csv               # Summary of DQA results by geography and indicator, with aggregated scores and flags.
 # FILE: overall_dqa.csv               # Geographic-level summary of overall data quality, including aggregated DQA scores and metrics.
 
+# IMAGE: outliers_heatmap.png         # Heatmap visualization showing the percent change due to outliers by administrative region and indicator.
+# IMAGE: completeness_heatmap.png     # Heatmap visualization representing the completeness percentage by administrative region and indicator.
+# IMAGE: bar_chart_volume_change.png  # Bar chart showing monthly percentage changes in volume due to outlier adjustments, by region and indicator.
 
 
 # Load Required Libraries -----------------------------------------------------
@@ -525,5 +526,11 @@ print("Saving all data outputs from DQA analysis...")
 write.csv(dqa_results$facility_dqa, "facility_dqa.csv", row.names = FALSE)
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
 write.csv(dqa_results$overall_dqa, "overall_dqa.csv", row.names = FALSE)
+
+print("Saving all plots...")
+ggsave("outliers_heatmap.png", plot = heatmap_outliers, width = 12, height = 8)
+ggsave("completeness_heatmap.png", plot = heatmap_plot, width = 12, height = 8)
+ggsave("bar_chart_volume_change.png", plot = bar_chart, width = 12, height = 8)
+
 
 print("DQA analysis completed and outputs saved.")
