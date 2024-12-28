@@ -7,8 +7,8 @@
 # FILE: national_results.csv            # National-level trends with control limits for each indicator.
 # IMAGE: national_grid_plot.png         # Grid plot of national-level trends for all indicators, with control limits.
 
-# Description of Current Approach:
-# - Deseasonalized volumes are calculated by subtracting monthly averages (volume_predict = total_volume - monthly_mean).
+# Description of current approach:
+# - De-seasonalized volumes are calculated by subtracting monthly averages (volume_predict = total_volume - monthly_mean).
 # - A 12-month rolling average (rollmean()) is used to smooth the data and highlight trends.
 # - Next step: Implement regression-based deseasonalization to replicate the Stata script.
 
@@ -19,8 +19,7 @@ library(lubridate)
 library(zoo)  # For interpolation
 
 # Define Functions -----------------------------------------------------------
-
-# 1. Load and Preprocess Data
+# PART 1 Load and Preprocess Data
 load_and_preprocess_data <- function(file_path) {
   print("Loading and preprocessing data...")
   data <- read.csv(file_path)
@@ -30,7 +29,7 @@ load_and_preprocess_data <- function(file_path) {
   return(list(data = data, geo_cols = geo_cols))
 }
 
-# 2. Outlier Analysis
+# PART 2 Outlier Analysis
 outlier_analysis <- function(data, geo_cols) {
   print("Performing outlier analysis...")
   
@@ -133,8 +132,7 @@ outlier_analysis <- function(data, geo_cols) {
   ))
 }
 
-
-# 3. Control Chart Analysis Function --------------------------------------------
+# PART 3 Control Chart Analysis Function --------------------------------------------
 control_chart_analysis <- function(cleaned_data, geo_cols) {
   print("Performing control chart analysis...")
   
@@ -174,7 +172,7 @@ control_chart_analysis <- function(cleaned_data, geo_cols) {
   return(deseasonalized_data)
 }
 
-# 4. National Aggregation
+# PART 4 National Aggregation
 generate_national_results <- function(cleaned_data) {
   print("Generating national-level results with control limits...")
   unique_indicators <- unique(cleaned_data$indicator_common_id)
@@ -204,7 +202,7 @@ generate_national_results <- function(cleaned_data) {
 }
 
 
-# 5. Visualizations
+# PART 5 Visualizations
 plot_national_grid <- function(national_data) {
   # Create a combined grid plot for all indicators
   ggplot(national_data, aes(x = date, y = total_volume)) +
@@ -232,20 +230,25 @@ data <- inputs$data
 geo_cols <- inputs$geo_cols
 
 # Perform outlier analysis
+print("Running outlier analysis...")
 outlier_results <- outlier_analysis(data, geo_cols)
 cleaned_data <- outlier_results$outlier_data
 
 # Perform control chart analysis
+print("Running control chart analysis...")
 control_chart_results <- control_chart_analysis(cleaned_data, geo_cols)
 
 # Generate national results
+print("Generating national results...")
 national_results <- generate_national_results(cleaned_data)
 
-# Visualise all indicators in a single grid plot
+# Visualize all indicators in a single grid plot
+print("Visualizing all indicators in a single grid plot...")
 national_grid_plot <- plot_national_grid(national_results)
 print(national_grid_plot)
 
 # Save Outputs
+print("Saving plot and results...")
 ggsave("national_grid_plot.png", plot = national_grid_plot, width = 12, height = 8)
 write.csv(control_chart_results, "control_chart_results.csv", row.names = FALSE)
 write.csv(national_results, "national_results.csv", row.names = FALSE)
