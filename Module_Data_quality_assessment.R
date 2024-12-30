@@ -1,7 +1,7 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2024 Dec 24
+# Last edit: 2024 Dec 30
 
-#DATA: guinea_imported_dataset.csv
+#DATA: sierraleone_imported_dataset.csv
 
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
 # FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
@@ -13,24 +13,29 @@
 # FILE: facility_dqa.csv              # Facility-level results from DQA analysis, including completeness, outlier, and consistency flags.
 # FILE: dqa_summary.csv               # Summary of DQA results by geography and indicator, with aggregated scores and flags.
 # FILE: overall_dqa.csv               # Geographic-level summary of overall data quality, including aggregated DQA scores and metrics.
+# FILE: adjusted_data.csv             # Dataset including facility-level adjusted volumes for all adjustment scenarios.
+# FILE: adjusted_national_results.csv # National-level dataset summarizing adjusted service volumes for each scenario.
+
 
 # IMAGE: outliers_heatmap.png         # Heatmap visualization showing the percent change due to outliers by administrative region and indicator.
 # IMAGE: completeness_heatmap.png     # Heatmap visualization representing the completeness percentage by administrative region and indicator.
 # IMAGE: bar_chart_volume_change.png  # Bar chart showing monthly percentage changes in volume due to outlier adjustments, by region and indicator.
+# IMAGE: adjusted_data.png            # Grid plot of national-level trends for all indicators, for all adjustment scenarios
 
 
 # Load Required Libraries -----------------------------------------------------
 library(tidyverse)
 library(scales)
 
-
 # Define Functions -----------------------------------------------------------
 load_and_preprocess_data <- function(file_path) {
   print("Loading and preprocessing data...")
-  data <- read.csv(file_path)
+  data <- read.csv(file_path) %>%
+    mutate(
+      date = as.Date(paste(year, month, "1", sep = "-")),
+      panelvar = paste(indicator_common_id, facility_id, sep = "_")
+    )  # Add date column here
   geo_cols <- colnames(data)[grepl("^admin_area_", colnames(data))]
-  data <- data %>%
-    mutate(date = ymd(paste(year, month, "1", sep = "-")))
   return(list(data = data, geo_cols = geo_cols))
 }
 
@@ -336,54 +341,54 @@ completeness_analysis <- function(data, geo_cols) {
   return(list(summary = aggregate_data, long_format = long_format))
 }
 
-# PART 4 DQA
+# PART 4 DQA ## keep - but adjust to run on adjusted data -- note adjusted data should include all geo columns 
 dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_cols) {
   print("Performing DQA analysis...")
-  
+
   # Step 1: Map ratio_type to indicator_common_id in consistency_data
   ratio_mapping <- tibble(
     ratio_type = c("ratio_anc1", "ratio_delivery", "ratio_pnc1"),
     indicator_common_id = c("anc1", "delivery", "pnc1")
   )
-  
+
   consistency_data <- consistency_data %>%
     left_join(ratio_mapping, by = "ratio_type")
-  
+
   # Step 2: Deduplicate Input Data
   completeness_data <- completeness_data %>%
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
-  
+
   consistency_data <- consistency_data %>%
     distinct(across(all_of(c(geo_cols, "year", "indicator_common_id"))), .keep_all = TRUE)
-  
+
   outlier_data <- outlier_data %>%
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
-  
+
   # Step 3: Merge Completeness, Consistency, and Outlier Data
   print("Merging completeness, consistency, and outlier data...")
   merged_data <- completeness_data %>%
     left_join(
-      outlier_data %>% select(all_of(geo_cols), facility_id, year, indicator_common_id, outlier_flag = outlier), 
+      outlier_data %>% select(all_of(geo_cols), facility_id, year, indicator_common_id, outlier_flag = outlier),
       by = c(geo_cols, "facility_id", "year", "indicator_common_id")
     ) %>%
     left_join(
-      consistency_data %>% select(all_of(geo_cols), year, indicator_common_id, sconsistency), 
+      consistency_data %>% select(all_of(geo_cols), year, indicator_common_id, sconsistency),
       by = c(geo_cols, "year", "indicator_common_id")
     )
-  
+
   # Step 4: Calculate Facility-Level DQA Flags
   print("Calculating facility-level DQA flags...")
   merged_data <- merged_data %>%
     mutate(
       dqa_temp = case_when(
-        indicator_common_id %in% c("opd", "penta1", "anc1") & 
-          completeness_percentage == 100 & 
+        indicator_common_id %in% c("opd", "penta1", "anc1") &
+          completeness_percentage == 100 &
           outlier_flag == 0 &
           (is.na(sconsistency) | sconsistency == 1) ~ 1,
         TRUE ~ 0
       )
     )
-  
+
   # Step 5: Aggregate DQA Results by Geography and Indicator
   print("Aggregating DQA results...")
   dqa_summary <- merged_data %>%
@@ -396,7 +401,7 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
       consistency_failures = sum(ifelse(is.na(sconsistency), 0, 1 - sconsistency), na.rm = TRUE),
       .groups = "drop"
     )
-  
+
   # Step 6: Calculate Overall Scores at Geographic Levels and Split by Year
   print("Calculating overall scores at geographic levels by year...")
   overall_dqa <- dqa_summary %>%
@@ -409,7 +414,7 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
       total_consistency_failures = sum(consistency_failures, na.rm = TRUE),
       .groups = "drop"
     )
-  
+
   # Return Results
   return(list(
     facility_dqa = merged_data,
@@ -419,8 +424,133 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
 }
 
 
+# PART 5: Dynamic Adjustments -----------------------------------------------
+apply_adjustments <- function(data,
+                              outlier_data,
+                              completeness_data,
+                              geo_cols,
+                              adjust_outliers = FALSE,
+                              adjust_completeness = FALSE) {
+  cat("Applying dynamic adjustments...\n")
+  
+  # Step 1: Merge “outlier flags” and “count_adjust” into the main data
+  data_merged <- data %>%
+    left_join(
+      outlier_data %>%
+        select(
+          facility_id, indicator_common_id, year, month,
+          outlier, count_adjust
+        ),
+      by = c("facility_id", "indicator_common_id", "year", "month")
+    )
+  
+  # Step 2: Merge completeness info (assuming completeness_data is at facility-year-indicator level)
+  data_merged <- data_merged %>%
+    left_join(
+      completeness_data %>%
+        select(
+          facility_id, indicator_common_id, year,
+          completeness_percentage
+        ),
+      by = c("facility_id", "indicator_common_id", "year")
+    )
+  
+  # Step 3: Create a working column “count_working” that starts as the raw “count”
+  data_merged <- data_merged %>%
+    mutate(count_working = count)  # Keep an original reference to the raw count
+  
+  # Step 4: If adjust_outliers is TRUE, replace raw counts with outlier-adjusted counts
+  if (adjust_outliers) {
+    cat(" -> Replacing raw counts with outlier-adjusted counts...\n")
+    data_merged <- data_merged %>%
+      mutate(
+        count_working = if_else(
+          !is.na(count_adjust),
+          count_adjust,     # If we have an adjusted value for outliers
+          count_working     # Otherwise keep the original
+        )
+      )
+  }
+  
+  # Step 5: If adjust_completeness is TRUE, scale “count_working” by fraction_reported
+  #         fraction_reported = completeness_percentage / 100
+  if (adjust_completeness) {
+    cat(" -> Scaling counts by completeness fraction...\n")
+    data_merged <- data_merged %>%
+      mutate(
+        fraction_reported = completeness_percentage / 100,
+        count_working = if_else(
+          !is.na(fraction_reported) & fraction_reported > 0,
+          count_working / fraction_reported,  # Scale up if fraction < 1
+          count_working                       # If fraction is NA or 0, keep as-is
+        )
+      )
+  }
+  
+  # Step 6: Rename the final adjusted column to something consistent, e.g. “count_final”
+  data_merged <- data_merged %>%
+    mutate(count_final = count_working)
+  
+  # Step 7: Print a summary of the differences
+  diff_summary <- data_merged %>%
+    mutate(diff = count_final - count) %>%
+    summarise(
+      n_changed_rows = sum(diff != 0, na.rm = TRUE),
+      mean_diff      = mean(diff, na.rm = TRUE),
+      max_diff       = max(diff, na.rm = TRUE)
+    )
+  
+  cat("Summary of changes from original 'count' to 'count_final':\n")
+  cat("  Rows changed:", diff_summary$n_changed_rows, "\n")
+  cat("  Mean diff:   ", round(diff_summary$mean_diff, 2), "\n")
+  cat("  Max diff:    ", round(diff_summary$max_diff, 2), "\n")
+  
+  # Step 8: Return the merged dataset with the new “count_final” column
+  return(data_merged)
+}
+
+apply_adjustments_scenarios <- function(data,
+                                        outlier_data,
+                                        completeness_data,
+                                        geo_cols) {
+  join_cols <- c(geo_cols, "facility_id", "indicator_common_id", "year", "month", "period_id")
+  
+  scenarios <- list(
+    none = list(adjust_outliers = FALSE, adjust_completeness = FALSE),
+    outliers = list(adjust_outliers = TRUE, adjust_completeness = FALSE),
+    completeness = list(adjust_outliers = FALSE, adjust_completeness = TRUE),
+    both = list(adjust_outliers = TRUE, adjust_completeness = TRUE)
+  )
+  
+  results <- lapply(names(scenarios), function(name) {
+    adjustment <- scenarios[[name]]
+    data_adjusted <- apply_adjustments(
+      data = data,
+      outlier_data = outlier_data,
+      completeness_data = completeness_data,
+      geo_cols = geo_cols,
+      adjust_outliers = adjustment$adjust_outliers,
+      adjust_completeness = adjustment$adjust_completeness
+    ) %>%
+      select(all_of(join_cols), count_final) %>%
+      rename_with(~ paste0("count_final_", name), "count_final")
+    return(data_adjusted)
+  })
+  
+  # Merge all four results into one wide dataset
+  df_merged <- Reduce(function(x, y) left_join(x, y, by = join_cols), results)
+  
+  # Add the `date` column to the merged dataset
+  df_merged <- df_merged %>%
+    mutate(date = as.Date(paste(year, month, "1", sep = "-")))
+  
+  return(df_merged)
+}
+
+
+
 # Main Execution --------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 # Main Execution --------------------------------------------------------------
@@ -428,12 +558,29 @@ geo_cols <- inputs$geo_cols
 
 print("Running outlier analysis...")
 outlier_data <- outlier_analysis(data, geo_cols)
+
 print("Running consistency analysis...")
 consistency_data <- consistency_analysis(outlier_data$outlier_data, geo_cols)
+
 print("Running completeness analysis...")
 completeness_results <- completeness_analysis(outlier_data$outlier_data, geo_cols)
+
 print("Running DQA analysis...")
-dqa_results <- dqa_analysis(completeness_data = completeness_results$long_format, consistency_data = consistency_data, outlier_data = outlier_data$outlier_data, geo_cols = geo_cols)
+dqa_results <- dqa_analysis(
+  completeness_data = completeness_results$long_format,
+  consistency_data = consistency_data,
+  outlier_data = outlier_data$outlier_data,
+  geo_cols = geo_cols)
+
+print("Running adjustments analysis...")
+adjusted_data <- apply_adjustments_scenarios(
+  data              = data,
+  outlier_data      = outlier_data$outlier_data,   # or outlier_data if named differently
+  completeness_data = completeness_results$long_format,
+  geo_cols          = geo_cols
+)
+
+
 # Visualization  --------------------------------------------------------------
 #SETUP
 viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
@@ -489,7 +636,7 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
   geom_tile(color = "white") +
   scale_fill_gradientn(
     colors = viz_colors,
-    values = rescale(c(0, 25, 50, 90, 100)),  # Adjust thresholds for your data
+    values = rescale(c(0, 25, 50, 90, 100)),  # Adjust thresholds
     limits = c(0, 100),                       # Ensure the scale is [0, 100]
     name = "Completeness (%)"
   ) +
@@ -508,7 +655,92 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
 print(heatmap_plot)
 
 
-# Save Outputs
+# ADJUSTED DATA // control chart (data prep) ------------------------------------------------
+generate_adjusted_national_results <- function(adjusted_data) {
+  print("Generating national-level results for adjusted data...")
+  unique_indicators <- unique(adjusted_data$indicator_common_id)
+  
+  national_results <- lapply(unique_indicators, function(indicator) {
+    indicator_data <- adjusted_data %>%
+      filter(indicator_common_id == indicator) %>%
+      pivot_longer(
+        cols = starts_with("count_final"), 
+        names_to = "scenario",
+        values_to = "total_volume"
+      ) %>%
+      mutate(
+        scenario = recode(
+          scenario,
+          "count_final_none" = "Unadjusted",
+          "count_final_outliers" = "Outlier Adjusted",
+          "count_final_completeness" = "Completeness Adjusted",
+          "count_final_both" = "Both Adjusted"
+        )
+      ) %>%
+      group_by(date, scenario) %>%
+      summarise(
+        total_volume = sum(total_volume, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        indicator = indicator
+      )
+    
+    return(indicator_data)
+  }) %>%
+    bind_rows()
+  
+  return(national_results)
+}
+
+# ADJUSTED DATA // control chart (plot) --------------------------------------------------------------
+plot_adjusted_national_grid <- function(national_data) {
+  # Create a combined grid plot for all indicators and scenarios
+  ggplot(national_data, aes(x = date, y = total_volume, color = scenario)) +
+    geom_line(size = 0.8) +
+    facet_wrap(~indicator, scales = "free_y") +  # Create one subplot per indicator
+    labs(
+      title = "Control Chart with Adjusted Scenarios",
+      subtitle = "Change in service volumes over time for different adjustment scenarios",
+      x = "Year",
+      y = "Total Volume",
+      caption = "Scenarios: Unadjusted, Outlier Adjusted, Completeness Adjusted, Both Adjusted"
+    ) +
+    scale_color_manual(
+      values = c(
+        "Unadjusted" = "lightblue",  # Grey color for Unadjusted
+        "Outlier Adjusted" = "blue",  # Blue for Outlier Adjusted
+        "Completeness Adjusted" = "orange",  # Orange for Completeness Adjusted
+        "Both Adjusted" = "red"  # Red for Both Adjusted
+      ),
+      breaks = c(
+        "Unadjusted",
+        "Outlier Adjusted",
+        "Completeness Adjusted",
+        "Both Adjusted"
+      ),
+      labels = c(
+        "Unadjusted",
+        "Outlier Adjusted",
+        "Completeness Adjusted",
+        "Both Adjusted"
+      )
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(size = 10),  # Adjust facet labels
+      axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels
+      legend.position = "bottom"  # Move legend to bottom
+    )
+}
+
+
+adjusted_national_results <- generate_adjusted_national_results(adjusted_data)
+print("Plotting adjusted national grid...")
+adjusted_national_plot <- plot_adjusted_national_grid(adjusted_national_results)
+print(adjusted_national_plot)
+
+# Save Outputs ------------------------------------------------------------------------------------
 print("Saving all data outputs from outlier analysis...")
 write.csv(outlier_data$outlier_data, "output_outliers.csv", row.names = FALSE)
 write.csv(outlier_data$top_outliers_data, "top_outliers_data.csv", row.names = FALSE)
@@ -520,17 +752,23 @@ write.csv(consistency_data, "output_consistency.csv", row.names = FALSE)
 print("Saving all data outputs from conpleteness analysis...")
 write.csv(completeness_results$summary, "completeness_summary.csv", row.names = FALSE)
 write.csv(completeness_results$long_format, "completeness_long_format.csv", row.names = FALSE)
-write.csv(completeness_results$aggregate, "completeness_aggregate.csv", row.names = FALSE)
+
 
 print("Saving all data outputs from DQA analysis...")
 write.csv(dqa_results$facility_dqa, "facility_dqa.csv", row.names = FALSE)
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
 write.csv(dqa_results$overall_dqa, "overall_dqa.csv", row.names = FALSE)
 
+
+
+print("Saving adjusted data...")
+write.csv(adjusted_data, "adjusted_data.csv", row.names = FALSE)
+write.csv(adjusted_national_results, "adjusted_national_results.csv", row.names = FALSE)
+
 print("Saving all plots...")
 ggsave("outliers_heatmap.png", plot = heatmap_outliers, width = 12, height = 8)
 ggsave("completeness_heatmap.png", plot = heatmap_plot, width = 12, height = 8)
 ggsave("bar_chart_volume_change.png", plot = bar_chart, width = 12, height = 8)
-
+ggsave("adjusted_data.png", plot = adjusted_national_plot, width = 12, height = 8)
 
 print("DQA analysis completed and outputs saved.")
