@@ -29,6 +29,7 @@ load_and_preprocess_data <- function(file_path) {
   return(list(data = data, geo_cols = geo_cols))
 }
 
+
 # PART 2 Outlier Analysis
 outlier_analysis <- function(data, geo_cols) {
   print("Performing outlier analysis...")
@@ -74,65 +75,11 @@ outlier_analysis <- function(data, geo_cols) {
     ) %>%
     ungroup()
   
-  # Step 6: Generate Dataset for Reporting Top Outliers
-  print("Generating dataset for reporting top outliers...")
-  top_outliers_data <- data %>%
-    filter(outlier == 1) %>%
-    mutate(percent_change = (count - count_adjust) / count_adjust) %>%
-    group_by(indicator_common_id, facility_id) %>%
-    summarise(
-      max_percent_change = max(percent_change, na.rm = TRUE),
-      mean_volIM = mean(volIM, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    group_by(indicator_common_id) %>%
-    slice_max(order_by = max_percent_change, n = 5, with_ties = FALSE) %>%
-    ungroup()
-  
-  # Step 7: Calculate Monthly Volume Increase/Decrease
-  print("Calculating monthly volume changes...")
-  volume_increase_data <- data %>%
-    group_by(
-      admin_area_1, 
-      indicator_common_id, 
-      month = floor_date(date, "month")  # Ensure 'date' column exists
-    ) %>%
-    summarise(
-      total_volume = sum(count, na.rm = TRUE),
-      adjusted_volume = sum(count_adjust, na.rm = TRUE),
-      percent_change = 100 * (total_volume - adjusted_volume) / adjusted_volume,
-      .groups = "drop"
-    )
-  
-  # Step 8: Create heatmap data dynamically with geographic flexibility
-  print("Creating heatmap data...")
-  heatmap_data <- data %>%
-    group_by(across(all_of(geo_cols)), indicator_common_id) %>%
-    summarise(
-      total_volume = sum(count, na.rm = TRUE),
-      adjusted_volume = sum(count_adjust, na.rm = TRUE),
-      percent_change = 100 * (total_volume - adjusted_volume) / adjusted_volume,
-      .groups = "drop"
-    ) %>%
-    pivot_wider(
-      id_cols = all_of(geo_cols),
-      names_from = indicator_common_id,
-      values_from = percent_change,
-      values_fill = 0
-    ) %>%
-    mutate(avg_indicators = rowMeans(select(., -all_of(geo_cols)), na.rm = TRUE)) %>%
-    select(all_of(geo_cols), avg_indicators, everything())
-  
-  # Return all relevant datasets
-  return(list(
-    outlier_data = data,
-    top_outliers_data = top_outliers_data,
-    volume_increase_data = volume_increase_data,
-    heatmap_data = heatmap_data
-  ))
+  # Return the cleaned dataset with outliers flagged and adjusted
+  return(data)
 }
 
-# PART 3 Control Chart Analysis Function --------------------------------------------
+# PART 3 Control Chart Analysis Function --------------------------------------------------------------------
 control_chart_analysis <- function(cleaned_data, geo_cols) {
   print("Performing control chart analysis...")
   
@@ -232,15 +179,14 @@ geo_cols <- inputs$geo_cols
 # Perform outlier analysis
 print("Running outlier analysis...")
 outlier_results <- outlier_analysis(data, geo_cols)
-cleaned_data <- outlier_results$outlier_data
 
 # Perform control chart analysis
 print("Running control chart analysis...")
-control_chart_results <- control_chart_analysis(cleaned_data, geo_cols)
+control_chart_results <- control_chart_analysis(outlier_results, geo_cols)
 
 # Generate national results
 print("Generating national results...")
-national_results <- generate_national_results(cleaned_data)
+national_results <- generate_national_results(outlier_results)
 
 # Visualize all indicators in a single grid plot
 print("Visualizing all indicators in a single grid plot...")
