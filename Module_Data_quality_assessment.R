@@ -1,7 +1,7 @@
 # CB - R code FASTR PROJECT
 # Last edit: 2024 Dec 30
 
-#DATA: sierraleone_imported_dataset.csv
+# DATA: sierraleone_imported_dataset.csv
 
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
 # FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
@@ -20,7 +20,7 @@
 # IMAGE: outliers_heatmap.png         # Heatmap visualization showing the percent change due to outliers by administrative region and indicator.
 # IMAGE: completeness_heatmap.png     # Heatmap visualization representing the completeness percentage by administrative region and indicator.
 # IMAGE: bar_chart_volume_change.png  # Bar chart showing monthly percentage changes in volume due to outlier adjustments, by region and indicator.
-# IMAGE: adjusted_data.png            # Grid plot of national-level trends for all indicators, for all adjustment scenarios
+# IMAGE: adjusted_data.png            # Grid plot visualizing national-level trends for all indicators under n=4 adjustment scenarios.
 
 
 # Load Required Libraries -----------------------------------------------------
@@ -499,7 +499,7 @@ apply_adjustments <- function(data,
       mean_diff      = mean(diff, na.rm = TRUE),
       max_diff       = max(diff, na.rm = TRUE)
     )
-  
+  # print summary of changes for troubleshooting
   cat("Summary of changes from original 'count' to 'count_final':\n")
   cat("  Rows changed:", diff_summary$n_changed_rows, "\n")
   cat("  Mean diff:   ", round(diff_summary$mean_diff, 2), "\n")
@@ -554,7 +554,6 @@ inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 # Main Execution --------------------------------------------------------------
-
 
 print("Running outlier analysis...")
 outlier_data <- outlier_analysis(data, geo_cols)
@@ -654,8 +653,9 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
 
 print(heatmap_plot)
 
-
-# ADJUSTED DATA // control chart (data prep) ------------------------------------------------
+# CONTROL CHARTS (PART 5) ---------------------------------------------------------------------------
+# wip... simply plotting adjusted count for each scenarios 
+# DRAFT .... ADJUSTED DATA // control chart (PART 5)-------------------------------------------------
 generate_adjusted_national_results <- function(adjusted_data) {
   print("Generating national-level results for adjusted data...")
   unique_indicators <- unique(adjusted_data$indicator_common_id)
@@ -693,7 +693,7 @@ generate_adjusted_national_results <- function(adjusted_data) {
   return(national_results)
 }
 
-# ADJUSTED DATA // control chart (plot) --------------------------------------------------------------
+# DRAFT .... ADJUSTED DATA // control chart (PART 5)-------------------------------------------------
 plot_adjusted_national_grid <- function(national_data) {
   # Create a combined grid plot for all indicators and scenarios
   ggplot(national_data, aes(x = date, y = total_volume, color = scenario)) +
@@ -740,6 +740,7 @@ print("Plotting adjusted national grid...")
 adjusted_national_plot <- plot_adjusted_national_grid(adjusted_national_results)
 print(adjusted_national_plot)
 
+# -------------------------------------------------------------------------------------------------
 # Save Outputs ------------------------------------------------------------------------------------
 print("Saving all data outputs from outlier analysis...")
 write.csv(outlier_data$outlier_data, "output_outliers.csv", row.names = FALSE)
