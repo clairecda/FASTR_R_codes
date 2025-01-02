@@ -1,5 +1,5 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2024 Dec 30
+# Last edit: 2025 Jan 02
 
 # DATA: sierraleone_imported_dataset.csv
 
@@ -155,7 +155,8 @@ consistency_analysis <- function(data, geo_cols) {
   required_pairs <- list(
     anc = c("anc1", "anc4"),
     delivery = c("delivery", "bcg"),
-    pnc = c("delivery", "pnc1")
+    pnc = c("delivery", "pnc1"),
+    penta = c("penta1", "penta3")
   )
   
   # Filter out missing indicator pairs based on available data
@@ -180,76 +181,54 @@ consistency_analysis <- function(data, geo_cols) {
     mutate(volume = ifelse(outlier == 1, NA, count))
   
   # Step 3: Aggregate Data
-  date_summary <- data %>%
-    group_by(indicator_common_id, year) %>%
-    summarise(
-      date_min = min(date, na.rm = TRUE),
-      date_max = max(date, na.rm = TRUE),
-      .groups = "drop"
-    )
-  
   aggregated_data <- data %>%
     group_by(across(all_of(c(geo_cols, "indicator_common_id", "year")))) %>%
     summarise(
       volume = sum(volume, na.rm = TRUE),
-      volIM = sum(volIM, na.rm = TRUE),
       .groups = "drop"
-    ) %>%
-    left_join(date_summary, by = c("indicator_common_id", "year"))
+    )
   
-  # Clean and prepare indicator types
-  aggregated_data <- aggregated_data %>%
-    mutate(indictemp = str_replace_all(indicator_common_id, " ", "_")) %>%
-    filter(!str_detect(indictemp, "\\+")) %>%
-    drop_na(any_of(tail(geo_cols, 1)))
-  
-  # Step 4: Calculate Consistency Ratios
-  print("Calculating consistency ratios...")
+  # Pivot data to wide format for ratio calculations
   wide_data <- aggregated_data %>%
     pivot_wider(
       id_cols = c(geo_cols, "year"),
-      names_from = indictemp,
-      values_from = c(volume, volIM),
-      names_sep = "_",
-      values_fill = list(volume = 0, volIM = 0)
+      names_from = "indicator_common_id",
+      values_from = "volume",
+      values_fill = list(volume = 0)
     )
   
-  # Add consistency calculations dynamically based on pairs_to_check
-  if (!is.null(pairs_to_check$anc)) {
-    wide_data <- wide_data %>%
-      mutate(
-        ratio_anc1 = if_else(volume_anc4 > 0, volume_anc1 / volume_anc4, NA_real_),
-        sratio_anc1 = if_else(!is.na(ratio_anc1) & ratio_anc1 > 1, 1, 0)
-      )
-  } else {
-    wide_data <- wide_data %>%
-      mutate(sratio_anc1 = NA_real_)
-  }
+  # Debug: Print wide data column names
+  print("Wide data column names:")
+  print(colnames(wide_data))
   
-  if (!is.null(pairs_to_check$delivery)) {
-    wide_data <- wide_data %>%
-      mutate(
-        ratio_delivery = if_else(volume_delivery > 0, volume_bcg / volume_delivery, NA_real_),
-        sratio_delivery = if_else(
-          !is.na(ratio_delivery) & ratio_delivery >= 0.7 & ratio_delivery <= 1.3, 1, 0
+  # Step 4: Calculate Consistency Ratios
+  print("Calculating consistency ratios...")
+  for (pair_name in names(pairs_to_check)) {
+    pair <- pairs_to_check[[pair_name]]
+    col1 <- pair[1] # First indicator
+    col2 <- pair[2] # Second indicator
+    
+    # Check if both columns exist in wide_data
+    if (all(c(col1, col2) %in% colnames(wide_data))) {
+      ratio_name <- paste0("ratio_", col1) # Name for the ratio
+      sratio_name <- paste0("sratio_", col1) # Name for the binary flag
+      
+      # Add ratio and flag dynamically
+      wide_data <- wide_data %>%
+        mutate(
+          !!ratio_name := if_else(
+            !!sym(col2) > 0,
+            !!sym(col1) / !!sym(col2),
+            NA_real_
+          ),
+          !!sratio_name := case_when(
+            pair_name == "delivery" ~ (!!sym(ratio_name) >= 0.7 & !!sym(ratio_name) <= 1.3),
+            TRUE ~ !!sym(ratio_name) > 1
+          )
         )
-      )
-  } else {
-    wide_data <- wide_data %>%
-      mutate(sratio_delivery = NA_real_)
-  }
-  
-  if (!is.null(pairs_to_check$pnc)) {
-    wide_data <- wide_data %>%
-      mutate(
-        ratio_pnc1 = if_else(volume_delivery > 0, volume_pnc1 / volume_delivery, NA_real_),
-        sratio_pnc1 = if_else(
-          !is.na(ratio_pnc1) & ratio_pnc1 >= 0.7 & ratio_pnc1 <= 1.3, 1, 0
-        )
-      )
-  } else {
-    wide_data <- wide_data %>%
-      mutate(sratio_pnc1 = NA_real_)
+    } else {
+      print(paste("Skipping pair:", col1, "and", col2, "- columns not found"))
+    }
   }
   
   # Reshape Data Back to Long Format
@@ -261,18 +240,12 @@ consistency_analysis <- function(data, geo_cols) {
       values_to = "consistency_ratio"
     ) %>%
     mutate(
-      sconsistency = case_when(
-        ratio_type == "ratio_anc1" ~ sratio_anc1,
-        ratio_type == "ratio_delivery" ~ sratio_delivery,
-        ratio_type == "ratio_pnc1" ~ sratio_pnc1,
-        TRUE ~ NA_real_
-      )
+      sconsistency = if_else(str_starts(ratio_type, "sratio_"), 1, 0)
     ) %>%
     select(any_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
   
   return(long_data)
 }
-
 
 # PART 3 COMPLETENESS
 completeness_analysis <- function(data, geo_cols) {
@@ -344,28 +317,28 @@ completeness_analysis <- function(data, geo_cols) {
 # PART 4 DQA
 # CB ... DQA - combining completeness, outliers, and consistency - is consistently applied at the annual level: True?
 dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_cols) {
-  print("Performing DQA analysis...")
-
-  # Step 1: Map ratio_type to indicator_common_id in consistency_data
+  print("Performing updated DQA analysis...")
+  
+  # Step 1: Map all ratio types to indicators in consistency_data
   ratio_mapping <- tibble(
-    ratio_type = c("ratio_anc1", "ratio_delivery", "ratio_pnc1"),
-    indicator_common_id = c("anc1", "delivery", "pnc1")
+    ratio_type = c("ratio_anc1", "ratio_delivery", "ratio_pnc1", "ratio_penta1"),
+    indicator_common_id = c("anc1", "delivery", "pnc1", "penta1")
   )
-
+  
   consistency_data <- consistency_data %>%
     left_join(ratio_mapping, by = "ratio_type")
-
-  # Step 2: Deduplicate Input Data
+  
+  # Step 2: Deduplicate Inputs
   completeness_data <- completeness_data %>%
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
-
+  
   consistency_data <- consistency_data %>%
     distinct(across(all_of(c(geo_cols, "year", "indicator_common_id"))), .keep_all = TRUE)
-
+  
   outlier_data <- outlier_data %>%
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
-
-  # Step 3: Merge Completeness, Consistency, and Outlier Data
+  
+  # Step 3: Merge Completeness, Consistency, and Outliers
   print("Merging completeness, consistency, and outlier data...")
   merged_data <- completeness_data %>%
     left_join(
@@ -376,37 +349,36 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
       consistency_data %>% select(all_of(geo_cols), year, indicator_common_id, sconsistency),
       by = c(geo_cols, "year", "indicator_common_id")
     )
-
-  # Step 4: Calculate Facility-Level DQA Flags
-  print("Calculating facility-level DQA flags...")
+  
+  # Step 4: Enhanced DQA Flags
+  print("Calculating enhanced DQA flags...")
   merged_data <- merged_data %>%
     mutate(
       dqa_temp = case_when(
-        indicator_common_id %in% c("opd", "penta1", "anc1") &
-          completeness_percentage == 100 &
-          outlier_flag == 0 &
+        completeness_percentage >= 90 &  # Flexible completeness threshold
+          outlier_flag == 0 & 
           (is.na(sconsistency) | sconsistency == 1) ~ 1,
         TRUE ~ 0
       )
     )
-
-  # Step 5: Aggregate DQA Results by Geography and Indicator
+  
+  # Step 5: Aggregate DQA Results
   print("Aggregating DQA results...")
   dqa_summary <- merged_data %>%
     group_by(across(all_of(c(geo_cols, "year", "indicator_common_id")))) %>%
     summarise(
-      dqa_score = mean(dqa_temp, na.rm = TRUE),
-      total_flags = sum(dqa_temp, na.rm = TRUE),
-      completeness_avg = mean(completeness_percentage, na.rm = TRUE),
-      outlier_count = sum(outlier_flag, na.rm = TRUE),
-      consistency_failures = sum(ifelse(is.na(sconsistency), 0, 1 - sconsistency), na.rm = TRUE),
+      dqa_score = mean(dqa_temp, na.rm = TRUE),  # Proportion of facilities passing DQA
+      total_flags = sum(dqa_temp, na.rm = TRUE),  # Count of facilities passing DQA
+      completeness_avg = mean(completeness_percentage, na.rm = TRUE),  # Avg completeness
+      outlier_count = sum(outlier_flag, na.rm = TRUE),  # Outlier flags
+      consistency_failures = sum(ifelse(is.na(sconsistency), 0, 1 - sconsistency), na.rm = TRUE),  # Count of failed consistency checks
       .groups = "drop"
     )
-
-  # Step 6: Calculate Overall Scores at Geographic Levels and Split by Year
-  print("Calculating overall scores at geographic levels by year...")
+  
+  # Step 6: Overall DQA Results at Geography-Year Level
+  print("Calculating overall DQA scores...")
   overall_dqa <- dqa_summary %>%
-    group_by(across(all_of(c(geo_cols, "year")))) %>%  # Include 'year' in grouping
+    group_by(across(all_of(c(geo_cols, "year")))) %>%
     summarise(
       overall_dqa_score = mean(dqa_score, na.rm = TRUE),
       total_indicators = n(),
@@ -415,8 +387,8 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
       total_consistency_failures = sum(consistency_failures, na.rm = TRUE),
       .groups = "drop"
     )
-
-  # Return Results
+  
+  # Return Updated Results
   return(list(
     facility_dqa = merged_data,
     dqa_summary = dqa_summary,
@@ -424,8 +396,32 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
   ))
 }
 
+# PART 5: Dynamic Adjustments (Work-in-Progress) ---------------------------------------
+# This section includes functions to dynamically adjust raw data for:
+#   1. Outliers: Corrects extreme values that may distort analyses by replacing them with adjusted counts.
+#   2. Completeness: Scales up reported counts to account for underreporting. the completeness adjustment implemented
+#      in this code aligns conceptually with WHO recommendations, https://www.who.int/publications/i/item/9789240063938
+#      for addressing incomplete reporting. 
+#      The implementation simplifies the adjustment by assuming that non-reporting facilities provide services at the same
+#      level as reporting facilities (k = 1).
+#      https://www.who.int/publications/i/item/9789240063938
+#
+# WHO Formula for completeness adjustment:
+#   p_adjusted = p_reported + p_reported * (1 / c - 1) * k
+#   - p_adjusted: Adjusted service outputs.
+#   - p_reported: Reported service outputs.
+#   - c: Reporting completeness as a fraction (e.g., 80% = 0.8).
+#   - k: Adjustment factor, reflecting service provision in non-reporting facilities:
+#       - k = 0: Non-reporting facilities provide no services.
+#       - 0 < k < 1: Non-reporting facilities provide fewer services than reporting ones.
+#       - k = 1: Non-reporting facilities provide services at the same rate as reporting ones.
 
-# PART 5: Dynamic Adjustments -----------------------------------------------
+# Simplified formula in this code:
+#   p_adjusted = p_reported / c
+#   - This assumes k = 1, meaning non-reporting facilities provide services at the same rate as reporting ones.
+#   - Completeness percentages are merged into the dataset, converted to fractions, and used to scale up
+#     reported counts proportionally.
+
 apply_adjustments <- function(data,
                               outlier_data,
                               completeness_data,
@@ -496,11 +492,11 @@ apply_adjustments <- function(data,
   diff_summary <- data_merged %>%
     mutate(diff = count_final - count) %>%
     summarise(
-      n_changed_rows = sum(diff != 0, na.rm = TRUE),
-      mean_diff      = mean(diff, na.rm = TRUE),
-      max_diff       = max(diff, na.rm = TRUE)
+      n_changed_rows = sum(diff != 0, na.rm = TRUE), #number of rows where adjustments were applied
+      mean_diff      = mean(diff, na.rm = TRUE), #average difference between original and adjusted counts
+      max_diff       = max(diff, na.rm = TRUE) #maximum difference applied during adjustments
     )
-  # print summary of changes for troubleshooting
+  # Print a summary of the differences between the original and adjusted counts
   cat("Summary of changes from original 'count' to 'count_final':\n")
   cat("  Rows changed:", diff_summary$n_changed_rows, "\n")
   cat("  Mean diff:   ", round(diff_summary$mean_diff, 2), "\n")
@@ -510,6 +506,12 @@ apply_adjustments <- function(data,
   return(data_merged)
 }
 
+
+# This function applies adjustments for multiple scenarios:
+# 1. None: No adjustments.
+# 2. Outliers: Only outlier adjustments.
+# 3. Completeness: Only completeness scaling.
+# 4. Both: Combination of outlier corrections and completeness scaling.
 apply_adjustments_scenarios <- function(data,
                                         outlier_data,
                                         completeness_data,
@@ -654,21 +656,80 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
 
 print(heatmap_plot)
 
-# CONTROL CHARTS (PART 5) ---------------------------------------------------------------------------
-# wip... simply plotting adjusted count for each scenarios 
-# DRAFT .... ADJUSTED DATA // control chart (PART 5)-------------------------------------------------
+
+# DQA Heatmap (Part 4)
+generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col = "year") {
+  print("Generating DQA heatmap data...")
+  
+  # Step 1: Aggregate DQA Results
+  dqa_aggregated <- dqa_summary %>%
+    group_by(!!sym(geo_col), !!sym(year_col)) %>%
+    summarise(
+      adequate_quality_percentage = mean(dqa_score, na.rm = TRUE) * 100,  # Convert to percentage
+      .groups = "drop"
+    )
+  
+  print("DQA heatmap data aggregation complete.")
+  
+  # Step 2: Generate Heatmap Plot
+  heatmap_plot <- ggplot(dqa_aggregated, aes_string(x = year_col, y = geo_col, fill = "adequate_quality_percentage")) +
+    geom_tile(color = "white") +
+    scale_fill_gradientn(
+      colors = c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"),
+      values = scales::rescale(c(0, 25, 50, 75, 100)),
+      limits = c(0, 100),
+      name = "Facilities Meeting\nDQA Criteria (%)"
+    ) +
+    labs(
+      title = "Yearly Trends in Data Quality by Region",
+      subtitle = "Percentage of facilities meeting DQA criteria, aggregated by region and year",
+      x = "Year",
+      y = "Administrative Region (Level 2)",
+      fill = "Adequate Quality (%)"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.x = element_text(size = 12, face = "bold"),
+      axis.title.y = element_text(size = 12, face = "bold"),
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 12, face = "italic"),
+      legend.title = element_text(size = 12, face = "bold"),
+      legend.text = element_text(size = 10),
+      panel.grid = element_blank()
+    )
+  
+  print("DQA plot created.")
+  
+  return(list(
+    heatmap_data = dqa_aggregated,
+    heatmap_plot = heatmap_plot
+  ))
+}
+
+
+dqa_heatmap_results <- generate_dqa_heatmap(dqa_results$dqa_summary)
+print(heatmap_plot)
+
+
+# ADJUSTED DATA // National Trends Visualization (PART 5) -------------------------------------------------------------
 generate_adjusted_national_results <- function(adjusted_data) {
   print("Generating national-level results for adjusted data...")
+  
+  # Extract unique indicators from the dataset
   unique_indicators <- unique(adjusted_data$indicator_common_id)
   
+  # Process each indicator separately to generate scenario-based trends
   national_results <- lapply(unique_indicators, function(indicator) {
+    # Filter data for the current indicator
     indicator_data <- adjusted_data %>%
       filter(indicator_common_id == indicator) %>%
       pivot_longer(
-        cols = starts_with("count_final"), 
+        cols = starts_with("count_final"),  # Transform different adjustment scenarios into long format
         names_to = "scenario",
         values_to = "total_volume"
       ) %>%
+      # Recode scenario names to make them more descriptive
       mutate(
         scenario = recode(
           scenario,
@@ -678,41 +739,43 @@ generate_adjusted_national_results <- function(adjusted_data) {
           "count_final_both" = "Both Adjusted"
         )
       ) %>%
+      # Group by date and adjustment scenario to aggregate total volumes
       group_by(date, scenario) %>%
       summarise(
-        total_volume = sum(total_volume, na.rm = TRUE),
+        total_volume = sum(total_volume, na.rm = TRUE),  # Aggregate total volume across all facilities
         .groups = "drop"
       ) %>%
+      # Add the indicator column for identification
       mutate(
         indicator = indicator
       )
     
     return(indicator_data)
   }) %>%
+    # Combine results for all indicators into a single dataset
     bind_rows()
   
   return(national_results)
 }
 
-# DRAFT .... ADJUSTED DATA // control chart (PART 5)-------------------------------------------------
 plot_adjusted_national_grid <- function(national_data) {
   # Create a combined grid plot for all indicators and scenarios
   ggplot(national_data, aes(x = date, y = total_volume, color = scenario)) +
-    geom_line(size = 0.8) +
+    geom_line(size = 0.8) +  # Plot the trend lines for each scenario
     facet_wrap(~indicator, scales = "free_y") +  # Create one subplot per indicator
     labs(
-      title = "Control Chart with Adjusted Scenarios",
-      subtitle = "Change in service volumes over time for different adjustment scenarios",
+      title = "Adjusted Data Trends by Scenario",
+      subtitle = "Visualizing changes in service volumes over time for different adjustment scenarios",
       x = "Year",
       y = "Total Volume",
-      caption = "Scenarios: Unadjusted, Outlier Adjusted, Completeness Adjusted, Both Adjusted"
+      caption = "'Unadjusted' (raw data), 'Outlier Adjusted' (extreme values corrected), 'Completeness Adjusted' (scaled for underreporting), and 'Both Adjusted' (combined adjustments)."
     ) +
     scale_color_manual(
       values = c(
-        "Unadjusted" = "lightblue",  # Grey color for Unadjusted
-        "Outlier Adjusted" = "blue",  # Blue for Outlier Adjusted
-        "Completeness Adjusted" = "orange",  # Orange for Completeness Adjusted
-        "Both Adjusted" = "red"  # Red for Both Adjusted
+        "Unadjusted" = "lightblue",  # Light blue for unadjusted data
+        "Outlier Adjusted" = "blue",  # Blue for outlier-adjusted data
+        "Completeness Adjusted" = "orange",  # Orange for completeness-adjusted data
+        "Both Adjusted" = "red"  # Red for both adjustments
       ),
       breaks = c(
         "Unadjusted",
@@ -729,13 +792,13 @@ plot_adjusted_national_grid <- function(national_data) {
     ) +
     theme_minimal() +
     theme(
-      strip.text = element_text(size = 10),  # Adjust facet labels
+      strip.text = element_text(size = 10),  # Style facet labels
       axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels
-      legend.position = "bottom"  # Move legend to bottom
+      legend.position = "bottom"  # Move legend to the bottom of the plot
     )
 }
 
-
+# Generate and plot adjusted national trends
 adjusted_national_results <- generate_adjusted_national_results(adjusted_data)
 print("Plotting adjusted national grid...")
 adjusted_national_plot <- plot_adjusted_national_grid(adjusted_national_results)
