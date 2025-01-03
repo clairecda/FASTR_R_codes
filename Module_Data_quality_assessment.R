@@ -605,7 +605,7 @@ heatmap_outliers <- outlier_data$heatmap_data %>%
     midpoint = 0, na.value = "grey50"
   ) +
   labs(
-    title = "Percent Change of Volume Due to Outliers",
+    title = "Percent change of volume due to outliers",
     x = "Indicator",
     y = "Administrative Area",
     fill = "% Change"
@@ -623,10 +623,10 @@ bar_chart <- ggplot(outlier_data$volume_increase_data, aes(x = month, y = percen
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~indicator_common_id, scales = "free_y") +
   labs(
-    title = "Volume Change Due to Outliers",
+    title = "Volume change due to outliers",
     x = "Month",
     y = "% Change",
-    fill = "Administrative Area"
+    fill = "Administrative area"
   ) +
   theme_minimal()
 print(bar_chart)
@@ -678,14 +678,14 @@ generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col
       colors = c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"),
       values = scales::rescale(c(0, 25, 50, 75, 100)),
       limits = c(0, 100),
-      name = "Facilities Meeting\nDQA Criteria (%)"
+      name = "Facilities meeting\nDQA criteria (%)"
     ) +
     labs(
       title = "Data Quality Assessment",
       subtitle = "Percentage of facilities meeting DQA criteria, aggregated by region and year",
       x = "Year",
       y = "Administrative Region (Level 2)",
-      fill = "Adequate Quality (%)"
+      fill = "Adequate quality (%)"
     ) +
     theme_minimal() +
     theme(
@@ -765,7 +765,7 @@ plot_adjusted_national_grid <- function(national_data) {
     geom_line(size = 0.8) +  # Plot the trend lines for each scenario
     facet_wrap(~indicator, scales = "free_y") +  # Create one subplot per indicator
     labs(
-      title = "Adjusted Data Trends by Scenario",
+      title = "Adjusted volumes by Scenario",
       subtitle = "Visualizing changes in service volumes over time for different adjustment scenarios",
       x = "Year",
       y = "Total Volume",
