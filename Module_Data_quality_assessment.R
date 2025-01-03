@@ -21,7 +21,7 @@
 # IMAGE: completeness_heatmap.png     # Heatmap visualization representing the completeness percentage by administrative region and indicator.
 # IMAGE: bar_chart_volume_change.png  # Bar chart showing monthly percentage changes in volume due to outlier adjustments, by region and indicator.
 # IMAGE: adjusted_data.png            # Grid plot visualizing national-level trends for all indicators under n=4 adjustment scenarios.
-
+# IMAGE: dqa_heatmap_results.png      # Heatmap visualization showing percentage of facilities meeting DQA criteria aggregated by region (level 2) and year.
 
 # Load Required Libraries -----------------------------------------------------
 library(tidyverse)
@@ -681,7 +681,7 @@ generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col
       name = "Facilities Meeting\nDQA Criteria (%)"
     ) +
     labs(
-      title = "Yearly Trends in Data Quality by Region",
+      title = "Data Quality Assessment",
       subtitle = "Percentage of facilities meeting DQA criteria, aggregated by region and year",
       x = "Year",
       y = "Administrative Region (Level 2)",
@@ -709,7 +709,7 @@ generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col
 
 
 dqa_heatmap_results <- generate_dqa_heatmap(dqa_results$dqa_summary)
-print(heatmap_plot)
+print(dqa_heatmap_results)
 
 
 # ADJUSTED DATA // National Trends Visualization (PART 5) -------------------------------------------------------------
@@ -823,7 +823,7 @@ print("Saving all data outputs from DQA analysis...")
 write.csv(dqa_results$facility_dqa, "facility_dqa.csv", row.names = FALSE)
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
 write.csv(dqa_results$overall_dqa, "overall_dqa.csv", row.names = FALSE)
-
+ggsave("dqa_heatmap_results.png", plot = dqa_heatmap_results, width = 12, height = 8)
 
 
 print("Saving adjusted data...")
