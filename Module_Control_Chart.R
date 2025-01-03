@@ -1,24 +1,37 @@
 # CB - R code FASTR PROJECT - Control Chart Analysis
-# Last edit: 2024 Dec 24
+# Last edit: 2025 Jan 03
 
 # DATA: sierraleone_imported_dataset.csv
 
 # FILE: control_chart_results.csv       # Facility-level control chart analysis results with flags for anomalies.
-# FILE: national_results.csv            # National-level trends with control limits for each indicator.
-# IMAGE: national_grid_plot.png         # Grid plot of national-level trends for all indicators, with control limits.
+# FILE: indicator_results.csv           # Indicator-level trends with control limits.
+# IMAGE: indicator_grid_plot.png        # Grid plot of indicator-level trends with control limits.
 
-# Description of current approach:
-# - De-seasonalized volumes are calculated by subtracting monthly averages (volume_predict = total_volume - monthly_mean).
-# - A 12-month rolling average (rollmean()) is used to smooth the data and highlight trends.
-# - Next step: Implement regression-based deseasonalization to replicate the Stata script.
+# NOTES
 
+# OUTPUTS:
+# 1. `control_chart_results.csv`: Facility-level dataset with:
+#    - Adjusted counts (`count_adjust`), deseasonalized values, and anomaly flags (`tag`).
+# 2. `indicator_results.csv`: National-level aggregated trends with control limits and anomaly flags.
+# 3. `indicator_grid_plot.png`: Grid plot of deseasonalized trends for all indicators.
 
-# Required Libraries ----------------------------------------------------------
+# KEY VARIABLES:
+# - `indicator_common_id`: Name of the health indicator (e.g., ANC visits, deliveries).
+# - `admin_area_1`, `admin_area_2`, `admin_area_3`: Geographic levels (national, province, district).
+# - `count`: Original count of health services provided.
+# - `count_adjust`: Cleaned count (outliers replaced with medians).
+# - `count_predict`: Predicted (deseasonalized) count using regression.
+# - `residual`: Difference between actual and predicted counts.
+# - `control`: Standardized residuals for anomaly detection.
+# - `UCL`, `LCL`: Upper and lower control limits for aggregated trends.
+
+# Required Libraries ------------------------------------------------------------------------------------------------------
 library(tidyverse)
 library(lubridate)
-library(zoo)  # For interpolation
+library(zoo)  # For rolling statistics
 
-# Define Functions -----------------------------------------------------------
+# Define Functions --------------------------------------------------------------------------------------------------
+
 # PART 1 Load and Preprocess Data
 load_and_preprocess_data <- function(file_path) {
   print("Loading and preprocessing data...")
@@ -29,173 +42,161 @@ load_and_preprocess_data <- function(file_path) {
   return(list(data = data, geo_cols = geo_cols))
 }
 
-
 # PART 2 Outlier Analysis
 outlier_analysis <- function(data, geo_cols) {
   print("Performing outlier analysis...")
   
-  # Step 1: Calculate Median Volume
-  data <- data %>%
-    group_by(facility_id, indicator_common_id) %>%
-    mutate(median_volume = median(count, na.rm = TRUE)) %>%
-    ungroup()
-  
-  # Step 2: Calculate MAD and Identify Outliers
   data <- data %>%
     group_by(facility_id, indicator_common_id) %>%
     mutate(
-      mad_volume = ifelse(!is.na(count), mad(count[count >= median_volume], na.rm = TRUE), NA),
-      mad_residual = ifelse(!is.na(mad_volume) & mad_volume > 0, abs(count - median_volume) / mad_volume, NA),
-      moderate = ifelse(!is.na(mad_residual) & mad_residual > 10 & mad_residual <= 20, 1, 0),
-      severe = ifelse(!is.na(mad_residual) & mad_residual > 20, 1, 0),
-      outlier_mad = ifelse(moderate == 1 | severe == 1, 1, 0)
+      median_count = median(count, na.rm = TRUE),
+      mad_count = ifelse(!is.na(count), mad(count[count >= median_count], na.rm = TRUE), NA),
+      mad_residual = ifelse(!is.na(mad_count) & mad_count > 0, abs(count - median_count) / mad_count, NA),
+      outlier = ifelse(!is.na(mad_residual) & mad_residual > 20, 1, 0)
     ) %>%
     ungroup()
   
-  # Step 3: Calculate Proportional Contribution
-  data <- data %>%
-    group_by(facility_id, indicator_common_id, year) %>%
-    mutate(
-      pc = count / sum(count, na.rm = TRUE),
-      outlier_pc = ifelse(!is.na(pc) & pc > 0.8, 1, 0)
-    ) %>%
-    ungroup()
-  
-  # Step 4: Combine Outlier Flags
-  data <- data %>%
-    mutate(outlier = ifelse((outlier_mad == 1 | outlier_pc == 1) & count > 100, 1, 0))
-  
-  # Step 5: Adjust Outliers
-  print("Adjusting outliers...")
   data <- data %>%
     group_by(across(all_of(c(geo_cols, "indicator_common_id")))) %>%
-    mutate(
-      count_adjust = ifelse(outlier == 1, median(count, na.rm = TRUE), count),
-      volIM = mean(count[!outlier], na.rm = TRUE)
-    ) %>%
+    mutate(count_adjust = ifelse(outlier == 1, median(count, na.rm = TRUE), count)) %>%
     ungroup()
   
-  # Return the cleaned dataset with outliers flagged and adjusted
   return(data)
 }
 
-# PART 3 Control Chart Analysis Function --------------------------------------------------------------------
+# PART 3 Control Chart Analysis with Regression-Based Deseasonalization
 control_chart_analysis <- function(cleaned_data, geo_cols) {
-  print("Performing control chart analysis...")
+  print("Performing control chart analysis with regression-based deseasonalization...")
   
-  # Step 1: Aggregate data by indicator, province, and time
   aggregated_data <- cleaned_data %>%
     group_by(across(all_of(geo_cols)), indicator_common_id, date) %>%
-    summarise(total_volume = sum(count_adjust, na.rm = TRUE), .groups = "drop")
+    summarise(total_count = sum(count_adjust, na.rm = TRUE), .groups = "drop")
   
-  # Step 2: Create panel variable for grouping
-  aggregated_data <- aggregated_data %>%
-    mutate(panelvar = paste(indicator_common_id, admin_area_1, sep = "_"))
-  
-  # Step 3: Fill missing dates and interpolate missing volumes
   complete_data <- aggregated_data %>%
-    group_by(panelvar) %>%
+    group_by(panelvar = paste(indicator_common_id, admin_area_1, sep = "_")) %>%
     complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")) %>%
-    fill(total_volume, .direction = "downup") %>%
+    fill(total_count, .direction = "downup") %>%
     ungroup()
   
-  # Step 4: Deseasonalize and calculate control limits
+  print("Applying regression-based deseasonalization...")
   deseasonalized_data <- complete_data %>%
-    mutate(month = month(date)) %>%
-    group_by(panelvar, month) %>%
-    mutate(monthly_mean = mean(total_volume, na.rm = TRUE)) %>%
-    ungroup() %>%
-    mutate(volume_predict = total_volume - monthly_mean) %>%
+    mutate(month = month(date), date_numeric = as.numeric(date)) %>%
+    group_by(panelvar) %>%
+    group_split() %>%
+    map_dfr(function(panel_data) {
+      tryCatch({
+        model <- lm(total_count ~ poly(date_numeric, 2) + factor(month), data = panel_data)
+        panel_data <- panel_data %>%
+          mutate(
+            count_predict = predict(model, newdata = panel_data),
+            residual = total_count - count_predict
+          )
+        return(panel_data)
+      }, error = function(e) {
+        message("Skipping panelvar: ", unique(panel_data$panelvar), " - Error: ", e$message)
+        return(tibble())
+      })
+    })
+  
+  deseasonalized_data <- deseasonalized_data %>%
     group_by(panelvar) %>%
     mutate(
-      volume_smooth = rollmean(volume_predict, k = 12, fill = NA),  # 12-month rolling average
-      residual = volume_predict - volume_smooth,
+      period_id = format(date, "%Y%m"),
       sd_residual = sd(residual, na.rm = TRUE),
       control = residual / sd_residual,
-      tag = ifelse(abs(control) >= 2, 1, 0)  # Anomalies if control >= 2 SD
+      tag = ifelse(abs(control) >= 2, 1, 0)
     ) %>%
     ungroup()
   
   return(deseasonalized_data)
 }
 
-# PART 4 National Aggregation
-generate_national_results <- function(cleaned_data) {
-  print("Generating national-level results with control limits...")
+# PART 4 Indicator-Level Aggregation with Control Limits
+generate_indicator_results <- function(cleaned_data) {
+  print("Generating indicator-level results with control limits...")
+  
   unique_indicators <- unique(cleaned_data$indicator_common_id)
   
-  national_results <- lapply(unique_indicators, function(indicator) {
+  indicator_results <- lapply(unique_indicators, function(indicator) {
     indicator_data <- cleaned_data %>%
       filter(indicator_common_id == indicator) %>%
       group_by(date) %>%
       summarise(
-        total_volume = sum(count_adjust, na.rm = TRUE),
+        total_count = sum(count_predict, na.rm = TRUE),
         .groups = "drop"
+      ) %>%
+      mutate(
+        indicator_common_id = indicator,
+        period_id = format(date, "%Y%m")
       )
     
     # Calculate control limits
-    mean_volume <- mean(indicator_data$total_volume, na.rm = TRUE)
-    sd_volume <- sd(indicator_data$total_volume, na.rm = TRUE)
+    mean_count <- mean(indicator_data$total_count, na.rm = TRUE)
+    sd_count <- sd(indicator_data$total_count, na.rm = TRUE)
     indicator_data <- indicator_data %>%
       mutate(
-        indicator = indicator,
-        UCL = mean_volume + 3 * sd_volume,
-        LCL = mean_volume - 3 * sd_volume
+        UCL = mean_count + 3 * sd_count,
+        LCL = mean_count - 3 * sd_count,
+        tag = ifelse(total_count > UCL | total_count < LCL, 1, 0)
       )
+    
+    return(indicator_data)
   }) %>%
     bind_rows()
   
-  return(national_results)
+  print("Indicator-level results generated successfully.")
+  return(indicator_results)
 }
 
-
 # PART 5 Visualizations
-plot_national_grid <- function(national_data) {
-  # Create a combined grid plot for all indicators
-  ggplot(national_data, aes(x = date, y = total_volume)) +
-    geom_line(size = 1.2, color = "black") +
+plot_indicator_grid <- function(indicator_data) {
+  if (nrow(indicator_data) == 0) {
+    stop("The input data is empty. Ensure 'generate_indicator_results' produced valid results.")
+  }
+  
+  ggplot(indicator_data, aes(x = date, y = total_count)) +
+    geom_line(size = 0.9, color = "black") +
     geom_hline(aes(yintercept = UCL), linetype = "dashed", color = "red") +
     geom_hline(aes(yintercept = LCL), linetype = "dashed", color = "blue") +
-    facet_wrap(~indicator, scales = "free_y") +  # Create one subplot per indicator
+    facet_wrap(~indicator_common_id, scales = "free_y") +  # Updated to use indicator_common_id
     labs(
-      title = "Control chart",
-      subtitle = "Change in the volumes of service over time - with control limits (UCL and LCL)",
-      x = "Year",
-      y = "Total Volume",
-      caption = "Upper Control Limit = red dashed line, Lower Control Limit = blue dashed line"
+      title = "Control charts by indicator",
+      subtitle = "Trends in deseasonalized counts with control limits",
+      x = "Date",
+      y = "Total Count",
+      caption = "Red dashed line = Upper Control Limit, Blue dashed line = Lower Control Limit"
     ) +
     theme_minimal() +
     theme(
-      strip.text = element_text(size = 10),  # Adjust facet labels
-      axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+      axis.text.y = element_text(size = 8),
+      strip.text = element_text(size = 10, face = "bold"),
+      axis.title.x = element_text(size = 12, face = "bold"),
+      axis.title.y = element_text(size = 12, face = "bold"),
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 12, face = "italic")
     )
 }
 
-# Main Script -----------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+# Main Script ---------------------------------------------------------------------------------------------------------
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
-# Perform outlier analysis
-print("Running outlier analysis...")
+print("Performing outlier analysis...")
 outlier_results <- outlier_analysis(data, geo_cols)
 
-# Perform control chart analysis
-print("Running control chart analysis...")
+print("Performing control chart analysis...")
 control_chart_results <- control_chart_analysis(outlier_results, geo_cols)
 
-# Generate national results
-print("Generating national results...")
-national_results <- generate_national_results(outlier_results)
+print("Generating indicator-level results...")
+indicator_results <- generate_indicator_results(control_chart_results)
 
-# Visualize all indicators in a single grid plot
-print("Visualizing all indicators in a single grid plot...")
-national_grid_plot <- plot_national_grid(national_results)
-print(national_grid_plot)
+print("Plotting indicator control charts...")
+indicator_grid_plot <- plot_indicator_grid(indicator_results)
+print(indicator_grid_plot)
 
-# Save Outputs
-print("Saving plot and results...")
-ggsave("national_grid_plot.png", plot = national_grid_plot, width = 12, height = 8)
+print("Saving results...")
+ggsave("indicator_grid_plot.png", plot = indicator_grid_plot, width = 14, height = 10)
 write.csv(control_chart_results, "control_chart_results.csv", row.names = FALSE)
-write.csv(national_results, "national_results.csv", row.names = FALSE)
-
+write.csv(indicator_results, "indicator_results.csv", row.names = FALSE) 
