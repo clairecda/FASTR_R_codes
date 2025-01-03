@@ -160,8 +160,8 @@ plot_indicator_grid <- function(indicator_data) {
     geom_hline(aes(yintercept = LCL), linetype = "dashed", color = "blue") +
     facet_wrap(~indicator_common_id, scales = "free_y") +  # Updated to use indicator_common_id
     labs(
-      title = "Control charts by indicator",
-      subtitle = "Trends in deseasonalized counts with control limits",
+      title = "Deseasonalized counts by indicator",
+      subtitle = "Regression-based deseasonalization",
       x = "Date",
       y = "Total Count",
       caption = "Red dashed line = Upper Control Limit, Blue dashed line = Lower Control Limit"
@@ -170,11 +170,11 @@ plot_indicator_grid <- function(indicator_data) {
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
       axis.text.y = element_text(size = 8),
-      strip.text = element_text(size = 10, face = "bold"),
-      axis.title.x = element_text(size = 12, face = "bold"),
-      axis.title.y = element_text(size = 12, face = "bold"),
-      plot.title = element_text(size = 16, face = "bold"),
-      plot.subtitle = element_text(size = 12, face = "italic")
+      strip.text = element_text(size = 9),
+      axis.title.x = element_text(size = 10),
+      axis.title.y = element_text(size = 10),
+      plot.title = element_text(size = 12),
+      plot.subtitle = element_text(size = 10, face = "italic")
     )
 }
 
