@@ -692,9 +692,9 @@ generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col
       axis.text.x = element_text(angle = 45, hjust = 1),
       axis.title.x = element_text(size = 12, face = "bold"),
       axis.title.y = element_text(size = 12, face = "bold"),
-      plot.title = element_text(size = 16, face = "bold"),
-      plot.subtitle = element_text(size = 12, face = "italic"),
-      legend.title = element_text(size = 12, face = "bold"),
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 11, face = "italic"),
+      legend.title = element_text(size = 11, face = "bold"),
       legend.text = element_text(size = 10),
       panel.grid = element_blank()
     )
@@ -707,9 +707,10 @@ generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col
   ))
 }
 
-
 dqa_heatmap_results <- generate_dqa_heatmap(dqa_results$dqa_summary)
-print(dqa_heatmap_results)
+heatmap_dqa <- dqa_heatmap_results$heatmap_plot  # Access the plot for further use
+print(heatmap_dqa)
+
 
 
 # ADJUSTED DATA // National Trends Visualization (PART 5) -------------------------------------------------------------
@@ -823,7 +824,6 @@ print("Saving all data outputs from DQA analysis...")
 write.csv(dqa_results$facility_dqa, "facility_dqa.csv", row.names = FALSE)
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)
 write.csv(dqa_results$overall_dqa, "overall_dqa.csv", row.names = FALSE)
-ggsave("dqa_heatmap_results.png", plot = dqa_heatmap_results, width = 12, height = 8)
 
 
 print("Saving adjusted data...")
@@ -834,6 +834,7 @@ print("Saving all plots...")
 ggsave("outliers_heatmap.png", plot = heatmap_outliers, width = 12, height = 8)
 ggsave("completeness_heatmap.png", plot = heatmap_plot, width = 12, height = 8)
 ggsave("bar_chart_volume_change.png", plot = bar_chart, width = 12, height = 8)
+ggsave("dqa_heatmap_results.png", plot = heatmap_dqa, width = 12, height = 8)
 ggsave("adjusted_data.png", plot = adjusted_national_plot, width = 12, height = 8)
 
 print("DQA analysis completed and outputs saved.")
