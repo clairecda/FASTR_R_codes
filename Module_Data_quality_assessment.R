@@ -765,18 +765,18 @@ plot_adjusted_national_grid <- function(national_data) {
     geom_line(size = 0.8) +  # Plot the trend lines for each scenario
     facet_wrap(~indicator, scales = "free_y") +  # Create one subplot per indicator
     labs(
-      title = "Adjusted volumes by Scenario",
-      subtitle = "Visualizing changes in service volumes over time for different adjustment scenarios",
+      title = "Adjusted volumes by adjustment scenario & indicator",
+      subtitle = "Changes in service volumes over time for different adjustment scenarios",
       x = "Year",
       y = "Total Volume",
       caption = "'Unadjusted' (raw data), 'Outlier Adjusted' (extreme values corrected), 'Completeness Adjusted' (scaled for underreporting), and 'Both Adjusted' (combined adjustments)."
     ) +
     scale_color_manual(
       values = c(
-        "Unadjusted" = "lightblue",  # Light blue for unadjusted data
-        "Outlier Adjusted" = "blue",  # Blue for outlier-adjusted data
-        "Completeness Adjusted" = "orange",  # Orange for completeness-adjusted data
-        "Both Adjusted" = "red"  # Red for both adjustments
+        "Unadjusted" = "#0099cc",  # Light blue for unadjusted data
+        "Outlier Adjusted" = "#bb99ff",  # Purple for outlier-adjusted data
+        "Completeness Adjusted" = "#ffe6b3",  # Orange for completeness-adjusted data
+        "Both Adjusted" = "#ff8080"  # Red for both adjustments
       ),
       breaks = c(
         "Unadjusted",
