@@ -195,7 +195,7 @@ plot_indicator_grid <- function(indicator_data) {
     facet_wrap(~indicator_common_id, scales = "free_y") +
     labs(
       title = "Service delivery trends with deseasonalized predictions and anomaly detection",
-      subtitle = "Predicted values were generated using seasonal-trend decomposition using LOESS (STL)",
+      subtitle = "Predicted values were generated with seasonal-trend decomposition using LOESS (STL)",
       x = "Date",
       y = "Total count",
       caption = "Black line = adjusted count (outliers removed). Green dashed line = predicted count (STL deseasonalized). Red dashed line = upper control limit (UCL). Blue dashed line = lower control limit (LCL). Red points = anomalies detected."
