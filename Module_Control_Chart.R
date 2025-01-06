@@ -34,11 +34,15 @@
 # - `UCL` (Upper Control Limit): The upper control limit for the aggregated `total_count`. Values above this limit are considered potential anomalies.
 # - `LCL` (Lower Control Limit): The lower control limit for the aggregated `total_count`. Values below this limit are considered potential anomalies.
 
+# chart...
+# black line (Total Count): it represents the actual observed count of services provided for each health indicator, but it has been adjusted for outliers. 
+# green dashed line (Predicted Count): This is the deseasonalized count.
+# It represents the expected value after removing seasonal fluctuations, derived using the STL (Seasonal-Trend Decomposition by Loess) method.
+
 # Required Libraries ------------------------------------------------------------------------------------------------
 library(tidyverse)
 library(lubridate)
 library(zoo)
-library(tidyr)   # For complete() and fill()
 library(stats)   # For ts() and stl()
 
 # Define Functions --------------------------------------------------------------------------------------------------
@@ -184,17 +188,17 @@ generate_indicator_results <- function(cleaned_data) {
 plot_indicator_grid <- function(indicator_data) {
   ggplot(indicator_data, aes(x = date, y = total_count)) +
     geom_line(size = 0.9, color = "black") +  # Actual counts
-    geom_line(aes(y = mean_predict), color = "blue", linetype = "dashed") +  # Predicted counts
+    geom_line(aes(y = mean_predict), color = "green", linetype = "dashed") +  # Predicted counts
     geom_point(data = indicator_data %>% filter(tag == 1), aes(x = date, y = total_count), color = "red", size = 0.9) +
     geom_hline(aes(yintercept = UCL), linetype = "dashed", color = "red") +
     geom_hline(aes(yintercept = LCL), linetype = "dashed", color = "blue") +
     facet_wrap(~indicator_common_id, scales = "free_y") +
     labs(
-      title = "Deseasonalized Counts by Indicator with Anomalies",
-      subtitle = "STL-based Deseasonalization with Anomaly Detection",
+      title = "Service delivery trends with deseasonalized predictions and anomaly detection",
+      subtitle = "Predicted values were generated using seasonal-trend decomposition using LOESS (STL)",
       x = "Date",
-      y = "Total Count",
-      caption = "Red dashed line = Upper Control Limit, Blue dashed line = Lower Control Limit. Dashed blue line = Predicted Count. Red points = Anomalies detected"
+      y = "Total count",
+      caption = "Black line = adjusted count (outliers removed). Green dashed line = predicted count (STL deseasonalized). Red dashed line = upper control limit (UCL). Blue dashed line = lower control limit (LCL). Red points = anomalies detected."
     ) +
     theme_minimal() +
     theme(
