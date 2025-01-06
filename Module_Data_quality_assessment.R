@@ -1,27 +1,30 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 02
+# Last edit: 2025 Jan 06
 
 # DATA: sierraleone_imported_dataset.csv
 
+# ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
+# FILE: completeness_long_format.csv  # Facility-level completeness data in a detailed long format, including reported and expected months.
+# FILE: output_consistency.csv        # Results of consistency analysis, including ratio calculations and consistency flags.
+# FILE: dqa_summary.csv               # Summary of DQA results by geography and indicator, with aggregated scores and flags.
+# FILE: adjusted_data.csv             # Dataset including facility-level adjusted volumes for all adjustment scenarios.
+
+# ------------------------------------- FOR R testing ------------------------------------------------------------------------------------------
 # FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
 # FILE: volume_increase_data.csv      # Monthly summary of volume changes due to outlier adjustments.
-# FILE: output_consistency.csv        # Results of consistency analysis, including ratio calculations and consistency flags.
 # FILE: completeness_summary.csv      # Aggregated completeness data at various geographic levels (e.g., national, regional).
-# FILE: completeness_long_format.csv  # Facility-level completeness data in a detailed long format, including reported and expected months.
+# FILE: adjusted_national_results.csv # National-level dataset summarizing adjusted service volumes for each scenario.
 # FILE: completeness_aggregate.csv    # Aggregated completeness data summarizing facility-month reporting across geographic levels.
 # FILE: facility_dqa.csv              # Facility-level results from DQA analysis, including completeness, outlier, and consistency flags.
-# FILE: dqa_summary.csv               # Summary of DQA results by geography and indicator, with aggregated scores and flags.
 # FILE: overall_dqa.csv               # Geographic-level summary of overall data quality, including aggregated DQA scores and metrics.
-# FILE: adjusted_data.csv             # Dataset including facility-level adjusted volumes for all adjustment scenarios.
-# FILE: adjusted_national_results.csv # National-level dataset summarizing adjusted service volumes for each scenario.
-
 
 # IMAGE: outliers_heatmap.png         # Heatmap visualization showing the percent change due to outliers by administrative region and indicator.
 # IMAGE: completeness_heatmap.png     # Heatmap visualization representing the completeness percentage by administrative region and indicator.
 # IMAGE: bar_chart_volume_change.png  # Bar chart showing monthly percentage changes in volume due to outlier adjustments, by region and indicator.
 # IMAGE: adjusted_data.png            # Grid plot visualizing national-level trends for all indicators under n=4 adjustment scenarios.
 # IMAGE: dqa_heatmap_results.png      # Heatmap visualization showing percentage of facilities meeting DQA criteria aggregated by region (level 2) and year.
+
 
 # Load Required Libraries -----------------------------------------------------
 library(tidyverse)
@@ -39,7 +42,7 @@ load_and_preprocess_data <- function(file_path) {
   return(list(data = data, geo_cols = geo_cols))
 }
 
-# PART 1 OUTLIERS
+# PART 1 OUTLIERS -- add column to 
 outlier_analysis <- function(data, geo_cols) {
   print("Performing outlier analysis...")
   
@@ -285,7 +288,7 @@ completeness_analysis <- function(data, geo_cols) {
     mutate(
       reported_facility_months = replace_na(reported_facility_months, 0),  # Replace missing values with 0
       expected_facility_months = 12,  # Expect 12 months per year
-      completeness_percentage = (reported_facility_months / expected_facility_months) * 100
+      completeness_percentage = (reported_facility_months / expected_facility_months)
     )
   
   geo_info <- data %>%
@@ -302,7 +305,7 @@ completeness_analysis <- function(data, geo_cols) {
     summarise(
       total_expected_facility_months = sum(expected_facility_months),
       total_reported_facility_months = sum(reported_facility_months),
-      completeness_percentage = (total_reported_facility_months / total_expected_facility_months) * 100,
+      completeness_percentage = (total_reported_facility_months / total_expected_facility_months),
       .groups = "drop"
     )
   
@@ -355,7 +358,7 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
   merged_data <- merged_data %>%
     mutate(
       dqa_temp = case_when(
-        completeness_percentage >= 90 &  # Flexible completeness threshold
+        completeness_percentage >= 0.9 &  # Flexible completeness threshold
           outlier_flag == 0 & 
           (is.na(sconsistency) | sconsistency == 1) ~ 1,
         TRUE ~ 0
@@ -470,12 +473,12 @@ apply_adjustments <- function(data,
   }
   
   # Step 5: If adjust_completeness is TRUE, scale “count_working” by fraction_reported
-  #         fraction_reported = completeness_percentage / 100
+  #         fraction_reported = completeness_percentage # Fixed error here
   if (adjust_completeness) {
     cat(" -> Scaling counts by completeness fraction...\n")
     data_merged <- data_merged %>%
       mutate(
-        fraction_reported = completeness_percentage / 100,
+        fraction_reported = completeness_percentage,
         count_working = if_else(
           !is.na(fraction_reported) & fraction_reported > 0,
           count_working / fraction_reported,  # Scale up if fraction < 1
@@ -638,8 +641,8 @@ heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id
   geom_tile(color = "white") +
   scale_fill_gradientn(
     colors = viz_colors,
-    values = rescale(c(0, 25, 50, 90, 100)),  # Adjust thresholds
-    limits = c(0, 100),                       # Ensure the scale is [0, 100]
+    values = rescale(c(0, 0.25, 0.50, 0.90, 1)),  # Adjust thresholds
+    limits = c(0, 1),                       # Ensure the scale is [0, 100]
     name = "Completeness (%)"
   ) +
   labs(
