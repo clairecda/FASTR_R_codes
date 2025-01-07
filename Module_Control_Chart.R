@@ -1,5 +1,5 @@
 # CB - R code FASTR PROJECT - Control Chart Analysis
-# Last edit: 2025 Jan 06
+# Last edit: 2025 Jan 07
 
 # DATA: sierraleone_imported_dataset.csv
 
@@ -8,36 +8,31 @@
 # IMAGE: indicator_grid_plot.png        # Grid plot of indicator-level trends with control limits.
 
 
-# NOTES
-# `control_chart_results` contains the results of the control chart analysis at the facility level. See breakdown of key columns below:
-
-# - `date`: The time period for which the data is recorded.
-# - `admin_area_1`, `admin_area_2`, `admin_area_3`: Geographic levels (national, province, district).
-# - `indicator_common_id`: The name of the health indicator (e.g., ANC visits, deliveries).
-# - `total_count`: The actual observed count of health services provided at the specific facility for the given date.
-# - `panelvar`: A unique identifier for the indicator and geographic region, used for analysis (e.g., "anc1_Sierra Leone").
-# - `count_predict`: The predicted (deseasonalized) count derived from the STL decomposition trend component.
-# - `residual`: The difference between the observed count (`total_count`) and the predicted count (`count_predict`), capturing deviations from the expected value.
-# - `seasonal`: The seasonal component extracted by STL decomposition for the facility.
-# - `sd_residual`: The standard deviation of the residuals, calculated at the facility level, used for anomaly detection.
-# - `control`: The standardized residual, calculated as `residual / sd_residual`, used to determine if a value is anomalous.
-# - `tag`: A binary anomaly flag, where `1` indicates an anomaly (when `control` exceeds ±2), and `0` indicates normal behavior.
+# NOTES/VALUE COLUMNS:
+# `control_chart_results` = results of the control chart analysis at the facility level.
+#   - `count_adjust`: Observed count of health services after outlier adjustment.
+#   - `count_predict`: Deseasonalized predicted count, derived using regression-based methods.
+#   - `residual`: Deviation of `count_adjust` from `count_predict`.
+#   - `sd_residual`: Standard deviation of residuals for anomaly detection.
+#   - `control`: Standardized residual, calculated as `residual / sd_residual`.
+#   - `tag`: Binary flag for anomalies (`1` = anomaly, `0` = normal).
 
 
-# `indicator_results` contains the aggregated results of the control chart analysis at the national (admin_area_1) & indicator level. See breakdown of key columns below:
-# - `date`: The time period for which the data is aggregated (monthly).
-# - `total_count`: The aggregated observed count of health services provided across all facilities for the specific indicator and time period.
-# - `mean_predict`: The aggregated predicted (deseasonalized) count derived from the STL decomposition trend component, averaged across all facilities.
-# - `tag`: A binary anomaly flag at the national or indicator level, where `1` indicates an anomaly (if any facility reported an anomaly during the period), and `0` indicates normal behavior.
-# - `indicator_common_id`
-# - `period_id`: A string identifier for the time period, formatted as `YYYYMM`.
-# - `UCL` (Upper Control Limit): The upper control limit for the aggregated `total_count`. Values above this limit are considered potential anomalies.
-# - `LCL` (Lower Control Limit): The lower control limit for the aggregated `total_count`. Values below this limit are considered potential anomalies.
+# `indicator_results` contains aggregated results of the control chart analysis at the national (admin_area_1) & indicator level. Key columns include:
+#   - `total_count`: Aggregated observed count across all facilities for the specific indicator and time period.
+#   - `predicted_count`: Aggregated deseasonalized count across all facilities for the specific indicator and time period.
+#   - `UCL` (Upper Control Limit): Upper threshold for identifying anomalies, calculated as the mean + 3 SD of `total_count`.
+#   - `LCL` (Lower Control Limit): Lower threshold for identifying anomalies, calculated as the mean - 3 SD of `total_count` (with no negative values).
+#   - `tag`: Binary flag for anomalies (`1` = anomaly, `0` = normal).
 
-# chart...
-# black line (Total Count): it represents the actual observed count of services provided for each health indicator, but it has been adjusted for outliers. 
-# green dashed line (Predicted Count): This is the deseasonalized count.
-# It represents the expected value after removing seasonal fluctuations, derived using the STL (Seasonal-Trend Decomposition by Loess) method.
+# VISUALIZATION:
+# The grid plot visualizes indicator-level trends:
+#   - Black line (Total Count): The observed count of services provided, adjusted for outliers.
+#   - Green dashed line (Predicted Count): The deseasonalized count derived from regression-based methods.
+#   - Red points: Detected anomalies.
+#   - Red dashed line (UCL): Upper Control Limit.
+#   - Blue dashed line (LCL): Lower Control Limit.
+
 
 # Required Libraries ------------------------------------------------------------------------------------------------
 library(tidyverse)
@@ -79,136 +74,112 @@ outlier_analysis <- function(data, geo_cols) {
   return(data)
 }
 
-# PART 3 Control Chart Analysis with STL Decomposition
-control_chart_analysis_stl <- function(cleaned_data, geo_cols) {
-  print("Performing control chart analysis with STL decomposition...")
+# PART 3: Control Chart Analysis (Aligned with Stata Methodology)
+control_chart_analysis <- function(cleaned_data, geo_cols) {
+  print("Performing control chart analysis with iteration over indicators and regions...")
   
-  # Aggregate the cleaned data by geography, indicator, and date
-  aggregated_data <- cleaned_data %>%
-    group_by(across(all_of(geo_cols)), indicator_common_id, date) %>%
-    summarise(total_count = sum(count_adjust, na.rm = TRUE), .groups = "drop")
+  # Ensure continuous time series for each panel
+  cleaned_data <- cleaned_data %>%
+    group_by(indicator_common_id, admin_area_1) %>%
+    complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")) %>%
+    fill(count_adjust, .direction = "downup") %>%  # Fill missing values
+    ungroup()
   
-  # Perform STL decomposition for each panel (indicator and geographic area)
-  stl_results <- aggregated_data %>%
-    group_by(panelvar = paste(indicator_common_id, admin_area_1, sep = "_")) %>%
-    group_split() %>%
-    map_dfr(function(panel_data) {
-      tryCatch({
-        # Ensure the time series has no missing dates
-        complete_data <- panel_data %>%
-          complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")) %>%
-          fill(total_count, .direction = "downup")
-        
-        # Check if there is enough data for STL decomposition
-        if (nrow(complete_data) >= 24) {
-          # Perform STL decomposition
-          ts_data <- ts(
-            complete_data$total_count,
-            frequency = 12,
-            start = c(year(min(complete_data$date)), month(min(complete_data$date)))
-          )
-          stl_decomp <- stl(ts_data, s.window = "periodic")
-          
-          # Extract deseasonalized trend and calculate residuals
-          trend <- as.numeric(stl_decomp$time.series[, "trend"])
-          seasonal <- as.numeric(stl_decomp$time.series[, "seasonal"])
-          residuals <- as.numeric(stl_decomp$time.series[, "remainder"])
-          
-          # Add results back to the data
-          complete_data <- complete_data %>%
-            mutate(
-              count_predict = trend,
-              residual = residuals,
-              seasonal = seasonal
-            )
-          
-          return(complete_data)
-        } else {
-          message("Skipping panelvar: ", unique(panel_data$panelvar), " - Not enough data for STL.")
-          return(tibble())
-        }
-      }, error = function(e) {
-        message("Skipping panelvar: ", unique(panel_data$panelvar), " - Error: ", e$message)
-        return(tibble())
-      })
-    })
-  
-  # Calculate standardized residuals and anomaly tags
-  stl_results <- stl_results %>%
-    group_by(panelvar) %>%
+  # Deseasonalize using regression
+  deseasonalized_data <- cleaned_data %>%
+    group_by(indicator_common_id, admin_area_1) %>%
+    nest() %>%
     mutate(
-      sd_residual = sd(residual, na.rm = TRUE),
+      model = map(data, ~ tryCatch(
+        lm(count_adjust ~ factor(month(.x$date)) + as.numeric(date), data = .x),
+        error = function(e) NULL
+      )),
+      deseasonalized = map2(data, model, ~ if (!is.null(.y)) {
+        mutate(.x, count_predict = predict(.y, newdata = .x))
+      } else {
+        seasonal_means <- .x %>%
+          group_by(month = month(date)) %>%
+          summarise(seasonal_mean = mean(count_adjust, na.rm = TRUE)) %>%
+          ungroup()
+        mutate(.x, count_predict = seasonal_means$seasonal_mean[match(.x$month, seasonal_means$month)])
+      })
+    ) %>%
+    select(-data, -model) %>%
+    unnest(deseasonalized)
+  
+  # Ensure predictions are non-negative
+  deseasonalized_data <- deseasonalized_data %>%
+    mutate(count_predict = pmax(count_predict, 0))
+  
+  # Smooth predictions using a moving average
+  deseasonalized_data <- deseasonalized_data %>%
+    group_by(indicator_common_id, admin_area_1) %>%
+    mutate(
+      count_smooth = zoo::rollmean(count_predict, k = 12, fill = NA, align = "center")
+    ) %>%
+    mutate(count_smooth = zoo::na.approx(count_smooth, na.rm = FALSE, maxgap = Inf)) %>%
+    mutate(count_smooth = ifelse(is.na(count_smooth), 0, count_smooth)) %>%
+    ungroup()
+  
+  
+  # Calculate residuals
+  deseasonalized_data <- deseasonalized_data %>%
+    group_by(indicator_common_id, admin_area_1) %>%
+    mutate(
+      residual = count_adjust - count_smooth,
+      sd_residual = sd(residual, na.rm = TRUE),  # Calculate SD of residuals
       control = residual / sd_residual,  # Standardized residuals
-      tag = ifelse(abs(control) >= 2, 1, 0)  # Flag anomalies with ±2 SD
+      tag = ifelse(abs(control) >= 2, 1, 0)  # Flag unusual points
     ) %>%
     ungroup()
   
-  return(stl_results)
+  return(deseasonalized_data)
 }
 
-# PART 4 Indicator-Level Aggregation with Control Limits
+# PART 4: Indicator-Level Aggregation with Control Limits
 generate_indicator_results <- function(cleaned_data) {
   print("Generating indicator-level results with control limits...")
   
-  unique_indicators <- unique(cleaned_data$indicator_common_id)
+  # Aggregate results by date and indicator
+  indicator_results <- cleaned_data %>%
+    group_by(indicator_common_id, date) %>%
+    summarise(
+      total_count = sum(count_adjust, na.rm = TRUE),
+      predicted_count = sum(count_smooth, na.rm = TRUE),  # Sum of smoothed predictions
+      tag = max(tag, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    group_by(indicator_common_id) %>%
+    mutate(
+      UCL = mean(total_count, na.rm = TRUE) + 3 * sd(total_count, na.rm = TRUE),  # Upper Control Limit
+      LCL = mean(total_count, na.rm = TRUE) - 3 * sd(total_count, na.rm = TRUE),  # Lower Control Limit
+      period_id = format(date, "%Y%m")
+    ) %>%
+    ungroup()
   
-  indicator_results <- lapply(unique_indicators, function(indicator) {
-    indicator_data <- cleaned_data %>%
-      filter(indicator_common_id == indicator) %>%
-      group_by(date) %>%
-      summarise(
-        total_count = sum(total_count, na.rm = TRUE),       # Aggregated actual counts
-        mean_predict = sum(count_predict, na.rm = TRUE),   # Summed predicted counts (reflect national trend)
-        tag = max(tag, na.rm = TRUE),                      # Anomaly flag: if any facility is flagged, mark as 1
-        .groups = "drop"
-      ) %>%
-      mutate(
-        indicator_common_id = indicator,
-        period_id = format(date, "%Y%m")  # Period ID for reference
-      )
-    
-    # Calculate control limits based on `total_count`
-    mean_count <- mean(indicator_data$total_count, na.rm = TRUE)
-    sd_count <- sd(indicator_data$total_count, na.rm = TRUE)
-    indicator_data <- indicator_data %>%
-      mutate(
-        UCL = mean_count + 3 * sd_count,  # Upper Control Limit
-        LCL = mean_count - 3 * sd_count  # Lower Control Limit
-      )
-    
-    return(indicator_data)
-  }) %>%
-    bind_rows()
-  
-  print("Indicator-level results generated successfully.")
   return(indicator_results)
 }
 
-# PART 5 Visualizations
+# PART 5: Visualization
 plot_indicator_grid <- function(indicator_data) {
-  ggplot(indicator_data, aes(x = date, y = total_count)) +
-    geom_line(size = 0.9, color = "black") +  # Actual counts
-    geom_line(aes(y = mean_predict), color = "green", linetype = "dashed") +  # Predicted counts
-    geom_point(data = indicator_data %>% filter(tag == 1), aes(x = date, y = total_count), color = "red", size = 0.9) +
-    geom_hline(aes(yintercept = UCL), linetype = "dashed", color = "red") +
-    geom_hline(aes(yintercept = LCL), linetype = "dashed", color = "blue") +
+  ggplot(indicator_data, aes(x = date)) +
+    geom_line(aes(y = total_count), size = 0.9, color = "black") +  # Raw counts
+    geom_line(aes(y = predicted_count), size = 0.9, color = "#1a9641") +  # Predicted counts
+    geom_point(data = indicator_data %>% filter(tag == 1), aes(y = total_count), color = "red", size = 0.9) +  # Anomalies
+    geom_hline(aes(yintercept = UCL), linetype = "dashed", color = "#d7191c") +  # Upper Control Limit
+    geom_hline(aes(yintercept = LCL), linetype = "dashed", color = "#0099cc") +  # Lower Control Limit
     facet_wrap(~indicator_common_id, scales = "free_y") +
     labs(
-      title = "Service delivery trends with deseasonalized predictions and anomaly detection",
-      subtitle = "Predicted values were generated with seasonal-trend decomposition using LOESS (STL)",
+      title = "Service delivery, regression-based predictions and anomalies",
+      subtitle = "Black line = raw counts. Green line = predicted counts.",
       x = "Date",
-      y = "Total count",
-      caption = "Black line = adjusted count (outliers removed). Green dashed line = predicted count (STL deseasonalized). Red dashed line = upper control limit (UCL). Blue dashed line = lower control limit (LCL). Red points = anomalies detected."
+      y = "Counts",
+      caption = "Red dashed line = UCL. Blue dashed line = LCL. Red points = residual-based anomalies detected."
     ) +
     theme_minimal() +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-      axis.text.y = element_text(size = 8),
-      strip.text = element_text(size = 9),
-      axis.title.x = element_text(size = 10),
-      axis.title.y = element_text(size = 10),
-      plot.title = element_text(size = 12),
-      plot.subtitle = element_text(size = 10, face = "italic")
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.text = element_text(size = 9)
     )
 }
 
@@ -220,8 +191,8 @@ geo_cols <- inputs$geo_cols
 print("Performing outlier analysis...")
 outlier_results <- outlier_analysis(data, geo_cols)
 
-print("Performing control chart analysis with STL decomposition...")
-control_chart_results <- control_chart_analysis_stl(outlier_results, geo_cols)
+print("Performing control chart analysis using iteration...")
+control_chart_results <- control_chart_analysis(outlier_results, geo_cols)
 
 print("Generating indicator-level results...")
 indicator_results <- generate_indicator_results(control_chart_results)
@@ -229,6 +200,7 @@ indicator_results <- generate_indicator_results(control_chart_results)
 print("Plotting indicator control charts...")
 indicator_grid_plot <- plot_indicator_grid(indicator_results)
 print(indicator_grid_plot)
+
 
 print("Saving results...")
 ggsave("indicator_grid_plot.png", plot = indicator_grid_plot, width = 14, height = 10)
