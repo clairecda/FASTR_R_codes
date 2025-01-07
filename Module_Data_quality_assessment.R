@@ -1,7 +1,7 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 06
+# Last edit: 2025 Jan 07
 
-# DATA: sierraleone_imported_dataset.csv
+# DATA: kenya_data.csv
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
@@ -25,6 +25,7 @@
 # IMAGE: adjusted_data.png            # Grid plot visualizing national-level trends for all indicators under n=4 adjustment scenarios.
 # IMAGE: dqa_heatmap_results.png      # Heatmap visualization showing percentage of facilities meeting DQA criteria aggregated by region (level 2) and year.
 
+# outliers - output full list of outlers (not simply top outliers)
 
 # Load Required Libraries -----------------------------------------------------
 library(tidyverse)
@@ -149,8 +150,7 @@ outlier_analysis <- function(data, geo_cols) {
 consistency_analysis <- function(data, geo_cols) {
   print("Performing consistency analysis...")
   
-  # Step 1: Identify Available Indicators
-  print("Checking available indicators...")
+  # Identify Available Indicators
   indicators <- unique(data$indicator_common_id)
   print(paste("Available indicators:", paste(indicators, collapse = ", ")))
   
@@ -162,36 +162,29 @@ consistency_analysis <- function(data, geo_cols) {
     penta = c("penta1", "penta3")
   )
   
-  # Filter out missing indicator pairs based on available data
-  pairs_to_check <- list()
-  for (key in names(required_pairs)) {
-    if (all(required_pairs[[key]] %in% indicators)) {
-      pairs_to_check[[key]] <- required_pairs[[key]]
-    } else {
-      print(paste("Skipping consistency check for", key, "due to missing indicators."))
-    }
-  }
-  
-  # If no valid pairs are available, return an empty data frame
+  # Filter out missing indicator pairs
+  pairs_to_check <- purrr::keep(required_pairs, ~ all(.x %in% indicators))
   if (length(pairs_to_check) == 0) {
     print("No valid indicator pairs available for consistency analysis.")
-    return(data.frame())
+    return(tibble(
+      !!!set_names(as.list(rep(NA, length(geo_cols))), geo_cols),
+      year = NA_integer_,
+      ratio_type = NA_character_,
+      consistency_ratio = NA_real_,
+      sconsistency = NA_integer_
+    ))
   }
   
-  # Step 2: Exclude Outliers
-  print("Excluding outliers...")
+  # Exclude Outliers
   data <- data %>%
     mutate(volume = ifelse(outlier == 1, NA, count))
   
-  # Step 3: Aggregate Data
+  # Aggregate Data
   aggregated_data <- data %>%
     group_by(across(all_of(c(geo_cols, "indicator_common_id", "year")))) %>%
-    summarise(
-      volume = sum(volume, na.rm = TRUE),
-      .groups = "drop"
-    )
+    summarise(volume = sum(volume, na.rm = TRUE), .groups = "drop")
   
-  # Pivot data to wide format for ratio calculations
+  # Pivot to Wide Format
   wide_data <- aggregated_data %>%
     pivot_wider(
       id_cols = c(geo_cols, "year"),
@@ -200,30 +193,18 @@ consistency_analysis <- function(data, geo_cols) {
       values_fill = list(volume = 0)
     )
   
-  # Debug: Print wide data column names
-  print("Wide data column names:")
-  print(colnames(wide_data))
-  
-  # Step 4: Calculate Consistency Ratios
-  print("Calculating consistency ratios...")
+  # Calculate Consistency Ratios
   for (pair_name in names(pairs_to_check)) {
     pair <- pairs_to_check[[pair_name]]
-    col1 <- pair[1] # First indicator
-    col2 <- pair[2] # Second indicator
+    col1 <- pair[1]
+    col2 <- pair[2]
+    ratio_name <- paste0("ratio_", col1)
+    sratio_name <- paste0("sratio_", col1)
     
-    # Check if both columns exist in wide_data
     if (all(c(col1, col2) %in% colnames(wide_data))) {
-      ratio_name <- paste0("ratio_", col1) # Name for the ratio
-      sratio_name <- paste0("sratio_", col1) # Name for the binary flag
-      
-      # Add ratio and flag dynamically
       wide_data <- wide_data %>%
         mutate(
-          !!ratio_name := if_else(
-            !!sym(col2) > 0,
-            !!sym(col1) / !!sym(col2),
-            NA_real_
-          ),
+          !!ratio_name := if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
           !!sratio_name := case_when(
             pair_name == "delivery" ~ (!!sym(ratio_name) >= 0.7 & !!sym(ratio_name) <= 1.3),
             TRUE ~ !!sym(ratio_name) > 1
@@ -234,8 +215,7 @@ consistency_analysis <- function(data, geo_cols) {
     }
   }
   
-  # Reshape Data Back to Long Format
-  print("Reshaping data back to long format...")
+  # Reshape Back to Long Format
   long_data <- wide_data %>%
     pivot_longer(
       cols = starts_with("ratio_"),
@@ -243,7 +223,7 @@ consistency_analysis <- function(data, geo_cols) {
       values_to = "consistency_ratio"
     ) %>%
     mutate(
-      sconsistency = if_else(str_starts(ratio_type, "sratio_"), 1, 0)
+      sconsistency = if_else(str_detect(ratio_type, "sratio_"), 1, 0)
     ) %>%
     select(any_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
   
@@ -318,20 +298,25 @@ completeness_analysis <- function(data, geo_cols) {
 }
 
 # PART 4 DQA
-# CB ... DQA - combining completeness, outliers, and consistency - is consistently applied at the annual level: True?
 dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_cols) {
   print("Performing updated DQA analysis...")
   
-  # Step 1: Map all ratio types to indicators in consistency_data
+  # Step 1: Map Ratio Types to Indicators
   ratio_mapping <- tibble(
     ratio_type = c("ratio_anc1", "ratio_delivery", "ratio_pnc1", "ratio_penta1"),
     indicator_common_id = c("anc1", "delivery", "pnc1", "penta1")
   )
   
+  # Ensure `ratio_type` exists in `consistency_data`
+  if (!"ratio_type" %in% colnames(consistency_data)) {
+    consistency_data <- consistency_data %>%
+      mutate(ratio_type = NA_character_)
+  }
+  
   consistency_data <- consistency_data %>%
     left_join(ratio_mapping, by = "ratio_type")
   
-  # Step 2: Deduplicate Inputs
+  # Step 2: Deduplicate Data
   completeness_data <- completeness_data %>%
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
   
@@ -342,7 +327,6 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE)
   
   # Step 3: Merge Completeness, Consistency, and Outliers
-  print("Merging completeness, consistency, and outlier data...")
   merged_data <- completeness_data %>%
     left_join(
       outlier_data %>% select(all_of(geo_cols), facility_id, year, indicator_common_id, outlier_flag = outlier),
@@ -353,33 +337,30 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
       by = c(geo_cols, "year", "indicator_common_id")
     )
   
-  # Step 4: Enhanced DQA Flags
-  print("Calculating enhanced DQA flags...")
+  # Step 4: Calculate DQA Flags
   merged_data <- merged_data %>%
     mutate(
       dqa_temp = case_when(
-        completeness_percentage >= 0.9 &  # Flexible completeness threshold
+        completeness_percentage >= 0.9 & 
           outlier_flag == 0 & 
           (is.na(sconsistency) | sconsistency == 1) ~ 1,
         TRUE ~ 0
       )
     )
   
-  # Step 5: Aggregate DQA Results
-  print("Aggregating DQA results...")
+  # Step 5: Summarize DQA Results
   dqa_summary <- merged_data %>%
     group_by(across(all_of(c(geo_cols, "year", "indicator_common_id")))) %>%
     summarise(
-      dqa_score = mean(dqa_temp, na.rm = TRUE),  # Proportion of facilities passing DQA
-      total_flags = sum(dqa_temp, na.rm = TRUE),  # Count of facilities passing DQA
-      completeness_avg = mean(completeness_percentage, na.rm = TRUE),  # Avg completeness
-      outlier_count = sum(outlier_flag, na.rm = TRUE),  # Outlier flags
-      consistency_failures = sum(ifelse(is.na(sconsistency), 0, 1 - sconsistency), na.rm = TRUE),  # Count of failed consistency checks
+      dqa_score = mean(dqa_temp, na.rm = TRUE),
+      total_flags = sum(dqa_temp, na.rm = TRUE),
+      completeness_avg = mean(completeness_percentage, na.rm = TRUE),
+      outlier_count = sum(outlier_flag, na.rm = TRUE),
+      consistency_failures = sum(if_else(is.na(sconsistency), 0, 1 - sconsistency), na.rm = TRUE),
       .groups = "drop"
     )
   
-  # Step 6: Overall DQA Results at Geography-Year Level
-  print("Calculating overall DQA scores...")
+  # Step 6: Overall DQA Scores
   overall_dqa <- dqa_summary %>%
     group_by(across(all_of(c(geo_cols, "year")))) %>%
     summarise(
@@ -391,13 +372,13 @@ dqa_analysis <- function(completeness_data, consistency_data, outlier_data, geo_
       .groups = "drop"
     )
   
-  # Return Updated Results
   return(list(
     facility_dqa = merged_data,
     dqa_summary = dqa_summary,
     overall_dqa = overall_dqa
   ))
 }
+
 
 # PART 5: Dynamic Adjustments (Work-in-Progress) ---------------------------------------
 # This section includes functions to dynamically adjust raw data for:
@@ -556,7 +537,7 @@ apply_adjustments_scenarios <- function(data,
 
 
 # Main Execution --------------------------------------------------------------
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("kenya_data.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 # Main Execution --------------------------------------------------------------
@@ -587,8 +568,6 @@ adjusted_data <- apply_adjustments_scenarios(
 
 
 # Visualization  --------------------------------------------------------------
-#SETUP
-viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
 
 # Outliers Heatmap (PART1)------------------------------------------------
 # Create the heatmap
@@ -635,15 +614,16 @@ bar_chart <- ggplot(outlier_data$volume_increase_data, aes(x = month, y = percen
 print(bar_chart)
 
 
-# Completeness Heatmap (PART3)------------------------------------------------
+# Completeness Heatmap (PART 3) ------------------------------------------------
 print("Creating completeness heatmap...")
 heatmap_plot <- ggplot(completeness_results$summary, aes(x = indicator_common_id, y = admin_area_2, fill = completeness_percentage)) +
   geom_tile(color = "white") +
   scale_fill_gradientn(
     colors = viz_colors,
     values = rescale(c(0, 0.25, 0.50, 0.90, 1)),  # Adjust thresholds
-    limits = c(0, 1),                       # Ensure the scale is [0, 100]
-    name = "Completeness (%)"
+    limits = c(0, 1),               
+    name = "Completeness (%)",
+    labels = scales::percent_format(accuracy = 1)  # Format labels as percentages
   ) +
   labs(
     title = "Completeness by Indicator and Region",
