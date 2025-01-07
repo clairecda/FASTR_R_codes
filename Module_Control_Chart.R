@@ -3,10 +3,12 @@
 
 # DATA: sierraleone_imported_dataset.csv
 
+# ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: control_chart_results.csv       # Facility-level control chart analysis results with flags for anomalies.
+
+
 # FILE: indicator_results.csv           # Indicator-level trends with control limits.
 # IMAGE: indicator_grid_plot.png        # Grid plot of indicator-level trends with control limits.
-
 
 # NOTES/VALUE COLUMNS:
 # `control_chart_results` = results of the control chart analysis at the facility level.
@@ -23,7 +25,6 @@
 #   - `predicted_count`: Aggregated deseasonalized count across all facilities for the specific indicator and time period.
 #   - `UCL` (Upper Control Limit): Upper threshold for identifying anomalies, calculated as the mean + 3 SD of `total_count`.
 #   - `LCL` (Lower Control Limit): Lower threshold for identifying anomalies, calculated as the mean - 3 SD of `total_count` (with no negative values).
-#   - `tag`: Binary flag for anomalies (`1` = anomaly, `0` = normal).
 
 # VISUALIZATION:
 # The grid plot visualizes indicator-level trends:
@@ -146,7 +147,6 @@ generate_indicator_results <- function(cleaned_data) {
     summarise(
       total_count = sum(count_adjust, na.rm = TRUE),
       predicted_count = sum(count_smooth, na.rm = TRUE),  # Sum of smoothed predictions
-      tag = max(tag, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     group_by(indicator_common_id) %>%
@@ -160,21 +160,21 @@ generate_indicator_results <- function(cleaned_data) {
   return(indicator_results)
 }
 
+
 # PART 5: Visualization
 plot_indicator_grid <- function(indicator_data) {
   ggplot(indicator_data, aes(x = date)) +
-    geom_line(aes(y = total_count), size = 0.9, color = "black") +  # Raw counts
-    geom_line(aes(y = predicted_count), size = 0.9, color = "#1a9641") +  # Predicted counts
-    geom_point(data = indicator_data %>% filter(tag == 1), aes(y = total_count), color = "red", size = 0.9) +  # Anomalies
+    geom_line(aes(y = total_count), size = 0.8, color = "black") +  # Raw counts
+    geom_line(aes(y = predicted_count), size = 0.8, color = "#1a9641") +  # Predicted counts
     geom_hline(aes(yintercept = UCL), linetype = "dashed", color = "#d7191c") +  # Upper Control Limit
     geom_hline(aes(yintercept = LCL), linetype = "dashed", color = "#0099cc") +  # Lower Control Limit
     facet_wrap(~indicator_common_id, scales = "free_y") +
     labs(
-      title = "Service delivery, regression-based predictions and anomalies",
-      subtitle = "Black line = raw counts. Green line = predicted counts.",
+      title = "Control Chart",
+      subtitle = "Black line: Observed counts of health services with outlier adjustments applied. Green line: Predicted (deseasonalized) counts based on regression.",
       x = "Date",
       y = "Counts",
-      caption = "Red dashed line = UCL. Blue dashed line = LCL. Red points = residual-based anomalies detected."
+      caption = "Red dashed line = UCL. Blue dashed line = LCL."
     ) +
     theme_minimal() +
     theme(
@@ -182,6 +182,7 @@ plot_indicator_grid <- function(indicator_data) {
       strip.text = element_text(size = 9)
     )
 }
+
 
 # Main Script ---------------------------------------------------------------------------------------------------------
 inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
