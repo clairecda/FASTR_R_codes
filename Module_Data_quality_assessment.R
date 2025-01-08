@@ -156,10 +156,10 @@ consistency_analysis <- function(data, geo_cols) {
   
   # Define required pairs for consistency checks
   required_pairs <- list(
-    anc = c("anc1", "anc4"),
-    delivery = c("delivery", "bcg"),
-    pnc = c("delivery", "pnc1"),
-    penta = c("penta1", "penta3")
+    pair_anc = c("anc1", "anc4"),
+    pair_delivery = c("delivery", "bcg"),
+    pair_pnc = c("delivery", "pnc1"),
+    pair_penta = c("penta1", "penta3")
   )
   
   # Filter out missing indicator pairs
@@ -193,67 +193,70 @@ consistency_analysis <- function(data, geo_cols) {
       values_fill = list(volume = 0)
     )
   
-  # Calculate Consistency Ratios
+  # Process each pair in isolation
+  pair_results <- list()
+  
   for (pair_name in names(pairs_to_check)) {
     pair <- pairs_to_check[[pair_name]]
     col1 <- pair[1]
     col2 <- pair[2]
-    ratio_name <- paste0("ratio_", col1)
-    sratio_name <- paste0("sratio_", col1)
+    ratio_name <- paste0(pair_name, "_ratio")
+    sratio_name <- paste0(pair_name, "_sratio")
     
     if (all(c(col1, col2) %in% colnames(wide_data))) {
-      wide_data <- wide_data %>%
+      # Create a temporary DataFrame for this pair
+      pair_data <- wide_data %>%
         mutate(
           !!ratio_name := if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
           !!sratio_name := case_when(
-            pair_name == "delivery" ~ (!!sym(ratio_name) >= 0.7 & !!sym(ratio_name) <= 1.3),
+            pair_name == "pair_delivery" ~ (!!sym(ratio_name) >= 0.7 & !!sym(ratio_name) <= 1.3),
             TRUE ~ !!sym(ratio_name) > 1
           )
-        )
+        ) %>%
+        select(all_of(c(geo_cols, "year", ratio_name, sratio_name)))  # Keep only relevant columns for this pair
+      
+      # Append results to the list
+      pair_results[[pair_name]] <- pair_data
+      print(paste("Processed pair:", pair_name))
     } else {
       print(paste("Skipping pair:", col1, "and", col2, "- columns not found"))
     }
   }
   
-  # Isolate only `ratio_` and `sratio_` columns for pivoting to long format
-  ratio_columns <- grep("ratio_", colnames(wide_data), value = TRUE)
-  sratio_columns <- grep("sratio_", colnames(wide_data), value = TRUE)
+  # Merge all pair results into a single wide DataFrame
+  combined_data <- reduce(pair_results, full_join, by = c(geo_cols, "year"))
   
   # Prepare long-format ratio table
-  long_ratio_data <- wide_data %>%
+  ratio_columns <- grep("_ratio$", colnames(combined_data), value = TRUE)
+  sratio_columns <- grep("_sratio$", colnames(combined_data), value = TRUE)
+  
+  long_ratio_data <- combined_data %>%
     select(all_of(c(geo_cols, "year", ratio_columns))) %>%
     pivot_longer(
-      cols = starts_with("ratio_"),
+      cols = ends_with("_ratio"),
       names_to = "ratio_type",
       values_to = "consistency_ratio"
     )
   
-  # Prepare long-format sratio table
-  long_sratio_data <- wide_data %>%
+  long_sratio_data <- combined_data %>%
     select(all_of(c(geo_cols, "year", sratio_columns))) %>%
     pivot_longer(
-      cols = starts_with("sratio_"),
+      cols = ends_with("_sratio"),
       names_to = "sratio_type",
       values_to = "sconsistency"
     ) %>%
     mutate(
-      ratio_type = gsub("sratio_", "ratio_", sratio_type)  # Match `sratio_` to corresponding `ratio_`
+      ratio_type = gsub("_sratio$", "_ratio", sratio_type)  # Match `sratio_` to corresponding `ratio_`
     ) %>%
     select(-sratio_type)
   
   # Merge ratios and sconsistency
   long_data <- long_ratio_data %>%
-    left_join(long_sratio_data, by = c(geo_cols, "year", "ratio_type"))
-  
-  # Final selection of required columns
-  long_data <- long_data %>%
+    left_join(long_sratio_data, by = c(geo_cols, "year", "ratio_type")) %>%
     mutate(
-      sconsistency = as.integer(sconsistency) # convert True/False to 1/0
+      sconsistency = as.integer(sconsistency)  # Convert TRUE/FALSE to 1/0
     ) %>%
     select(any_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
-  
-  print("Final long_data preview:")
-  print(head(long_data))
   
   return(long_data)
 }
@@ -596,6 +599,7 @@ adjusted_data <- apply_adjustments_scenarios(
 
 
 # Visualization  --------------------------------------------------------------
+viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
 
 # Outliers Heatmap (PART1)------------------------------------------------
 # Create the heatmap
