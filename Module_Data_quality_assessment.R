@@ -1,5 +1,5 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 07
+# Last edit: 2025 Jan 08
 
 # DATA: sierraleone_imported_dataset.csv
 
@@ -215,17 +215,45 @@ consistency_analysis <- function(data, geo_cols) {
     }
   }
   
-  # Reshape Back to Long Format
-  long_data <- wide_data %>%
+  # Isolate only `ratio_` and `sratio_` columns for pivoting to long format
+  ratio_columns <- grep("ratio_", colnames(wide_data), value = TRUE)
+  sratio_columns <- grep("sratio_", colnames(wide_data), value = TRUE)
+  
+  # Prepare long-format ratio table
+  long_ratio_data <- wide_data %>%
+    select(all_of(c(geo_cols, "year", ratio_columns))) %>%
     pivot_longer(
       cols = starts_with("ratio_"),
       names_to = "ratio_type",
       values_to = "consistency_ratio"
+    )
+  
+  # Prepare long-format sratio table
+  long_sratio_data <- wide_data %>%
+    select(all_of(c(geo_cols, "year", sratio_columns))) %>%
+    pivot_longer(
+      cols = starts_with("sratio_"),
+      names_to = "sratio_type",
+      values_to = "sconsistency"
     ) %>%
     mutate(
-      sconsistency = if_else(str_detect(ratio_type, "sratio_"), 1, 0)
+      ratio_type = gsub("sratio_", "ratio_", sratio_type)  # Match `sratio_` to corresponding `ratio_`
+    ) %>%
+    select(-sratio_type)
+  
+  # Merge ratios and sconsistency
+  long_data <- long_ratio_data %>%
+    left_join(long_sratio_data, by = c(geo_cols, "year", "ratio_type"))
+  
+  # Final selection of required columns
+  long_data <- long_data %>%
+    mutate(
+      sconsistency = as.integer(sconsistency) # convert True/False to 1/0
     ) %>%
     select(any_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
+  
+  print("Final long_data preview:")
+  print(head(long_data))
   
   return(long_data)
 }
@@ -600,7 +628,7 @@ heatmap_outliers <- outlier_data$heatmap_data %>%
 print(heatmap_outliers)
 
 
-# Volume Increase Due to Outliers ------------------------
+# Volume Increase Due to Outliers ---------------------------------------------
 bar_chart <- ggplot(outlier_data$volume_increase_data, aes(x = month, y = percent_change, fill = admin_area_1)) +
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~indicator_common_id, scales = "free_y") +
@@ -612,6 +640,52 @@ bar_chart <- ggplot(outlier_data$volume_increase_data, aes(x = month, y = percen
   ) +
   theme_minimal()
 print(bar_chart)
+
+# Consistency Heatmap (PART2) ---------------------------------------------------
+print("Creating consistency heatmap...")
+
+# Step 1: Summarize consistency benchmarks by geographic area
+consistency_summary <- consistency_data %>%
+  group_by(admin_area_3, ratio_type) %>%
+  summarise(
+    percent_meeting_benchmark = mean(sconsistency, na.rm = TRUE) * 100,  # Calculate % meeting consistency
+    .groups = "drop"
+  )
+
+# Step 2: Pivot data for heatmap
+consistency_heatmap_data <- consistency_summary %>%
+  pivot_wider(
+    names_from = ratio_type,
+    values_from = percent_meeting_benchmark,
+    values_fill = 0  # Fill missing with 0 if no data
+  )
+
+# Step 3: Create the heatmap plot
+consistency_heatmap <- consistency_summary %>%
+  ggplot(aes(x = ratio_type, y = admin_area_3, fill = percent_meeting_benchmark)) +
+  geom_tile(color = "white") +
+  scale_fill_gradientn(
+    colors = c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"),
+    values = rescale(c(0, 25, 50, 75, 100)),
+    limits = c(0, 100),
+    name = "Percent Meeting\nConsistency (%)"
+  ) +
+  labs(
+    title = "Consistency Benchmarks by Administrative Area",
+    subtitle = "Percent of administrative areas meeting consistency benchmarks",
+    x = "Consistency Benchmark",
+    y = "Administrative Area",
+    fill = "Consistency (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+
+# Step 4: Print the heatmap
+print(consistency_heatmap)
+
 
 
 # Completeness Heatmap (PART 3) ------------------------------------------------
@@ -693,6 +767,9 @@ generate_dqa_heatmap <- function(dqa_summary, geo_col = "admin_area_2", year_col
 dqa_heatmap_results <- generate_dqa_heatmap(dqa_results$dqa_summary)
 heatmap_dqa <- dqa_heatmap_results$heatmap_plot  # Access the plot for further use
 print(heatmap_dqa)
+
+
+
 
 
 
