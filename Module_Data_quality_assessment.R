@@ -1,7 +1,7 @@
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Jan 07
 
-# DATA: kenya_data.csv
+# DATA: sierraleone_imported_dataset.csv
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
@@ -537,7 +537,7 @@ apply_adjustments_scenarios <- function(data,
 
 
 # Main Execution --------------------------------------------------------------
-inputs <- load_and_preprocess_data("kenya_data.csv")
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 # Main Execution --------------------------------------------------------------
