@@ -185,7 +185,7 @@ plot_indicator_grid <- function(indicator_data) {
 
 
 # Main Script ---------------------------------------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
