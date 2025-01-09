@@ -1,7 +1,7 @@
 # CB - R code FASTR PROJECT - Control Chart Analysis
 # Last edit: 2025 Jan 07
 
-# DATA: sierraleone_imported_dataset.csv
+# DATA: guinea_imported_dataset.csv
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: control_chart_results.csv       # Facility-level control chart analysis results with flags for anomalies.
@@ -81,14 +81,14 @@ control_chart_analysis <- function(cleaned_data, geo_cols) {
   
   # Ensure continuous time series for each panel
   cleaned_data <- cleaned_data %>%
-    group_by(indicator_common_id, admin_area_1) %>%
+    group_by(indicator_common_id, across(all_of(geo_cols))) %>%
     complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")) %>%
     fill(count_adjust, .direction = "downup") %>%  # Fill missing values
     ungroup()
   
   # Deseasonalize using regression
   deseasonalized_data <- cleaned_data %>%
-    group_by(indicator_common_id, admin_area_1) %>%
+    group_by(indicator_common_id, admin_area_3) %>%
     nest() %>%
     mutate(
       model = map(data, ~ tryCatch(
@@ -185,7 +185,7 @@ plot_indicator_grid <- function(indicator_data) {
 
 
 # Main Script ---------------------------------------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
