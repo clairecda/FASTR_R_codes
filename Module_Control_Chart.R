@@ -185,7 +185,7 @@ plot_indicator_grid <- function(indicator_data) {
 
 
 # Main Script ---------------------------------------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -194,6 +194,10 @@ outlier_results <- outlier_analysis(data, geo_cols)
 
 print("Performing control chart analysis using iteration...")
 control_chart_results <- control_chart_analysis(outlier_results, geo_cols)
+
+control_chart_results <- control_chart_results %>%
+  filter(!is.na(period_id))
+
 
 print("Generating indicator-level results...")
 indicator_results <- generate_indicator_results(control_chart_results)
