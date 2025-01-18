@@ -1,16 +1,17 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 17
+# Last edit: 2025 Jan 18
 # Module: DATA QUALITY ASSESSMENT
 
-# DATA: sierraleone_imported_dataset.csv
+# DATA: guinea_imported_dataset.csv
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
 # FILE: completeness_long_format.csv  # Facility-level completeness data in a detailed long format, including reported and expected months.
-# FILE: output_consistency.csv        # Results of consistency analysis, including ratio calculations and consistency flags.
+# FILE: output_consistency_geo.csv    # Geo-level consistency results
+# FILE: output_consistency_facility.csv # Facility-level consistency results
 # FILE: dqa_summary.csv               # Summary of DQA results by admin_area_2 and priority indicator (% of facilities meeting DQA criteria).
 # FILE: facility_dqa.csv              # Facility-level results from DQA analysis.
-
+     
 
 # ------------------------------------- FOR R testing ------------------------------------------------------------------------------------------
 # FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
@@ -77,9 +78,12 @@ outlier_analysis <- function(data, geo_cols) {
     group_by(across(all_of(c(geo_cols, "indicator_common_id")))) %>%
     mutate(
       count_adjust = ifelse(outlier == 1, median(count, na.rm = TRUE), count),
+      deviance = ifelse(count_adjust > 0, (count - count_adjust) / count_adjust, NA_real_),
       volIM = mean(count[!outlier], na.rm = TRUE)
     ) %>%
     ungroup()
+
+  
   
   # Step 6: Generate Dataset for Reporting Top Outliers
   print("Generating dataset for reporting top outliers...")
@@ -143,7 +147,7 @@ outlier_analysis <- function(data, geo_cols) {
 facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id") {
   print("Performing facility-level consistency analysis...")
   
-  # Define required pairs for consistency checks
+  # Define required pairs for consistency checks # Add code block to allow for more pairs
   required_pairs <- list(
     pair_anc = c("anc1", "anc4"),
     pair_delivery = c("delivery", "bcg"),
@@ -223,7 +227,7 @@ facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id
     left_join(long_sratio_data, by = c(geo_cols_facility, "year", "ratio_type")) %>%
     mutate(sconsistency = as.integer(sconsistency))
   
-  # Join geographic columns back if available
+  # Join geographic columns back
   geo_cols <- colnames(data)[grepl("^admin_area_", colnames(data))]
   if (length(geo_cols) > 0) {
     long_data <- data %>%
@@ -240,7 +244,7 @@ facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id
 geo_consistency_analysis <- function(data, geo_cols) {
   print("Performing geo-level consistency analysis...")
   
-  # Define required pairs for consistency checks
+  # Step 1: Define required pairs for consistency checks
   required_pairs <- list(
     pair_anc = c("anc1", "anc4"),
     pair_delivery = c("delivery", "bcg"),
@@ -248,16 +252,16 @@ geo_consistency_analysis <- function(data, geo_cols) {
     pair_penta = c("penta1", "penta3")
   )
   
-  # Exclude Outliers
+  # Step 2: Exclude Outliers
   data <- data %>%
     mutate(count = ifelse(outlier == 1, NA, count))
   
-  # Aggregate data at geographic level
+  # Step 3: Aggregate data at geographic level
   aggregated_data <- data %>%
     group_by(across(all_of(c(geo_cols, "indicator_common_id", "year")))) %>%
     summarise(count = sum(count, na.rm = TRUE), .groups = "drop")
   
-  # Pivot to wide format
+  # Step 4: Pivot to wide format
   wide_data <- aggregated_data %>%
     pivot_wider(
       id_cols = c(geo_cols, "year"),
@@ -266,7 +270,7 @@ geo_consistency_analysis <- function(data, geo_cols) {
       values_fill = list(count = 0)
     )
   
-  # Process each pair in isolation
+  # Step 5: Process each pair in isolation
   pair_results <- list()
   
   for (pair_name in names(required_pairs)) {
@@ -292,14 +296,13 @@ geo_consistency_analysis <- function(data, geo_cols) {
     }
   }
   
-  # Combine results from all pairs
+  # Step 6: Combine results from all pairs
   combined_data <- bind_rows(pair_results)
   
-  # Ensure `sconsistency` is converted to integer for clarity
+  # Ensure `sconsistency` is converted to integer
   combined_data <- combined_data %>%
     mutate(sconsistency = as.integer(sconsistency))
   
-  # Return the cleaned and consistent dataset
   return(combined_data)
 }
 
@@ -308,7 +311,7 @@ geo_consistency_analysis <- function(data, geo_cols) {
 completeness_analysis <- function(data, geo_cols) {
   print("Performing completeness analysis (facility-month >0) with dynamic expected months...")
   
-  # 1) Identify the min and max month for EACH year in the dataset
+  # Step 1: Identify the min and max month for EACH year in the dataset
   year_month_range <- data %>%
     group_by(year) %>%
     summarise(
@@ -317,7 +320,7 @@ completeness_analysis <- function(data, geo_cols) {
       .groups = "drop"
     )
   
-  # 2) Build a table of all (year, month) combos from min_month..max_month for each year
+  # Step 2: Build a table of all (year, month) combos from min_month..max_month for each year
   all_year_months <- year_month_range %>%
     rowwise() %>%
     mutate(
@@ -327,18 +330,18 @@ completeness_analysis <- function(data, geo_cols) {
     rename(month = month_seq) %>%
     ungroup()
   
-  # 3) Cross with all facilities
+  # Step 3: Cross with all facilities
   all_facilities <- data %>%
     distinct(facility_id)
   
   complete_month_grid <- all_facilities %>%
     crossing(all_year_months)
   
-  # 4) LEFT JOIN raw data so missing months become NA
+  # Step 4: LEFT JOIN raw data so missing months become NA
   expanded_data <- complete_month_grid %>%
     left_join(data, by = c("facility_id", "year", "month"))
   
-  # 5) Convert year-month to a Date and add period_id (yyyymm)
+  # Step 5: Convert year-month to a Date and add period_id (yyyymm)
   expanded_data <- expanded_data %>%
     mutate(
       date = as.Date(paste(year, month, "1", sep = "-")),
@@ -350,7 +353,7 @@ completeness_analysis <- function(data, geo_cols) {
       !is.na(date)
     )
   
-  # 6) Summarize monthly reported units
+  # Step 6: Summarize monthly reported units
   facility_month_data <- expanded_data %>%
     group_by(
       facility_id, 
@@ -368,7 +371,7 @@ completeness_analysis <- function(data, geo_cols) {
       completeness_flag = ifelse(monthly_reported_units > 0, 1, 0)
     )
   
-  # 7) Count "expected months" for each facility-year
+  # Step 7: Count "expected months" for each facility-year
   year_monthly_reported_units_by_facility <- expanded_data %>%
     group_by(facility_id, year) %>%
     summarise(
@@ -376,7 +379,7 @@ completeness_analysis <- function(data, geo_cols) {
       .groups = "drop"
     )
   
-  # 8) Summarize to yearly level
+  # Step 8: Summarize to yearly level
   yearly_summary <- facility_month_data %>%
     group_by(
       facility_id, 
@@ -396,7 +399,7 @@ completeness_analysis <- function(data, geo_cols) {
       completeness_percentage = reported_facility_months / expected_facility_months
     )
   
-  # 9) Aggregate by geographies
+  # Step 9: Aggregate by geographies
   geography_aggregate <- yearly_summary %>%
     group_by(
       across(all_of(geo_cols)), 
@@ -410,7 +413,7 @@ completeness_analysis <- function(data, geo_cols) {
       .groups = "drop"
     )
   
-  # 10) Return results
+  # Step 10: Return results
   list(
     facility_month_data = facility_month_data,
     yearly_summary       = yearly_summary,
@@ -427,7 +430,7 @@ dqa_analysis_strict_facility_consistency <- function(
 ) {
   print("Performing strict DQA analysis (facility-level consistency)...")
   
-  # Define relevant indicators for DQA
+  # Step 1: Define relevant indicators for DQA
   relevant_indicators <- c("opd", "penta1", "anc1")  # List of priority indicators
   
   # Map ratio types to corresponding indicators
@@ -454,7 +457,7 @@ dqa_analysis_strict_facility_consistency <- function(
       by = c(geo_cols, "facility_id", "year", "indicator_common_id")
     )
   
-  # Create DQA criteria
+  # Step 2: Create DQA criteria
   merged_data <- merged_data %>%
     mutate(
       dqa_temp = case_when(
@@ -463,7 +466,7 @@ dqa_analysis_strict_facility_consistency <- function(
           completeness == 1 & 
           outlier_flag == 0 ~ 1,
         
-        # Penta1 / ANC1 require sconsistency == 1 or NA
+        # Penta1 & ANC1 require sconsistency == 1 or NA?
         indicator_common_id %in% c("penta1", "anc1") &
           completeness == 1 &
           outlier_flag == 0 &
@@ -474,7 +477,7 @@ dqa_analysis_strict_facility_consistency <- function(
       )
     )
   
-  # Aggregate DQA results for summary
+  # Step 3: Aggregate DQA results for summary
   dqa_summary <- merged_data %>%
     group_by(admin_area_2, year, indicator_common_id) %>%
     summarise(
@@ -483,7 +486,7 @@ dqa_analysis_strict_facility_consistency <- function(
       .groups = "drop"
     )
   
-  # Return results as a list
+  # Step 4: Return results as a list
   return(list(
     dqa_results = merged_data %>% select(all_of(geo_cols), facility_id, year, indicator_common_id, ratio_type, dqa_temp),
     dqa_summary = dqa_summary
@@ -539,7 +542,7 @@ dqa_results <- dqa_analysis_strict_facility_consistency(
 viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
 
 # PART 1 - VIZ
-# 1) Outliers Heatmap
+# A - Outliers Heatmap
 heatmap_outliers <- outlier_results$heatmap_data %>%
   pivot_longer(
     cols = -all_of(geo_cols), # Exclude all geographic columns dynamically
@@ -569,7 +572,7 @@ heatmap_outliers <- outlier_results$heatmap_data %>%
 print(heatmap_outliers)
 
 
-# 2) Volume Increase Due to Outliers
+# B - Volume Increase Due to Outliers
 bar_chart <- ggplot(outlier_results$volume_increase_data, aes(x = month, y = percent_change, fill = admin_area_1)) +
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~indicator_common_id, scales = "free_y") +
@@ -729,11 +732,11 @@ write.csv(facility_consistency_results, "output_consistency_facility.csv", row.n
 print("Saving all data outputs from completeness analysis...")
 write.csv(completeness_results$geography_aggregate, "completeness_geo_aggregated.csv", row.names = FALSE) # Geo-level completeness
 write.csv(completeness_results$facility_month_data, "completeness_long_format.csv", row.names = FALSE)     # Facility-month completeness
+write.csv(completeness_results$yearly_summary, "completeness_yearly_summary.csv", row.names = FALSE)     # Facility-month completeness by year
 
 print("Saving all data outputs from DQA analysis...")
 write.csv(dqa_results$dqa_results, "facility_dqa.csv", row.names = FALSE)                                # Facility-level DQA results
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)                                 # Summary by admin_area_2 DQA results
-
 
 
 # -------------------------------- SAVE VISUALIZATIONS --------------------------------------------------
