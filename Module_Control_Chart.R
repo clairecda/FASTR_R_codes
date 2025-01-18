@@ -1,5 +1,5 @@
 # CB - R code FASTR PROJECT - Control Chart Analysis
-# Last edit: 2025 Jan 07
+# Last edit: 2025 Jan 10
 
 # DATA: guinea_imported_dataset.csv
 
@@ -42,7 +42,6 @@ library(zoo)
 library(stats)   # For ts() and stl()
 
 # Define Functions --------------------------------------------------------------------------------------------------
-
 # PART 1 Load and Preprocess Data
 load_and_preprocess_data <- function(file_path) {
   print("Loading and preprocessing data...")
@@ -79,14 +78,27 @@ outlier_analysis <- function(data, geo_cols) {
 control_chart_analysis <- function(cleaned_data, geo_cols) {
   print("Performing control chart analysis with iteration over indicators and regions...")
   
-  # Ensure continuous time series for each panel
+  # Identify the latest available date
+  latest_date <- max(cleaned_data$date, na.rm = TRUE)
+  
+  # Ensure continuous time series for each panel only up to the latest available date
   cleaned_data <- cleaned_data %>%
     group_by(indicator_common_id, across(all_of(geo_cols))) %>%
-    complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")) %>%
-    fill(count_adjust, .direction = "downup") %>%  # Fill missing values
+    complete(
+      date = seq(min(date, na.rm = TRUE), latest_date, by = "month")  # Use latest_date here
+    ) %>%
+    mutate(
+      # Fill missing values
+      count_adjust = if_else(is.na(count_adjust), 0, count_adjust),
+      year = year(date),
+      month = month(date),
+      period_id = if_else(!is.na(date), format(date, "%Y%m"), NA_character_)
+    ) %>%
     ungroup()
+  # Verify
+  print(colnames(cleaned_data))  # Ensure indicator_common_id is still present
   
-  # Deseasonalize using regression
+  # Proceed with deseasonalization and smoothing...
   deseasonalized_data <- cleaned_data %>%
     group_by(indicator_common_id, admin_area_3) %>%
     nest() %>%
@@ -108,29 +120,28 @@ control_chart_analysis <- function(cleaned_data, geo_cols) {
     select(-data, -model) %>%
     unnest(deseasonalized)
   
-  # Ensure predictions are non-negative
-  deseasonalized_data <- deseasonalized_data %>%
-    mutate(count_predict = pmax(count_predict, 0))
-  
   # Smooth predictions using a moving average
   deseasonalized_data <- deseasonalized_data %>%
-    group_by(indicator_common_id, admin_area_1) %>%
+    group_by(indicator_common_id, admin_area_3) %>%
     mutate(
-      count_smooth = zoo::rollmean(count_predict, k = 12, fill = NA, align = "center")
+      count_smooth = if (n() < 12) {
+        zoo::rollmean(count_predict, k = n(), fill = NA, align = "center")
+      } else {
+        zoo::rollmean(count_predict, k = 12, fill = NA, align = "center")
+      },
+      count_smooth = zoo::na.approx(count_smooth, na.rm = FALSE, maxgap = Inf),
+      count_smooth = ifelse(is.na(count_smooth), 0, count_smooth)
     ) %>%
-    mutate(count_smooth = zoo::na.approx(count_smooth, na.rm = FALSE, maxgap = Inf)) %>%
-    mutate(count_smooth = ifelse(is.na(count_smooth), 0, count_smooth)) %>%
     ungroup()
-  
   
   # Calculate residuals
   deseasonalized_data <- deseasonalized_data %>%
-    group_by(indicator_common_id, admin_area_1) %>%
+    group_by(indicator_common_id, admin_area_3) %>%
     mutate(
       residual = count_adjust - count_smooth,
-      sd_residual = sd(residual, na.rm = TRUE),  # Calculate SD of residuals
-      control = residual / sd_residual,  # Standardized residuals
-      tag = ifelse(abs(control) >= 2, 1, 0)  # Flag unusual points
+      sd_residual = sd(residual, na.rm = TRUE),
+      control = residual / sd_residual,
+      tag = ifelse(abs(control) >= 2, 1, 0)
     ) %>%
     ungroup()
   
@@ -143,16 +154,17 @@ generate_indicator_results <- function(cleaned_data) {
   
   # Aggregate results by date and indicator
   indicator_results <- cleaned_data %>%
+    filter(!is.na(count_adjust) & !is.na(count_predict)) %>%  # Only use valid data
     group_by(indicator_common_id, date) %>%
     summarise(
       total_count = sum(count_adjust, na.rm = TRUE),
-      predicted_count = sum(count_smooth, na.rm = TRUE),  # Sum of smoothed predictions
+      predicted_count = sum(count_smooth, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     group_by(indicator_common_id) %>%
     mutate(
-      UCL = mean(total_count, na.rm = TRUE) + 3 * sd(total_count, na.rm = TRUE),  # Upper Control Limit
-      LCL = mean(total_count, na.rm = TRUE) - 3 * sd(total_count, na.rm = TRUE),  # Lower Control Limit
+      UCL = mean(total_count, na.rm = TRUE) + 3 * sd(total_count, na.rm = TRUE), #Upper Control Limit
+      LCL = mean(total_count, na.rm = TRUE) - 3 * sd(total_count, na.rm = TRUE), #Lower Control Limit
       period_id = format(date, "%Y%m")
     ) %>%
     ungroup()
@@ -160,8 +172,7 @@ generate_indicator_results <- function(cleaned_data) {
   return(indicator_results)
 }
 
-
-# PART 5: Visualization
+# PART 5: Visualization (national view)
 plot_indicator_grid <- function(indicator_data) {
   ggplot(indicator_data, aes(x = date)) +
     geom_line(aes(y = total_count), size = 0.8, color = "black") +  # Raw counts
@@ -183,7 +194,6 @@ plot_indicator_grid <- function(indicator_data) {
     )
 }
 
-
 # Main Script ---------------------------------------------------------------------------------------------------------
 inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
@@ -191,23 +201,15 @@ geo_cols <- inputs$geo_cols
 
 print("Performing outlier analysis...")
 outlier_results <- outlier_analysis(data, geo_cols)
-
 print("Performing control chart analysis using iteration...")
 control_chart_results <- control_chart_analysis(outlier_results, geo_cols)
-
-control_chart_results <- control_chart_results %>%
-  filter(!is.na(period_id))
-
-
 print("Generating indicator-level results...")
 indicator_results <- generate_indicator_results(control_chart_results)
-
 print("Plotting indicator control charts...")
 indicator_grid_plot <- plot_indicator_grid(indicator_results)
 print(indicator_grid_plot)
 
-
-print("Saving results...")
+# print("Saving results...")
 ggsave("indicator_grid_plot.png", plot = indicator_grid_plot, width = 14, height = 10)
 write.csv(control_chart_results, "control_chart_results.csv", row.names = FALSE)
 write.csv(indicator_results, "indicator_results.csv", row.names = FALSE)
