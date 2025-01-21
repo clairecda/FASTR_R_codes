@@ -4,26 +4,64 @@
 
 # DATA: guinea_imported_dataset.csv
 
+# ------------------------------------- PARAMETERS -----------------------------
+
+# ------------------------------------------------------------------------------
+
+# Outlier Analysis Parameters
+outlier_params <- list(
+  outlier_pc_threshold = 0.8,  # Threshold for proportional contribution to flag outliers
+  count_threshold = 100        # Minimum count to consider for outlier adjustment
+)
+
+# Consistency Analysis Parameters 
+consistency_params <- list(
+  consistency_pairs = list(
+    pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
+    pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
+    pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
+    # Removed pair_pnc - it was part of the stata analysis - it is not mentioned in the methodology?
+  ),
+  consistency_ranges = list(
+    pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
+    pair_penta = c(lower = 1, upper = Inf),       # Penta1 / Penta3 > 1
+    pair_anc = c(lower = 1, upper = Inf)          # ANC1 / ANC4 > 1
+    # Removed pair_pnc consistency range - for review
+  )
+)
+
+# DQA Analysis Parameters
+dqa_params <- list(
+  priority_indicators = c("opd", "penta1", "anc1"),  # List of priority indicators
+  non_priority_indicators = c("penta3", "anc4"),     # Explicitly defined non-priority indicators (replace with NULL to select all indicators that are not in the priority list)
+  dqa_rules = list(
+    priority = list(
+      completeness = 1,
+      outlier_flag = 0,
+      sconsistency = 1
+    ),
+    non_priority = list(
+      completeness = 1,
+      outlier_flag = 0
+      # sconsistency not required for non-priority indicators
+    )
+  )
+)
+
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: output_outliers.csv           # Detailed facility-level data with identified outliers and adjusted volumes.
 # FILE: completeness_long_format.csv  # Facility-level completeness data in a detailed long format, including reported and expected months.
-# FILE: output_consistency_geo.csv    # Geo-level consistency results
+# FILE: output_consistency_geo.csv    # District-level consistency results
 # FILE: output_consistency_facility.csv # Facility-level consistency results
-# FILE: dqa_summary.csv               # Summary of DQA results by admin_area_2 and priority indicator (% of facilities meeting DQA criteria).
+# FILE: dqa_summary.csv               # Summary of DQA results by admin_area_2 and indicators (% of facilities meeting DQA criteria).
 # FILE: facility_dqa.csv              # Facility-level results from DQA analysis.
-     
 
-# ------------------------------------- FOR R testing ------------------------------------------------------------------------------------------
-# FILE: top_outliers_data.csv         # Top outliers based on percentage change in volume, highlighting extreme deviations.
-# FILE: volume_increase_data.csv      # Monthly summary of volume changes due to outlier adjustments.
-# FILE: completeness_summary.csv      # Aggregated completeness data at various geographic levels (e.g., national, regional).
-# FILE: adjusted_national_results.csv # National-level dataset summarizing adjusted service volumes for each scenario.
-# FILE: completeness_aggregate.csv    # Aggregated completeness data summarizing facility-month reporting across geographic levels.
 
 
 # Load Required Libraries -----------------------------------------------------
 library(tidyverse)
 library(scales)
+library(lubridate)  # Ensure lubridate is loaded for floor_date
 
 # Define Functions -----------------------------------------------------------
 load_and_preprocess_data <- function(file_path) {
@@ -37,8 +75,67 @@ load_and_preprocess_data <- function(file_path) {
   return(list(data = data, geo_cols = geo_cols))
 }
 
+# Function to Adjust DQA Parameters for Flexibility
+adjust_dqa_parameters <- function(dqa_params, consistency_params, data) {
+  # Adjust priority indicators
+  existing_priority <- dqa_params$priority_indicators[dqa_params$priority_indicators %in% unique(data$indicator_common_id)]
+  missing_priority <- setdiff(dqa_params$priority_indicators, existing_priority)
+  
+  if(length(missing_priority) > 0) {
+    warning(paste("The following priority indicators are missing from the data and will be excluded:", 
+                  paste(missing_priority, collapse = ", ")))
+    dqa_params$priority_indicators <- existing_priority
+  }
+  
+  # Handle non_priority_indicators
+  if(is.null(dqa_params$non_priority_indicators)) {
+    # Automatically assign all indicators not in priority as non-priority
+    dqa_params$non_priority_indicators <- setdiff(unique(data$indicator_common_id), dqa_params$priority_indicators)
+    message("Non-priority indicators have been automatically assigned as all indicators not listed as priority.")
+  } else {
+    # Ensure that explicitly defined non-priority indicators exist in the data
+    existing_non_priority <- dqa_params$non_priority_indicators[dqa_params$non_priority_indicators %in% unique(data$indicator_common_id)]
+    missing_non_priority <- setdiff(dqa_params$non_priority_indicators, existing_non_priority)
+    
+    if(length(missing_non_priority) > 0) {
+      warning(paste("The following non-priority indicators are missing from the data and will be excluded:", 
+                    paste(missing_non_priority, collapse = ", ")))
+      dqa_params$non_priority_indicators <- existing_non_priority
+    }
+    
+    # Assign remaining indicators not in priority or explicitly non-priority
+    auto_assigned_non_priority <- setdiff(unique(data$indicator_common_id), 
+                                          c(dqa_params$priority_indicators, dqa_params$non_priority_indicators))
+    
+    if(length(auto_assigned_non_priority) > 0) {
+      message(paste("Automatically assigning the following indicators as non-priority:", 
+                    paste(auto_assigned_non_priority, collapse = ", ")))
+      dqa_params$non_priority_indicators <- c(dqa_params$non_priority_indicators, auto_assigned_non_priority)
+    }
+  }
+  
+  # Adjust consistency_params based on available indicators
+  consistency_pairs_names <- names(consistency_params$consistency_pairs)
+  
+  # Identify valid consistency pairs where both indicators exist
+  valid_consistency_pairs <- consistency_params$consistency_pairs[sapply(consistency_params$consistency_pairs, 
+                                                                         function(pair) all(pair %in% unique(data$indicator_common_id)))]
+  
+  # Update consistency_params with valid pairs only
+  consistency_params$consistency_pairs <- valid_consistency_pairs
+  consistency_params$consistency_ranges <- consistency_params$consistency_ranges[names(consistency_params$consistency_ranges) %in% names(valid_consistency_pairs)]
+  
+  if(length(consistency_params$consistency_pairs) < length(consistency_pairs_names)) {
+    removed_pairs <- setdiff(consistency_pairs_names, names(consistency_params$consistency_pairs))
+    warning(paste("Removed the following consistency pairs due to missing indicators:", 
+                  paste(removed_pairs, collapse = ", ")))
+  }
+  
+  return(list(dqa_params = dqa_params, consistency_params = consistency_params))
+}
+
 # PART 1 OUTLIERS
-outlier_analysis <- function(data, geo_cols) {
+outlier_analysis <- function(data, geo_cols, outlier_params) {
   print("Performing outlier analysis...")
   
   # Step 1: Calculate Median Volume
@@ -59,18 +156,18 @@ outlier_analysis <- function(data, geo_cols) {
     ) %>%
     ungroup()
   
-  # Step 3: Calculate Proportional Contribution
+  # Step 3: Calculate Proportional Contribution using Parameter
   data <- data %>%
     group_by(facility_id, indicator_common_id, year) %>%
     mutate(
       pc = count / sum(count, na.rm = TRUE),
-      outlier_pc = ifelse(!is.na(pc) & pc > 0.8, 1, 0)
+      outlier_pc = ifelse(!is.na(pc) & pc > outlier_params$outlier_pc_threshold, 1, 0)
     ) %>%
     ungroup()
   
   # Step 4: Combine Outlier Flags
   data <- data %>%
-    mutate(outlier = ifelse((outlier_mad == 1 | outlier_pc == 1) & count > 100, 1, 0))
+    mutate(outlier = ifelse((outlier_mad == 1 | outlier_pc == 1) & count > outlier_params$count_threshold, 1, 0))
   
   # Step 5: Adjust Outliers
   print("Adjusting outliers...")
@@ -82,8 +179,6 @@ outlier_analysis <- function(data, geo_cols) {
       volIM = mean(count[!outlier], na.rm = TRUE)
     ) %>%
     ungroup()
-
-  
   
   # Step 6: Generate Dataset for Reporting Top Outliers
   print("Generating dataset for reporting top outliers...")
@@ -144,16 +239,12 @@ outlier_analysis <- function(data, geo_cols) {
 }
 
 # PART 2-A: Consistency Analysis - Facility Level ----------------------------
-facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id") {
+facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id", consistency_params) {
   print("Performing facility-level consistency analysis...")
   
-  # Define required pairs for consistency checks # Add code block to allow for more pairs
-  required_pairs <- list(
-    pair_anc = c("anc1", "anc4"),
-    pair_delivery = c("delivery", "bcg"),
-    pair_pnc = c("delivery", "pnc1"),
-    pair_penta = c("penta1", "penta3")
-  )
+  # Extract required pairs and ranges from parameters
+  required_pairs <- consistency_params$consistency_pairs
+  consistency_ranges <- consistency_params$consistency_ranges
   
   # Exclude Outliers
   data <- data %>%
@@ -184,12 +275,21 @@ facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id
     sratio_name <- paste0(pair_name, "_sratio")
     
     if (all(c(col1, col2) %in% colnames(wide_data))) {
+      # Retrieve consistency range for the current pair
+      range <- consistency_ranges[[pair_name]]
+      lower_bound <- range["lower"]
+      upper_bound <- range["upper"]
+      
       pair_data <- wide_data %>%
         mutate(
           !!ratio_name := if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
           !!sratio_name := case_when(
-            pair_name == "pair_delivery" ~ (!!sym(ratio_name) >= 0.7 & !!sym(ratio_name) <= 1.3),
-            TRUE ~ !!sym(ratio_name) > 1
+            !is.na(!!sym(ratio_name)) & 
+              !!sym(ratio_name) > 1 ~ 1, # ANC1/ANC4 and Penta1/Penta3
+            !is.na(!!sym(ratio_name)) & 
+              !!sym(ratio_name) >= lower_bound & !!sym(ratio_name) <= upper_bound ~ 1, # BCG/Delivery
+            !is.na(!!sym(ratio_name)) ~ 0,
+            TRUE ~ NA_real_
           )
         ) %>%
         select(all_of(c(geo_cols_facility, "year", ratio_name, sratio_name)))
@@ -239,29 +339,24 @@ facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id
   return(long_data)
 }
 
-
 # PART 2-B: Consistency Analysis - Geo Level ----------------------------------
-geo_consistency_analysis <- function(data, geo_cols) {
+geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   print("Performing geo-level consistency analysis...")
   
-  # Step 1: Define required pairs for consistency checks
-  required_pairs <- list(
-    pair_anc = c("anc1", "anc4"),
-    pair_delivery = c("delivery", "bcg"),
-    pair_pnc = c("delivery", "pnc1"),
-    pair_penta = c("penta1", "penta3")
-  )
+  # Extract required pairs and ranges from parameters
+  required_pairs <- consistency_params$consistency_pairs
+  consistency_ranges <- consistency_params$consistency_ranges
   
-  # Step 2: Exclude Outliers
+  # Exclude Outliers
   data <- data %>%
     mutate(count = ifelse(outlier == 1, NA, count))
   
-  # Step 3: Aggregate data at geographic level
+  # Aggregate data at geographic level
   aggregated_data <- data %>%
     group_by(across(all_of(c(geo_cols, "indicator_common_id", "year")))) %>%
     summarise(count = sum(count, na.rm = TRUE), .groups = "drop")
   
-  # Step 4: Pivot to wide format
+  # Pivot to wide format
   wide_data <- aggregated_data %>%
     pivot_wider(
       id_cols = c(geo_cols, "year"),
@@ -270,33 +365,41 @@ geo_consistency_analysis <- function(data, geo_cols) {
       values_fill = list(count = 0)
     )
   
-  # Step 5: Process each pair in isolation
+  # Process each pair in isolation
   pair_results <- list()
   
   for (pair_name in names(required_pairs)) {
     pair <- required_pairs[[pair_name]]
     col1 <- pair[1]
     col2 <- pair[2]
-    ratio_name <- paste0(pair_name, "_ratio")
-    sratio_name <- paste0(pair_name, "_sratio")
+    ratio_type <- pair_name
+    ratio_name <- "consistency_ratio"
+    sconsistency_name <- "sconsistency"
     
     if (all(c(col1, col2) %in% colnames(wide_data))) {
+      # Retrieve consistency range for the current pair
+      range <- consistency_ranges[[pair_name]]
+      lower_bound <- range["lower"]
+      upper_bound <- range["upper"]
+      
       pair_data <- wide_data %>%
         mutate(
           consistency_ratio = if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
           sconsistency = case_when(
-            pair_name == "pair_delivery" ~ (consistency_ratio >= 0.7 & consistency_ratio <= 1.3),
-            TRUE ~ consistency_ratio > 1
-          )
+            pair_name != "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio > 1 ~ 1,  # ANC1/ANC4 and Penta1/Penta3
+            pair_name == "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio >= lower_bound & consistency_ratio <= upper_bound ~ 1,  # BCG/Delivery
+            !is.na(consistency_ratio) ~ 0,
+            TRUE ~ NA_real_
+          ),
+          ratio_type = pair_name  # Assign the ratio type
         ) %>%
-        mutate(ratio_type = pair_name) %>% # Directly assign the ratio type
         select(all_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
       
       pair_results[[pair_name]] <- pair_data
     }
   }
   
-  # Step 6: Combine results from all pairs
+  # Combine results from all pairs
   combined_data <- bind_rows(pair_results)
   
   # Ensure `sconsistency` is converted to integer
@@ -305,7 +408,6 @@ geo_consistency_analysis <- function(data, geo_cols) {
   
   return(combined_data)
 }
-
 
 # PART 3 COMPLETENESS
 completeness_analysis <- function(data, geo_cols) {
@@ -320,7 +422,7 @@ completeness_analysis <- function(data, geo_cols) {
       .groups = "drop"
     )
   
-  # Step 2: Build a table of all (year, month) combos from min_month..max_month for each year
+  # Step 2: Build a table of all (year, month) combinations from min_month..max_month for each year
   all_year_months <- year_month_range %>%
     rowwise() %>%
     mutate(
@@ -426,58 +528,61 @@ dqa_analysis_strict_facility_consistency <- function(
     completeness_data, 
     consistency_data,   # Facility-level sconsistency
     outlier_data, 
-    geo_cols
+    geo_cols,
+    dqa_params,
+    consistency_params
 ) {
   print("Performing strict DQA analysis (facility-level consistency)...")
   
-  # Step 1: Define relevant indicators for DQA
-  relevant_indicators <- c("opd", "penta1", "anc1")  # List of priority indicators
+  # Step 1: Define priority and non-priority indicators
+  priority_indicators <- dqa_params$priority_indicators
+  non_priority_indicators <- dqa_params$non_priority_indicators
   
-  # Map ratio types to corresponding indicators
+  # Step 2: Map ratio types to corresponding indicators correctly
   ratio_mapping <- tibble::tibble(
-    ratio_type = c("pair_anc_ratio", "pair_delivery_ratio", "pair_pnc_ratio", "pair_penta_ratio"),
-    indicator_common_id = c("anc1", "delivery", "pnc1", "penta1")
+    ratio_type = paste0(names(consistency_params$consistency_pairs), "_ratio"),
+    indicator_common_id = sapply(consistency_params$consistency_pairs, function(x) x[1])
   )
   
-  # Merge completeness, consistency, and outlier data
+  
+  # Step 3: Merge completeness, consistency, and outlier data
   merged_data <- completeness_data %>%
-    filter(indicator_common_id %in% relevant_indicators) %>%  # Filter relevant indicators
     distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE) %>%
     left_join(
       outlier_data %>%
         distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id"))), .keep_all = TRUE) %>%
-        select(all_of(geo_cols), facility_id, year, indicator_common_id, outlier_flag),
+        select(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id", "outlier_flag"))),
       by = c(geo_cols, "facility_id", "year", "indicator_common_id")
     ) %>%
     left_join(
       consistency_data %>%
         left_join(ratio_mapping, by = "ratio_type") %>%
         distinct(across(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id", "ratio_type"))), .keep_all = TRUE) %>%
-        select(all_of(geo_cols), facility_id, year, indicator_common_id, sconsistency, ratio_type),
+        select(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id", "sconsistency", "ratio_type"))),
       by = c(geo_cols, "facility_id", "year", "indicator_common_id")
     )
   
-  # Step 2: Create DQA criteria
+  # Step 4: Create DQA criteria using Parameters
   merged_data <- merged_data %>%
     mutate(
       dqa_temp = case_when(
-        # OPD has no consistency requirement
-        indicator_common_id == "opd" &
-          completeness == 1 & 
-          outlier_flag == 0 ~ 1,
+        # Priority indicators: Strict rules
+        indicator_common_id %in% priority_indicators &
+          completeness_flag == dqa_params$dqa_rules$priority$completeness & 
+          outlier_flag == dqa_params$dqa_rules$priority$outlier_flag &
+          sconsistency == dqa_params$dqa_rules$priority$sconsistency ~ 1,
         
-        # Penta1 & ANC1 require sconsistency == 1 or NA?
-        indicator_common_id %in% c("penta1", "anc1") &
-          completeness == 1 &
-          outlier_flag == 0 &
-          (is.na(sconsistency) | sconsistency == 1) ~ 1,
+        # Non-priority indicators: Simpler rules
+        indicator_common_id %in% non_priority_indicators &
+          completeness_flag == dqa_params$dqa_rules$non_priority$completeness &
+          outlier_flag == dqa_params$dqa_rules$non_priority$outlier_flag ~ 1,
         
-        # Irrelevant indicators are automatically set to 0
+        # All other cases fail
         TRUE ~ 0
       )
     )
   
-  # Step 3: Aggregate DQA results for summary
+  # Step 5: Aggregate DQA results for summary
   dqa_summary <- merged_data %>%
     group_by(admin_area_2, year, indicator_common_id) %>%
     summarise(
@@ -486,23 +591,28 @@ dqa_analysis_strict_facility_consistency <- function(
       .groups = "drop"
     )
   
-  # Step 4: Return results as a list
+  # Step 6: Return results as a list
   return(list(
-    dqa_results = merged_data %>% select(all_of(geo_cols), facility_id, year, indicator_common_id, ratio_type, dqa_temp),
+    dqa_results = merged_data %>% select(all_of(c(geo_cols, "facility_id", "year", "indicator_common_id", "ratio_type", "dqa_temp"))),
     dqa_summary = dqa_summary
   ))
 }
 
 # -----------------------------------------------------------------------------
-# Main Execution --------------------------------------------------------------
+# Main Execution 
 # -----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
+# Adjust DQA Parameters for Flexibility
+adjusted_params <- adjust_dqa_parameters(dqa_params, consistency_params, data)
+dqa_params <- adjusted_params$dqa_params
+consistency_params <- adjusted_params$consistency_params
+
 # Outlier Analysis
 print("Running outlier analysis...")
-outlier_results    <- outlier_analysis(data, geo_cols)
+outlier_results    <- outlier_analysis(data, geo_cols, outlier_params)
 outlier_data_main  <- outlier_results$outlier_data
 
 # Completeness Analysis
@@ -516,11 +626,19 @@ completeness_data <- facility_month_data
 
 # Consistency Analysis (Facility-Level)
 print("Running consistency analysis (facility-level)...")
-facility_consistency_results <- facility_consistency_analysis(outlier_data_main) # Call facility-level consistency analysis
+facility_consistency_results <- facility_consistency_analysis(
+  outlier_data_main, 
+  geo_cols_facility = "facility_id", 
+  consistency_params = consistency_params
+)
 
 # Consistency Analysis (Geo-Level)
 print("Running consistency analysis (geo-level)...")
-geo_consistency_results <- geo_consistency_analysis(outlier_data_main, geo_cols)
+geo_consistency_results <- geo_consistency_analysis(
+  outlier_data_main, 
+  geo_cols = geo_cols, 
+  consistency_params = consistency_params
+)
 
 # Prepare outlier_data for DQA (rename 'outlier' to 'outlier_flag')
 outlier_data_for_dqa <- outlier_data_main %>%
@@ -532,198 +650,18 @@ dqa_results <- dqa_analysis_strict_facility_consistency(
   completeness_data = completeness_data,
   consistency_data  = facility_consistency_results, 
   outlier_data      = outlier_data_for_dqa,
-  geo_cols          = geo_cols
+  geo_cols          = geo_cols,
+  dqa_params        = dqa_params,
+  consistency_params = consistency_params  # Ensure this is passed
 )
 
-
-# -----------------------------------------------------------------------------
-# Visualization  --------------------------------------------------------------
-# -----------------------------------------------------------------------------
-viz_colors <- c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
-
-# PART 1 - VIZ
-# A - Outliers Heatmap
-heatmap_outliers <- outlier_results$heatmap_data %>%
-  pivot_longer(
-    cols = -all_of(geo_cols), # Exclude all geographic columns dynamically
-    names_to = "indicator", 
-    values_to = "percent_change"
-  ) %>%
-  mutate(
-    indicator = factor(indicator, levels = c("avg_indicators", sort(setdiff(unique(indicator), "avg_indicators"))))
-  ) %>%
-  ggplot(aes(x = indicator, y = admin_area_2, fill = percent_change)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient2(
-    low = "#1a9641", mid = "#ffffbf", high = "#d7191c",
-    midpoint = 0, na.value = "grey50"
-  ) +
-  labs(
-    title = "Percent change of volume due to outliers",
-    x = "Indicator",
-    y = "Administrative Area",
-    fill = "% Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
-    panel.grid = element_blank() # Remove gridlines
-  )
-print(heatmap_outliers)
-
-
-# B - Volume Increase Due to Outliers
-bar_chart <- ggplot(outlier_results$volume_increase_data, aes(x = month, y = percent_change, fill = admin_area_1)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  facet_wrap(~indicator_common_id, scales = "free_y") +
-  labs(
-    title = "Volume change due to outliers",
-    x = "Month",
-    y = "% Change",
-    fill = "Administrative area"
-  ) +
-  theme_minimal()
-print(bar_chart)
-
-# PART 2 - VIZ
-# Consistency Heatmap
-print("Creating consistency heatmap...")
-
-# Step 1: Summarize consistency benchmarks by geographic area
-consistency_summary <- geo_consistency_results %>%
-  group_by(admin_area_2, ratio_type) %>%
-  summarise(
-    percent_meeting_benchmark = mean(sconsistency, na.rm = TRUE) * 100,  # Calculate % meeting consistency
-    .groups = "drop"
-  )
-
-# Step 2: Pivot data for heatmap
-consistency_heatmap_data <- consistency_summary %>%
-  pivot_wider(
-    names_from = ratio_type,
-    values_from = percent_meeting_benchmark,
-    values_fill = 0  # Fill missing with 0 if no data
-  )
-
-# Step 3: Create the heatmap plot
-consistency_heatmap <- consistency_summary %>%
-  ggplot(aes(x = ratio_type, y = admin_area_2, fill = percent_meeting_benchmark)) +
-  geom_tile(color = "white") +
-  scale_fill_gradientn(
-    colors = c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"),
-    values = rescale(c(0, 25, 50, 75, 100)),
-    limits = c(0, 100),
-    name = "Percent Meeting\nConsistency (%)"
-  ) +
-  labs(
-    title = "Consistency Benchmarks by Administrative Area",
-    subtitle = "Percent of administrative areas meeting consistency benchmarks",
-    x = "Consistency Benchmark",
-    y = "Administrative Area",
-    fill = "Consistency (%)"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid = element_blank()
-  )
-
-# Step 4: Print the heatmap
-print(consistency_heatmap)
-
-# Completeness Heatmap
-print("Creating completeness heatmap...")
-heatmap_plot <- ggplot(completeness_results$geography_aggregate, aes(x = indicator_common_id, y = admin_area_2, fill = completeness_percentage)) +
-  geom_tile(color = "white") +
-  scale_fill_gradientn(
-    colors = viz_colors,
-    values = rescale(c(0, 0.25, 0.50, 0.90, 1)),  # Adjust thresholds
-    limits = c(0, 1),               
-    name = "Completeness (%)",
-    labels = scales::percent_format(accuracy = 1)  # Format labels as percentages
-  ) +
-  labs(
-    title = "Completeness by Indicator and Region",
-    x = "Indicator",
-    y = "Region",
-    fill = "Completeness (%)"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid = element_blank()
-  )
-
-print(heatmap_plot)
-
-# PART 3 - VIZ
-generate_dqa_heatmap <- function(dqa_results, geo_col = "admin_area_2", year_col = "year") {
-  print("Aggregating DQA results at admin_area_2 level...")
-  
-  # Access the dqa_results dataframe from the input list
-  dqa_data <- dqa_results$dqa_results
-  
-  # Step 1: Aggregate data to calculate % of facilities meeting DQA criteria
-  dqa_aggregated <- dqa_data %>%
-    group_by(!!sym(geo_col), !!sym(year_col)) %>%
-    summarise(
-      total_facilities = n(),
-      adequate_quality = sum(dqa_temp == 1, na.rm = TRUE),
-      adequate_quality_percentage = 100 * adequate_quality / total_facilities,
-      .groups = "drop"
-    )
-  
-  print("Data aggregation complete. Preparing heatmap...")
-  
-  # Step 2: Generate Heatmap Plot
-  heatmap_plot_DQA <- ggplot(dqa_aggregated, aes_string(x = year_col, y = geo_col, fill = "adequate_quality_percentage")) +
-    geom_tile(color = "white") +
-    scale_fill_gradientn(
-      colors = c("#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"),
-      values = scales::rescale(c(0, 25, 50, 75, 100)),
-      limits = c(0, 100),
-      name = "Facilities meeting\nDQA criteria (%)"
-    ) +
-    labs(
-      title = "Data Quality Assessment",
-      subtitle = "Percentage of facilities meeting DQA criteria, aggregated by region and year",
-      x = "Year",
-      y = "Administrative Region (Level 2)",
-      fill = "Adequate quality (%)"
-    ) +
-    theme_minimal() +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      axis.title.x = element_text(size = 12, face = "bold"),
-      axis.title.y = element_text(size = 12, face = "bold"),
-      plot.title = element_text(size = 14, face = "bold"),
-      plot.subtitle = element_text(size = 11, face = "italic"),
-      legend.title = element_text(size = 11, face = "bold"),
-      legend.text = element_text(size = 10),
-      panel.grid = element_blank()
-    )
-  
-  print("DQA heatmap plot created. Displaying now...")
-  print(heatmap_plot_DQA)
-  
-  # Step 3: Return aggregated data and the plot
-  return(list(
-    heatmap_data = dqa_aggregated,
-    heatmap_plot_DQA = heatmap_plot_DQA
-  ))
-}
-# Generate DQA heatmap
-heatmap_dqa <- generate_dqa_heatmap(dqa_results)
-
-
-
-
-
 # -------------------------------- SAVE DATA OUTPUTS --------------------------------------------------
+
 print("Saving all data outputs from outlier analysis...")
 write.csv(outlier_results$outlier_data, "output_outliers.csv", row.names = FALSE)            # Facility-level outlier data
 write.csv(outlier_results$top_outliers_data, "top_outliers_data.csv", row.names = FALSE)      # Top outliers summary
 write.csv(outlier_results$volume_increase_data, "volume_increase_data.csv", row.names = FALSE) # Monthly volume changes
+write.csv(outlier_results$heatmap_data, "heatmap_data.csv", row.names = FALSE)                # Heatmap data
 
 print("Saving all data outputs from consistency analysis...")
 write.csv(geo_consistency_results, "output_consistency_geo.csv", row.names = FALSE)          # Geo-level consistency results
@@ -738,13 +676,4 @@ print("Saving all data outputs from DQA analysis...")
 write.csv(dqa_results$dqa_results, "facility_dqa.csv", row.names = FALSE)                                # Facility-level DQA results
 write.csv(dqa_results$dqa_summary, "dqa_summary.csv", row.names = FALSE)                                 # Summary by admin_area_2 DQA results
 
-
-# -------------------------------- SAVE VISUALIZATIONS --------------------------------------------------
-print("Saving all plots...")
-ggsave("heatmap_outliers.png", plot = heatmap_outliers, width = 12, height = 8, dpi = 300)    # 1) Save Outliers Heatmap
-ggsave("bar_chart_outliers.png", plot = bar_chart, width = 12, height = 8, dpi = 300)         # 2) Save Volume Increase Due to Outliers
-ggsave("consistency_heatmap.png", plot = consistency_heatmap, width = 12, height = 8, dpi = 300)  # 3) Save Consistency Heatmap
-ggsave("completeness_heatmap.png", plot = heatmap_plot, width = 12, height = 8, dpi = 300)        # 4) Save Completeness Heatmap
-ggsave("heatmap_DQA.png", plot = heatmap_dqa$heatmap_plot_DQA, width = 12, height = 8, dpi = 300) # 5) Save DQA Heatmap
-
-print("DQA Analysis completed. All outputs and plots saved.")
+print("DQA Analysis completed. All outputs saved.")
