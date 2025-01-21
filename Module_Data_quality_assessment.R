@@ -20,17 +20,17 @@ consistency_params <- list(
     pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
     pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
     pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
-    # Removed pair_pnc - it was part of the stata analysis - it is not mentioned in the methodology?
+    # Removed pair_pnc - it WAS part of the stata analysis - it is not mentioned in the methodology? 
   ),
   consistency_ranges = list(
     pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
     pair_penta = c(lower = 1, upper = Inf),       # Penta1 / Penta3 > 1
     pair_anc = c(lower = 1, upper = Inf)          # ANC1 / ANC4 > 1
-    # Removed pair_pnc consistency range - for review
+    # Removed pair_pnc consistency range - ?? it WAS part of the stata analysis - it is not mentioned in the methodology? 
   )
 )
 
-# DQA Analysis Parameters
+# DQA Analysis Parameters # priority vs non priority - is this the best approach?
 dqa_params <- list(
   priority_indicators = c("opd", "penta1", "anc1"),  # List of priority indicators
   non_priority_indicators = c("penta3", "anc4"),     # Explicitly defined non-priority indicators (replace with NULL to select all indicators that are not in the priority list)
@@ -43,7 +43,7 @@ dqa_params <- list(
     non_priority = list(
       completeness = 1,
       outlier_flag = 0
-      # sconsistency not required for non-priority indicators
+      # sconsistency not required for non-priority indicators #cb: ?? confirm that the approach is correct
     )
   )
 )
@@ -601,7 +601,7 @@ dqa_analysis_strict_facility_consistency <- function(
 # -----------------------------------------------------------------------------
 # Main Execution 
 # -----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -645,7 +645,7 @@ outlier_data_for_dqa <- outlier_data_main %>%
   rename(outlier_flag = outlier)
 
 # Run DQA (Strict, Facility-Level)
-print("Running DQA (strict, facility-level consistency)...")
+print("Running DQA analysis...")
 dqa_results <- dqa_analysis_strict_facility_consistency(
   completeness_data = completeness_data,
   consistency_data  = facility_consistency_results, 
