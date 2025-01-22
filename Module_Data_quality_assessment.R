@@ -1,5 +1,5 @@
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 18
+# Last edit: 2025 Jan 21
 # Module: DATA QUALITY ASSESSMENT
 
 # DATA: guinea_imported_dataset.csv
@@ -134,7 +134,7 @@ adjust_dqa_parameters <- function(dqa_params, consistency_params, data) {
   return(list(dqa_params = dqa_params, consistency_params = consistency_params))
 }
 
-# PART 1 OUTLIERS
+# PART 1 OUTLIERS ---------------------------------------------------------------
 outlier_analysis <- function(data, geo_cols, outlier_params) {
   print("Performing outlier analysis...")
   
@@ -246,6 +246,23 @@ facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id
   required_pairs <- consistency_params$consistency_pairs
   consistency_ranges <- consistency_params$consistency_ranges
   
+  # Identify all unique indicators in the dataset
+  indicators <- unique(data$indicator_common_id)
+  
+  # Filter out missing indicator pairs
+  pairs_to_check <- purrr::keep(required_pairs, ~ all(.x %in% indicators))
+  
+  if (length(pairs_to_check) == 0) {
+    print("No valid indicator pairs available for consistency analysis.")
+    return(tibble(
+      !!sym(geo_cols_facility) := character(),
+      year = integer(),
+      ratio_type = character(),
+      consistency_ratio = numeric(),
+      sconsistency = integer()
+    ))
+  }
+  
   # Exclude Outliers
   data <- data %>%
     mutate(count = ifelse(outlier == 1, NA, count))
@@ -267,56 +284,54 @@ facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id
   # Process each pair in isolation
   pair_results <- list()
   
-  for (pair_name in names(required_pairs)) {
-    pair <- required_pairs[[pair_name]]
+  for (pair_name in names(pairs_to_check)) {
+    pair <- pairs_to_check[[pair_name]]
     col1 <- pair[1]
     col2 <- pair[2]
     ratio_name <- paste0(pair_name, "_ratio")
     sratio_name <- paste0(pair_name, "_sratio")
     
-    if (all(c(col1, col2) %in% colnames(wide_data))) {
-      # Retrieve consistency range for the current pair
-      range <- consistency_ranges[[pair_name]]
-      lower_bound <- range["lower"]
-      upper_bound <- range["upper"]
-      
-      pair_data <- wide_data %>%
-        mutate(
-          !!ratio_name := if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
-          !!sratio_name := case_when(
-            !is.na(!!sym(ratio_name)) & 
-              !!sym(ratio_name) > 1 ~ 1, # ANC1/ANC4 and Penta1/Penta3
-            !is.na(!!sym(ratio_name)) & 
-              !!sym(ratio_name) >= lower_bound & !!sym(ratio_name) <= upper_bound ~ 1, # BCG/Delivery
-            !is.na(!!sym(ratio_name)) ~ 0,
-            TRUE ~ NA_real_
-          )
-        ) %>%
-        select(all_of(c(geo_cols_facility, "year", ratio_name, sratio_name)))
-      
-      pair_results[[pair_name]] <- pair_data
-    }
+    # Retrieve consistency range for the current pair
+    range <- consistency_ranges[[pair_name]]
+    lower_bound <- range["lower"]
+    upper_bound <- range["upper"]
+    
+    pair_data <- wide_data %>%
+      mutate(
+        !!ratio_name := if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
+        !!sratio_name := case_when(
+          !!sym(ratio_name) > 1 ~ 1, # For ratios that should be greater than 1
+          !!sym(ratio_name) >= lower_bound & !!sym(ratio_name) <= upper_bound ~ 1, # For "between" conditions
+          !is.na(!!sym(ratio_name)) ~ 0,
+          TRUE ~ NA_real_
+        )
+      ) %>%
+      select(all_of(c(geo_cols_facility, "year", ratio_name, sratio_name)))
+    
+    pair_results[[pair_name]] <- pair_data
   }
   
+  # Combine all pair results
   combined_data <- reduce(pair_results, full_join, by = c(geo_cols_facility, "year"))
   
-  ratio_columns <- grep("_ratio$", colnames(combined_data), value = TRUE)
+  # Gather ratio and sratio columns into long format
+  ratio_columns  <- grep("_ratio$", colnames(combined_data), value = TRUE)
   sratio_columns <- grep("_sratio$", colnames(combined_data), value = TRUE)
   
   long_ratio_data <- combined_data %>%
     select(all_of(c(geo_cols_facility, "year", ratio_columns))) %>%
     pivot_longer(
-      cols = ends_with("_ratio"),
-      names_to = "ratio_type",
-      values_to = "consistency_ratio"
+      cols        = ends_with("_ratio"),
+      names_to    = "ratio_type",
+      values_to   = "consistency_ratio"
     )
   
   long_sratio_data <- combined_data %>%
     select(all_of(c(geo_cols_facility, "year", sratio_columns))) %>%
     pivot_longer(
-      cols = ends_with("_sratio"),
-      names_to = "sratio_type",
-      values_to = "sconsistency"
+      cols        = ends_with("_sratio"),
+      names_to    = "sratio_type",
+      values_to   = "sconsistency"
     ) %>%
     mutate(
       ratio_type = gsub("_sratio$", "_ratio", sratio_type)
@@ -347,6 +362,23 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   required_pairs <- consistency_params$consistency_pairs
   consistency_ranges <- consistency_params$consistency_ranges
   
+  # Identify all unique indicators in the dataset
+  indicators <- unique(data$indicator_common_id)
+  
+  # Filter out missing indicator pairs
+  pairs_to_check <- purrr::keep(required_pairs, ~ all(.x %in% indicators))
+  
+  if (length(pairs_to_check) == 0) {
+    print("No valid indicator pairs available for consistency analysis.")
+    return(tibble(
+      !!!syms(geo_cols),
+      year = NA_integer_,
+      ratio_type = NA_character_,
+      consistency_ratio = NA_real_,
+      sconsistency = NA_integer_
+    ))
+  }
+  
   # Exclude Outliers
   data <- data %>%
     mutate(count = ifelse(outlier == 1, NA, count))
@@ -368,38 +400,36 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   # Process each pair in isolation
   pair_results <- list()
   
-  for (pair_name in names(required_pairs)) {
-    pair <- required_pairs[[pair_name]]
+  for (pair_name in names(pairs_to_check)) {
+    pair <- pairs_to_check[[pair_name]]
     col1 <- pair[1]
     col2 <- pair[2]
     ratio_type <- pair_name
     ratio_name <- "consistency_ratio"
     sconsistency_name <- "sconsistency"
     
-    if (all(c(col1, col2) %in% colnames(wide_data))) {
-      # Retrieve consistency range for the current pair
-      range <- consistency_ranges[[pair_name]]
-      lower_bound <- range["lower"]
-      upper_bound <- range["upper"]
-      
-      pair_data <- wide_data %>%
-        mutate(
-          consistency_ratio = if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
-          sconsistency = case_when(
-            pair_name != "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio > 1 ~ 1,  # ANC1/ANC4 and Penta1/Penta3
-            pair_name == "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio >= lower_bound & consistency_ratio <= upper_bound ~ 1,  # BCG/Delivery
-            !is.na(consistency_ratio) ~ 0,
-            TRUE ~ NA_real_
-          ),
-          ratio_type = pair_name  # Assign the ratio type
-        ) %>%
-        select(all_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
-      
-      pair_results[[pair_name]] <- pair_data
-    }
+    # Retrieve consistency range for the current pair
+    range <- consistency_ranges[[pair_name]]
+    lower_bound <- range["lower"]
+    upper_bound <- range["upper"]
+    
+    pair_data <- wide_data %>%
+      mutate(
+        consistency_ratio = if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
+        sconsistency = case_when(
+          pair_name != "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio > 1 ~ 1,  # ANC1/ANC4 and Penta1/Penta3
+          pair_name == "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio >= lower_bound & consistency_ratio <= upper_bound ~ 1,  # BCG/Delivery
+          !is.na(consistency_ratio) ~ 0,
+          TRUE ~ NA_real_
+        ),
+        ratio_type = ratio_type  # Assign the ratio type
+      ) %>%
+      select(all_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
+    
+    pair_results[[pair_name]] <- pair_data
   }
   
-  # Combine results from all pairs
+  # Combine all pair results
   combined_data <- bind_rows(pair_results)
   
   # Ensure `sconsistency` is converted to integer
@@ -409,7 +439,7 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   return(combined_data)
 }
 
-# PART 3 COMPLETENESS
+# PART 3 COMPLETENESS --------------------------------------------------------------------------
 completeness_analysis <- function(data, geo_cols) {
   print("Performing completeness analysis (facility-month >0) with dynamic expected months...")
   
@@ -523,7 +553,7 @@ completeness_analysis <- function(data, geo_cols) {
   )
 }
 
-# PART 4 DQA (Strict, Facility-Level Consistency)
+# PART 4 DQA (Strict, Facility-Level Consistency) ------------------------
 dqa_analysis_strict_facility_consistency <- function(
     completeness_data, 
     consistency_data,   # Facility-level sconsistency
@@ -598,9 +628,8 @@ dqa_analysis_strict_facility_consistency <- function(
   ))
 }
 
-# -----------------------------------------------------------------------------
-# Main Execution 
-# -----------------------------------------------------------------------------
+
+# -------------------------------------------Main Execution --------------------------------------------------------------
 inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
