@@ -158,73 +158,119 @@ outlier_analysis <- function(data, geo_cols) {
 
 # PART 2 COMPLETENESS
 completeness_analysis <- function(data, geo_cols) {
-  print("Performing completeness analysis...")
+  print("Performing completeness analysis (facility-month >0) with dynamic expected months...")
   
-  # Step 1: Ensure 'date' and 'year' columns exist
-  data <- data %>%
-    mutate(
-      date = as.Date(paste(year, month, "1", sep = "-")),
-      panelvar = paste(indicator_common_id, facility_id, sep = "_")
-    ) %>%
-    filter(!is.na(date) & !is.na(panelvar))  # Keep rows with valid dates and panelvars
-  
-  # Step 2: Generate full facility-year combinations
-  print("Generating expected facility-year combinations...")
-  facilities <- unique(data$facility_id)
-  indicators <- unique(data$indicator_common_id)
-  years <- unique(data$year)
-  
-  all_combinations <- expand.grid(
-    facility_id = facilities,
-    indicator_common_id = indicators,
-    year = years,
-    KEEP.OUT.ATTRS = FALSE
-  )
-  
-  # Step 3: Count reported facility-months per year for each facility-indicator
-  print("Counting reported facility-months per facility-indicator...")
-  monthly_reporting <- data %>%
-    group_by(facility_id, indicator_common_id, year) %>%
-    summarise(reported_facility_months = n(), .groups = "drop")  # Count facility-months reported
-  
-  # Step 4: Merge expected combinations and add geographic columns
-  print("Merging expected combinations and adding geographic information...")
-  yearly_data <- all_combinations %>%
-    left_join(monthly_reporting, by = c("facility_id", "indicator_common_id", "year")) %>%
-    mutate(
-      reported_facility_months = replace_na(reported_facility_months, 0),  # Replace missing values with 0
-      expected_facility_months = 12,  # Expect 12 months per year
-      completeness_percentage = (reported_facility_months / expected_facility_months)
-    )
-  
-  geo_info <- data %>%
-    select(facility_id, all_of(geo_cols)) %>%
-    distinct()
-  
-  yearly_data <- yearly_data %>%
-    left_join(geo_info, by = "facility_id")
-  
-  # Step 5: Aggregate completeness over geography
-  print("Aggregating completeness over geography...")
-  aggregate_data <- yearly_data %>%
-    group_by(across(all_of(geo_cols)), indicator_common_id, year) %>%
+  # Step 1: Identify the min and max month for EACH year in the dataset
+  year_month_range <- data %>%
+    group_by(year) %>%
     summarise(
-      total_expected_facility_months = sum(expected_facility_months),
-      total_reported_facility_months = sum(reported_facility_months),
-      completeness_percentage = (total_reported_facility_months / total_expected_facility_months),
+      min_month = min(month, na.rm = TRUE),
+      max_month = max(month, na.rm = TRUE),
       .groups = "drop"
     )
   
-  # Step 6: Reorder columns in long_format
-  print("Reordering columns in long_format...")
-  long_format <- yearly_data %>%
-    select(all_of(geo_cols), everything())  # Ensure geo_cols are at the beginning
+  # Step 2: Build a table of all (year, month) combinations from min_month..max_month for each year
+  all_year_months <- year_month_range %>%
+    rowwise() %>%
+    mutate(
+      month_seq = list(seq(from = min_month, to = max_month))
+    ) %>%
+    unnest(month_seq) %>%
+    rename(month = month_seq) %>%
+    ungroup()
   
-  return(list(summary = aggregate_data, long_format = long_format))
+  # Step 3: Cross with all facilities
+  all_facilities <- data %>%
+    distinct(facility_id)
+  
+  complete_month_grid <- all_facilities %>%
+    crossing(all_year_months)
+  
+  # Step 4: LEFT JOIN raw data so missing months become NA
+  expanded_data <- complete_month_grid %>%
+    left_join(data, by = c("facility_id", "year", "month"))
+  
+  # Step 5: Convert year-month to a Date and add period_id (yyyymm)
+  expanded_data <- expanded_data %>%
+    mutate(
+      date = as.Date(paste(year, month, "1", sep = "-")),
+      period_id = as.integer(paste0(year, sprintf("%02d", month)))
+    ) %>%
+    filter(
+      !is.na(facility_id),
+      !is.na(indicator_common_id),
+      !is.na(date)
+    )
+  
+  # Step 6: Summarize monthly reported units
+  facility_month_data <- expanded_data %>%
+    group_by(
+      facility_id, 
+      indicator_common_id, 
+      year, 
+      month, 
+      period_id,
+      across(all_of(geo_cols))
+    ) %>%
+    summarise(
+      monthly_reported_units = sum(count, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      completeness_flag = ifelse(monthly_reported_units > 0, 1, 0)
+    )
+  
+  # Step 7: Count "expected months" for each facility-year
+  year_monthly_reported_units_by_facility <- expanded_data %>%
+    group_by(facility_id, year) %>%
+    summarise(
+      expected_facility_months = n_distinct(month),
+      .groups = "drop"
+    )
+  
+  # Step 8: Summarize to yearly level
+  yearly_summary <- facility_month_data %>%
+    group_by(
+      facility_id, 
+      indicator_common_id, 
+      year, 
+      across(all_of(geo_cols))
+    ) %>%
+    summarise(
+      reported_facility_months = sum(completeness_flag, na.rm = TRUE), 
+      .groups = "drop"
+    ) %>%
+    left_join(
+      year_monthly_reported_units_by_facility, 
+      by = c("facility_id", "year")
+    ) %>%
+    mutate(
+      completeness_percentage = reported_facility_months / expected_facility_months
+    )
+  
+  # Step 9: Aggregate by geographies
+  geography_aggregate <- yearly_summary %>%
+    group_by(
+      across(all_of(geo_cols)), 
+      indicator_common_id, 
+      year
+    ) %>%
+    summarise(
+      total_expected_facility_months = sum(expected_facility_months, na.rm = TRUE),
+      total_reported_facility_months = sum(reported_facility_months, na.rm = TRUE),
+      completeness_percentage = total_reported_facility_months / total_expected_facility_months,
+      .groups = "drop"
+    )
+  
+  # Step 10: Return results
+  list(
+    facility_month_data = facility_month_data,
+    yearly_summary       = yearly_summary,
+    geography_aggregate  = geography_aggregate
+  )
 }
 
 # PART 3 ADJUSTMENTS
-
 apply_adjustments <- function(data,
                               outlier_data,
                               completeness_data,
@@ -371,7 +417,7 @@ print("Running adjustments analysis...")
 adjusted_data <- apply_adjustments_scenarios(
   data              = data,
   outlier_data      = outlier_data$outlier_data,   # or outlier_data if named differently
-  completeness_data = completeness_results$long_format,
+  completeness_data = completeness_results$yearly_summary,
   geo_cols          = geo_cols
 )
 
@@ -467,7 +513,6 @@ adjusted_national_results <- generate_adjusted_national_results(adjusted_data)
 print("Plotting adjusted national grid...")
 adjusted_national_plot <- plot_adjusted_national_grid(adjusted_national_results)
 print(adjusted_national_plot)
-
 
 
 
