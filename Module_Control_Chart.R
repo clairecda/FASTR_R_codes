@@ -11,7 +11,7 @@
 # IMAGE: indicator_grid_plot.png        # Grid plot of indicator-level trends with control limits.
 
 # NOTES/VALUE COLUMNS:
-# `control_chart_results` = results of the control chart analysis at the facility level.
+# dataframe `control_chart_results` = results of the control chart analysis at the facility level.
 #   - `count_adjust`: Observed count of health services after outlier adjustment.
 #   - `count_predict`: Deseasonalized predicted count, derived using regression-based methods.
 #   - `residual`: Deviation of `count_adjust` from `count_predict`.
@@ -20,7 +20,7 @@
 #   - `tag`: Binary flag for anomalies (`1` = anomaly, `0` = normal).
 
 
-# `indicator_results` contains aggregated results of the control chart analysis at the national (admin_area_1) & indicator level. Key columns include:
+# dataframe `indicator_results` contains aggregated results of the control chart analysis at the national (admin_area_1) & indicator level. Key columns include:
 #   - `total_count`: Aggregated observed count across all facilities for the specific indicator and time period.
 #   - `predicted_count`: Aggregated deseasonalized count across all facilities for the specific indicator and time period.
 #   - `UCL` (Upper Control Limit): Upper threshold for identifying anomalies, calculated as the mean + 3 SD of `total_count`.
@@ -99,11 +99,15 @@ control_chart_analysis <- function(cleaned_data, geo_cols) {
   print(colnames(cleaned_data))  # Ensure indicator_common_id is still present
   
   # Proceed with deseasonalization and smoothing...
+  #model doesn't include random intercepts or slopes, so it doesn't account for unobserved variability across regions (admin_area_3) or indicators.
+  #Mixed-effects models would be appropriate if you wanted to allow each region/indicator to have its own "baseline" or unique trend.
+  #If one indicator has different seasonal or trend patterns, this approach might not capture them adequately.
+
   deseasonalized_data <- cleaned_data %>%
     group_by(indicator_common_id, admin_area_3) %>%
     nest() %>%
     mutate(
-      model = map(data, ~ tryCatch(
+      model = map(data, ~ tryCatch(             #fixed-effects regression with categorical predictors
         lm(count_adjust ~ factor(month(.x$date)) + as.numeric(date), data = .x),
         error = function(e) NULL
       )),
