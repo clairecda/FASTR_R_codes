@@ -456,8 +456,6 @@ completeness_analysis <- function(data, geo_cols) {
   # Step 10: Return results
   return(facility_month_data)
 
-  
-
 }
 
 # PART 4 DQA (Strict, Facility-Level Consistency)
@@ -577,7 +575,7 @@ dqa_without_consistency <- function(
 
 # ------------------- Main Execution-------------------------------------------------------------------------------------
 
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -597,11 +595,11 @@ outlier_data_main  <- outlier_results$outlier_data
 # Completeness Analysis
 print("Running completeness analysis...")
 completeness_results <- completeness_analysis(outlier_data_main, geo_cols)
-facility_month_data <- facility_month_data %>%
+completeness_results <- completeness_results %>%
   mutate(completeness = completeness_flag)
 
 # Select completeness facility-month output for monthly-level DQA:
-completeness_data <- facility_month_data
+completeness_data <- completeness_results
 
 if(has_consistency) {
   # Consistency Analysis (Facility-Level)
@@ -664,7 +662,7 @@ if(has_consistency) {
 }
 
 print("Saving data output from completeness analysis...")
-write.csv(facility_month_data, "completeness_long_format.csv", row.names = FALSE)     # Facility-month completeness
+write.csv(completeness_results, "completeness_long_format.csv", row.names = FALSE)     # Facility-month completeness
 
 print("Saving data output from DQA analysis...")
 write.csv(dqa_results, "facility_dqa.csv", row.names = FALSE)                          # Facility-level DQA results
