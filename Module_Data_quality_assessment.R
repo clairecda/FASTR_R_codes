@@ -14,6 +14,8 @@ GEOLEVEL <- "admin_area_3"
 # outliers and completeness, without including consistency checks.
 
 
+# Claire - modify dqa function - for each facility evaluate on each indicator. (see rules in do)
+
 # DATA: guinea_imported_dataset.csv
 
 # ------------------------------------- PARAMETERS -----------------------------
@@ -45,13 +47,13 @@ consistency_params <- list(
 
 # DQA Analysis Parameters # priority vs non priority - is this the best approach
 dqa_params <- list(
-  priority_indicators = c("opd", "penta1", "anc1"),  # List of priority indicators
+  priority_indicators = c("opd", "penta1", "anc1"),  # List of priority indicators, needs to be user option with default
   non_priority_indicators = c("penta3", "anc4"),     # Explicitly defined non-priority indicators (replace with NULL to select all indicators that are not in the priority list)
   dqa_rules = list(
     priority = list(
       completeness = 1,
       outlier_flag = 0,
-      sconsistency = 1
+      sconsistency = 1 #pair_penta1/penta3
     ),
     non_priority = list(
       completeness = 1,
@@ -63,9 +65,7 @@ dqa_params <- list(
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
 # FILE: M1_output_outliers.csv             # Detailed facility-level data with identified outliers and adjusted volumes.
-# FILE: M1_top_outliers_data.csv           # Aggregated facility-level outliers identified during the outlier analysis.
 # FILE: M1_completeness_long_format.csv    # Facility-level completeness data in a detailed long format, including reported and expected months.
-# FILE: M1_output_consistency_facility.csv # Facility-level consistency results -- aggregate in tableau
 # FILE: M1_output_consistency_geo.csv      # District-level consistency results - use in visualizer
 # FILE: M1_facility_dqa.csv                # Facility-level results from DQA analysis.
 
@@ -430,16 +430,13 @@ completeness_analysis <- function(data, geo_cols) {
     mutate(
       date = as.Date(paste(year, month, "1", sep = "-")),
       period_id = as.integer(paste0(year, sprintf("%02d", month)))
-    ) %>%
-    filter(
-      !is.na(facility_id),
-      !is.na(indicator_common_id),
-      !is.na(date)
-    )
+
+    ) #remove
   
+  # Step 6: Create completeness_flag and assess completeness
   expanded_data <- expanded_data %>%
     mutate(
-      completeness_flag = ifelse(!is.na(count) & count > 0, 1, 0)
+      completeness_flag = ifelse(!is.na(count) & count > 0, 1, 0) #NA check if he removes NAs
     )
   
   # Step 7: Summarize monthly reported units
@@ -461,7 +458,6 @@ completeness_analysis <- function(data, geo_cols) {
     )
   # Step 10: Return results
   return(facility_month_data)
-
 }
 
 # PART 4 DQA (Strict, Facility-Level Consistency)
