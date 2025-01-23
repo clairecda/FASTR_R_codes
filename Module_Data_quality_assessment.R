@@ -1,12 +1,17 @@
+OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
+MINIMUM_COUNT_THRESHOLD <- 100      # Minimum count threshold for consideration
+GEOLEVEL <- "admin_area_3" 
+
+
+#------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 22
+# Last edit: 2025 Jan 23
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to handle datasets where the available indicators are limited 
 # and insufficient to conduct a consistency analysis. In such cases, the script defaults 
 # to performing the DQA using the relaxed "non-priority" rules. These rules only assess 
-# outliers and completeness, without including consistency checks. For example, this approach 
-# is applicable to datasets such as the Kenya test data, where consistency analysis is not feasible.
+# outliers and completeness, without including consistency checks.
 
 
 # DATA: guinea_imported_dataset.csv
@@ -16,11 +21,11 @@
 # ------------------------------------------------------------------------------
 # Outlier Analysis Parameters
 outlier_params <- list(
-  outlier_pc_threshold = 0.8,  # Threshold for proportional contribution to flag outliers
-  count_threshold = 100        # Minimum count to consider for outlier adjustment
+  outlier_pc_threshold = OUTLIER_PROPORTION_THRESHOLD,  # Threshold for proportional contribution to flag outliers
+  count_threshold = MINIMUM_COUNT_THRESHOLD        # Minimum count to consider for outlier adjustment
 )
 
-geo_level <- "admin_area_3"    # Desired geographic level (district) for grouping when adjusting outliers (e.g., "admin_area_3").
+geo_level <- GEOLEVEL  # Desired geographic level (district) for grouping when adjusting outliers (e.g., "admin_area_3").
 # If this level is not available in the dataset, the function will fall back to the lowest 
 # available level in `geo_cols` (e.g., "admin_area_2").
 
@@ -57,12 +62,12 @@ dqa_params <- list(
 )
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
-# FILE: output_outliers.csv             # Detailed facility-level data with identified outliers and adjusted volumes.
-# FILE: completeness_long_format.csv    # Facility-level completeness data in a detailed long format, including reported and expected months.
-# FILE: output_consistency_facility.csv # Facility-level consistency results -- aggregate in tableau
-# FILE: facility_dqa.csv                # Facility-level results from DQA analysis.
-
-# TBC - # FILE: output_consistency_geo.csv    # District-level consistency results - use in visualizer?
+# FILE: M1_output_outliers.csv             # Detailed facility-level data with identified outliers and adjusted volumes.
+# FILE: M1_top_outliers_data.csv           # Aggregated facility-level outliers identified during the outlier analysis.
+# FILE: M1_completeness_long_format.csv    # Facility-level completeness data in a detailed long format, including reported and expected months.
+# FILE: M1_output_consistency_facility.csv # Facility-level consistency results -- aggregate in tableau
+# FILE: M1_output_consistency_geo.csv      # District-level consistency results - use in visualizer
+# FILE: M1_facility_dqa.csv                # Facility-level results from DQA analysis.
 
 # Load Required Libraries -----------------------------------------------------
 library(tidyverse)
@@ -213,6 +218,7 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
     outlier_data = data,
     top_outliers_data = top_outliers_data))
 }
+
 
 # PART 2-A: Consistency Analysis - Facility Level -------------------------------------------------------------
 facility_consistency_analysis <- function(data, geo_cols_facility = "facility_id", consistency_params) {
@@ -651,20 +657,20 @@ if(has_consistency) {
 # -------------------------------- SAVE DATA OUTPUTS --------------------------------------------------------------------------------------------------
 
 print("Saving all data outputs from outlier analysis...")
-write.csv(outlier_results$outlier_data, "output_outliers.csv", row.names = FALSE)             # Facility-level outlier data
-write.csv(outlier_results$top_outliers_data, "top_outliers_data.csv", row.names = FALSE)      # Top outliers summary
+write.csv(outlier_results$outlier_data, "M1_output_outliers.csv", row.names = FALSE)             # Facility-level outlier data
+write.csv(outlier_results$top_outliers_data, "M1_top_outliers_data.csv", row.names = FALSE)      # Aggregated facility-level outliers
 
 
 if(has_consistency) {
   print("Saving all data outputs from consistency analysis...")
-  write.csv(geo_consistency_results, "output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
-  write.csv(facility_consistency_results, "output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
+  write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
+  write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
 }
 
 print("Saving data output from completeness analysis...")
-write.csv(completeness_results, "completeness_long_format.csv", row.names = FALSE)     # Facility-month completeness
+write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)     # Facility-month completeness
 
 print("Saving data output from DQA analysis...")
-write.csv(dqa_results, "facility_dqa.csv", row.names = FALSE)                          # Facility-level DQA results
+write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                          # Facility-level DQA results
 
 print("DQA Analysis completed. All outputs saved.")
