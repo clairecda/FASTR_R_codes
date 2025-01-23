@@ -39,64 +39,6 @@ load_and_preprocess_data <- function(file_path) {
   return(list(data = data, geo_cols = geo_cols))
 }
 
-# Function to Adjust DQA Parameters for Flexibility
-adjust_dqa_parameters <- function(dqa_params, consistency_params, data) {
-  # Adjust priority indicators
-  existing_priority <- dqa_params$priority_indicators[dqa_params$priority_indicators %in% unique(data$indicator_common_id)]
-  missing_priority <- setdiff(dqa_params$priority_indicators, existing_priority)
-  
-  if(length(missing_priority) > 0) {
-    warning(paste("The following priority indicators are missing from the data and will be excluded:", 
-                  paste(missing_priority, collapse = ", ")))
-    dqa_params$priority_indicators <- existing_priority
-  }
-  
-  # Handle non_priority_indicators
-  if(is.null(dqa_params$non_priority_indicators)) {
-    # Automatically assign all indicators not in priority as non-priority
-    dqa_params$non_priority_indicators <- setdiff(unique(data$indicator_common_id), dqa_params$priority_indicators)
-    message("Non-priority indicators have been automatically assigned as all indicators not listed as priority.")
-  } else {
-    # Ensure that explicitly defined non-priority indicators exist in the data
-    existing_non_priority <- dqa_params$non_priority_indicators[dqa_params$non_priority_indicators %in% unique(data$indicator_common_id)]
-    missing_non_priority <- setdiff(dqa_params$non_priority_indicators, existing_non_priority)
-    
-    if(length(missing_non_priority) > 0) {
-      warning(paste("The following non-priority indicators are missing from the data and will be excluded:", 
-                    paste(missing_non_priority, collapse = ", ")))
-      dqa_params$non_priority_indicators <- existing_non_priority
-    }
-    
-    # Assign remaining indicators not in priority or explicitly non-priority
-    auto_assigned_non_priority <- setdiff(unique(data$indicator_common_id), 
-                                          c(dqa_params$priority_indicators, dqa_params$non_priority_indicators))
-    
-    if(length(auto_assigned_non_priority) > 0) {
-      message(paste("Automatically assigning the following indicators as non-priority:", 
-                    paste(auto_assigned_non_priority, collapse = ", ")))
-      dqa_params$non_priority_indicators <- c(dqa_params$non_priority_indicators, auto_assigned_non_priority)
-    }
-  }
-  
-  # Adjust consistency_params based on available indicators
-  consistency_pairs_names <- names(consistency_params$consistency_pairs)
-  
-  # Identify valid consistency pairs where both indicators exist
-  valid_consistency_pairs <- consistency_params$consistency_pairs[sapply(consistency_params$consistency_pairs, 
-                                                                         function(pair) all(pair %in% unique(data$indicator_common_id)))]
-  
-  # Update consistency_params with valid pairs only
-  consistency_params$consistency_pairs <- valid_consistency_pairs
-  consistency_params$consistency_ranges <- consistency_params$consistency_ranges[names(consistency_params$consistency_ranges) %in% names(valid_consistency_pairs)]
-  
-  if(length(consistency_params$consistency_pairs) < length(consistency_pairs_names)) {
-    removed_pairs <- setdiff(consistency_pairs_names, names(consistency_params$consistency_pairs))
-    warning(paste("Removed the following consistency pairs due to missing indicators:", 
-                  paste(removed_pairs, collapse = ", ")))
-  }
-  
-  return(list(dqa_params = dqa_params, consistency_params = consistency_params))
-}
 
 # PART 1 OUTLIERS ------------------------------------------------------------------
 outlier_analysis <- function(data, geo_cols, outlier_params) {
