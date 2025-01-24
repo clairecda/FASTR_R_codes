@@ -13,7 +13,7 @@
 # DATA: sierraleone_imported_dataset.csv
 
 # -------------------------- KEY OUTPUT ----------------------------------------------------------------------
-# FILE: adjusted_data.csv    # Dataset including facility-level adjusted volumes for all adjustment scenarios.
+# FILE: M2_adjusted_data.csv    # Dataset including facility-level adjusted volumes for all adjustment scenarios.
 
 
 
@@ -172,6 +172,7 @@ adjusted_data <- apply_adjustments_scenarios(
 
 # Save Outputs
 print("Saving adjusted data...")
-write.csv(adjusted_data, "adjusted_data.csv", row.names = FALSE)
+write.csv(adjusted_data, "M2_adjusted_data.csv", row.names = FALSE)
+
 print("Adjustments completed and saved.")
 
