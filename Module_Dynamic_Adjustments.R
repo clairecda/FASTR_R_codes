@@ -1,6 +1,8 @@
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
-# Last edit: 2025 Jan 16
+# Last edit: 2025 Jan 24
+
+# use rolling averages - for outliers and completeness
 
 # DATA: sierraleone_imported_dataset.csv
 # ------------------------------------- KEY OUTPUT(S) ------------------------------------------------------------------------
@@ -34,8 +36,7 @@
 #   - This assumes k = 1, meaning non-reporting facilities provide services at the same rate as reporting ones.
 #   - Completeness percentages are merged into the dataset, converted to fractions, and used to scale up
 #     reported counts proportionally.
-#
-# Lit review in progress - review later
+
 
 # Load Required Libraries ----------------------------------------------------------------------------------------------------------
 library(tidyverse)
