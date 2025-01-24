@@ -304,64 +304,59 @@ expand_consistency_results <- function(consistency_data, completeness_data) {
 
 # PART 3-A COMPLETENESS ----------------------------------------------------------------------------------------
 completeness_analysis <- function(data, geo_cols) {
-  print("Performing completeness analysis with smoothing for trailing missing data...")
+  print("Performing completeness analysis with smoothing...")
   
-  # Step 1: Identify the min and max month for EACH year in the dataset
-  year_month_range <- data %>%
+  # Step 1: Generate a grid of all possible year-month combinations for each facility
+  all_year_months <- data %>%
     group_by(year) %>%
     summarise(
       min_month = min(month, na.rm = TRUE),
       max_month = max(month, na.rm = TRUE),
       .groups = "drop"
-    )
-  
-  # Step 2: Build a table of all (year, month) combinations from min_month..max_month for each year
-  all_year_months <- year_month_range %>%
-    rowwise() %>%
-    mutate(
-      month_seq = list(seq(from = min_month, to = max_month))
     ) %>%
+    rowwise() %>%
+    mutate(month_seq = list(seq(from = min_month, to = max_month))) %>%
     unnest(month_seq) %>%
     rename(month = month_seq) %>%
-    ungroup()
+    select(-min_month, -max_month)
   
-  # Step 3: Cross with all facilities
-  all_facilities <- data %>%
-    distinct(facility_id)
+  all_facilities <- data %>% distinct(facility_id)
   
   complete_month_grid <- all_facilities %>%
     crossing(all_year_months)
   
-  # Step 4: LEFT JOIN raw data so missing months become NA
+  # Step 2: Join data with the full grid to include all facility-month combinations
   expanded_data <- complete_month_grid %>%
-    left_join(data, by = c("facility_id", "year", "month"))
-  
-  # Step 5: Convert year-month to a Date and add period_id (yyyymm)
-  expanded_data <- expanded_data %>%
+    left_join(data, by = c("facility_id", "year", "month")) %>%
     mutate(
       date = as.Date(paste(year, month, "1", sep = "-")),
       period_id = as.integer(paste0(year, sprintf("%02d", month))),
       negdate = as.integer(date) * -1  # Generate negative date for sorting
     )
   
-  # Step 6: Mark completeness (only NA is considered incomplete)
+  # Step 3: Identify completeness (only `NA` is considered incomplete)
   expanded_data <- expanded_data %>%
     mutate(
-      completeness_flag = ifelse(!is.na(count), 1, 0)  # NA is incomplete, 0 is fine
+      completeness_flag = ifelse(!is.na(count), 1, 0)  # NA is incomplete
     )
   
-  # Step 7: Smoothing the reporting time frame
+  # Step 4: Smoothing reporting timeframe
   smoothed_data <- expanded_data %>%
     group_by(panelvar = paste(indicator_common_id, facility_id, sep = "_")) %>%
-    arrange(panelvar, date) %>%
+    arrange(date) %>%
     mutate(
-      first_occurrence = cumsum(completeness_flag),  # Identify first occurrence of completeness
-      num1 = ifelse(first_occurrence == 0, row_number(), NA_integer_)  # Count rows before the first occurrence
+      # First and last valid report
+      first_valid_report = cumsum(completeness_flag) > 0,
+      last_valid_report = rev(cumsum(rev(completeness_flag)) > 0),  # Reverse cumsum for trailing data
+      trailing_months = lag(cumsum(first_valid_report), default = 0),
+      include_flag = ifelse(
+        first_valid_report | (trailing_months <= 12 & last_valid_report), 1, 0
+      )  # Allow up to 12 trailing months but only within valid reporting range
     ) %>%
     ungroup() %>%
-    filter(is.na(num1) | num1 <= 12)  # Keep data within 12 months before the first occurrence
+    filter(include_flag == 1)  # Keep valid months only
   
-  # Step 8: Summarize monthly reported units
+  # Step 5: Summarize completeness at the facility-month level
   facility_month_data <- smoothed_data %>%
     group_by(
       facility_id, 
@@ -372,16 +367,17 @@ completeness_analysis <- function(data, geo_cols) {
       across(all_of(geo_cols))
     ) %>%
     summarise(
-      reported_facility_months = sum(completeness_flag, na.rm = TRUE),
+      reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Number of complete reports
       .groups = "drop"
     ) %>%
     mutate(
-      completeness_flag = ifelse(reported_facility_months > 0, 1, 0)
+      completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Final completeness assessment
     )
   
-  # Step 9: Return results
+  # Step 6: Return the summarized completeness data
   return(facility_month_data)
 }
+
 
 
 # PART 4 DQA ----------------------------------------------------------------------------------------------------
@@ -434,25 +430,46 @@ dqa_with_consistency <- function(
       .groups = "drop"
     )
   
-  # Aggregate consistency results
+  # Check if a facility is eligible for consistency checks
+  eligible_facilities <- consistency_data %>%
+    group_by(facility_id) %>%
+    summarise(
+      has_consistency_data = any(!is.na(sconsistency)),  # At least one pair exists
+      .groups = "drop"
+    )
+  
+  # Aggregate consistency results (only for eligible facilities)
   consistency_results <- consistency_data %>%
     group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
       total_consistency_points = sum(sconsistency, na.rm = TRUE),  # Max 1 point per pair
       .groups = "drop"
+    ) %>%
+    left_join(eligible_facilities, by = "facility_id") %>%
+    mutate(
+      total_consistency_points = if_else(
+        !has_consistency_data, NA_real_, total_consistency_points  # Exclude consistency points if not eligible
+      )
     )
   
   # Merge indicator and consistency results
   dqa_results <- indicator_results %>%
     left_join(consistency_results, by = c("facility_id", "year", "month", geo_cols)) %>%
     mutate(
+      total_consistency_points = replace_na(total_consistency_points, 0),  # Replace NA with 0
       total_points = total_indicator_points + total_consistency_points,
       max_points = 2 * length(DQA_INDICATORS) + length(unique(consistency_data$ratio_type)),
+      max_points = if_else(
+        !eligible_facilities$has_consistency_data[match(facility_id, eligible_facilities$facility_id)],
+        2 * length(DQA_INDICATORS),  # Adjust max_points if not eligible for consistency
+        max_points
+      ),
       dqa_score = ifelse(total_points == max_points, 1, 0)
     )
   
   return(dqa_results)
 }
+
 
 # DQA Function Excluding Consistency Checks
 dqa_without_consistency <- function(
