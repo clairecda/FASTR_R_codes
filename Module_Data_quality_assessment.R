@@ -422,44 +422,41 @@ dqa_with_consistency <- function(
       by = c("facility_id", "year", "month", "indicator_common_id", geo_cols)
     ) %>%
     mutate(
-      indicator_pass = case_when(
-        completeness_flag == dqa_rules$completeness & 
-          outlier_flag == dqa_rules$outlier_flag ~ 1,
-        TRUE ~ 0
-      )
+      completeness_pass = ifelse(completeness_flag == dqa_rules$completeness, 1, 0),
+      outlier_pass = ifelse(outlier_flag == dqa_rules$outlier_flag, 1, 0)
     )
   
-  # Aggregate results for completeness and outliers
-  completeness_outlier_results <- merged_completeness_outliers %>%
+  # Calculate total points for indicators (completeness + outliers)
+  indicator_results <- merged_completeness_outliers %>%
     group_by(facility_id, year, month, !!!syms(geo_cols), indicator_common_id) %>%
     summarise(
-      num_indicators = n(),                                 # Total indicators for this facility
-      passed_checks = sum(indicator_pass, na.rm = TRUE),    # Passed completeness and outlier checks
-      total_checks = n(),                                   # Total completeness and outlier checks
+      total_indicator_points = completeness_pass + outlier_pass,  # Each indicator contributes up to 2 points
       .groups = "drop"
     )
   
-  # Evaluate consistency checks
+  # Evaluate consistency checks (each pair contributes 1 point)
   consistency_results <- consistency_data %>%
-    group_by(facility_id, year, month, !!!syms(geo_cols), ratio_type) %>%
+    group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
-      num_pairs = n(),                                      # Total consistency pairs for this facility
-      passed_checks = sum(sconsistency, na.rm = TRUE),      # Passed consistency checks
-      total_checks = n(),                                   # Total consistency checks
+      total_consistency_points = sum(sconsistency, na.rm = TRUE),
       .groups = "drop"
     )
   
-  # Combine completeness/outliers and consistency results
-  dqa_results <- bind_rows(
-    completeness_outlier_results %>% mutate(ratio_type = NA),  # Add empty `ratio_type` column for completeness/outliers
-    consistency_results %>% mutate(indicator_common_id = NA)   # Add empty `indicator_common_id` for consistency
-  ) %>%
-    mutate(
-      dqa_score = passed_checks / total_checks  # Calculate DQA score as a proportion of checks passed
+  # Combine results: Merge indicator and consistency results
+  dqa_results <- indicator_results %>%
+    group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
+    summarise(
+      total_indicator_points = sum(total_indicator_points, na.rm = TRUE),
+      total_consistency_points = consistency_results$total_consistency_points[1],
+      total_points = total_indicator_points + total_consistency_points,  # Total points for the DQA
+      max_points = 2 * length(DQA_INDICATORS) + length(unique(consistency_data$ratio_type)),  # Maximum possible points
+      dqa_score = ifelse(total_points == max_points, 1, 0),  # Pass if all points are achieved
+      .groups = "drop"
     )
   
   return(dqa_results)
 }
+
 
 # DQA Function Excluding Consistency Checks
 dqa_without_consistency <- function(
@@ -495,22 +492,19 @@ dqa_without_consistency <- function(
       by = c("facility_id", "year", "month", "indicator_common_id", geo_cols)
     ) %>%
     mutate(
-      indicator_pass = case_when(
-        completeness_flag == dqa_rules$completeness & 
-          outlier_flag == dqa_rules$outlier_flag ~ 1,
-        TRUE ~ 0
-      )
+      completeness_pass = ifelse(completeness_flag == dqa_rules$completeness, 1, 0),
+      outlier_pass = ifelse(outlier_flag == dqa_rules$outlier_flag, 1, 0)
     )
   
-  # Calculate DQA scores
+  # Calculate total points for indicators (completeness + outliers)
   dqa_scores <- merged_data %>%
     group_by(
-      facility_id, year, month, !!!syms(geo_cols), indicator_common_id
+      facility_id, year, month, !!!syms(geo_cols)
     ) %>%
     summarise(
-      indicator_pass = sum(indicator_pass, na.rm = TRUE),      # Total passed indicators
-      total_checks = n(),                                     # Total checks (based on indicators)
-      dqa_score = sum(indicator_pass, na.rm = TRUE),          # Total passed checks
+      total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),  # Up to 2 points per indicator
+      max_points = 2 * length(DQA_INDICATORS),  # Maximum points possible without consistency checks
+      dqa_score = ifelse(total_indicator_points == max_points, 1, 0),  # Pass if all points achieved
       .groups = "drop"
     )
   
@@ -518,9 +512,10 @@ dqa_without_consistency <- function(
 }
 
 
+
 # ------------------- Main Execution ----------------------------------------------------------------------------
 
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -605,7 +600,6 @@ if (!is.null(facility_consistency_results)) {
     dqa_rules = dqa_rules
   )
 }
-
 
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
