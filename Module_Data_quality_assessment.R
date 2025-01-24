@@ -416,7 +416,7 @@ dqa_with_consistency <- function(
     distinct(facility_id, year, month, indicator_common_id, outlier_flag, !!!syms(geo_cols))
   
   # Merge completeness and outlier data
-  merged_completeness_outliers <- completeness_data %>%
+  merged_data <- completeness_data %>%
     left_join(
       outlier_data,
       by = c("facility_id", "year", "month", "indicator_common_id", geo_cols)
@@ -426,37 +426,33 @@ dqa_with_consistency <- function(
       outlier_pass = ifelse(outlier_flag == dqa_rules$outlier_flag, 1, 0)
     )
   
-  # Calculate total points for indicators (completeness + outliers)
-  indicator_results <- merged_completeness_outliers %>%
-    group_by(facility_id, year, month, !!!syms(geo_cols), indicator_common_id) %>%
+  # Aggregate indicator results
+  indicator_results <- merged_data %>%
+    group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
-      total_indicator_points = completeness_pass + outlier_pass,  # Each indicator contributes up to 2 points
+      total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),  # Max 2 points per indicator
       .groups = "drop"
     )
   
-  # Evaluate consistency checks (each pair contributes 1 point)
+  # Aggregate consistency results
   consistency_results <- consistency_data %>%
     group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
-      total_consistency_points = sum(sconsistency, na.rm = TRUE),
+      total_consistency_points = sum(sconsistency, na.rm = TRUE),  # Max 1 point per pair
       .groups = "drop"
     )
   
-  # Combine results: Merge indicator and consistency results
+  # Merge indicator and consistency results
   dqa_results <- indicator_results %>%
-    group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
-    summarise(
-      total_indicator_points = sum(total_indicator_points, na.rm = TRUE),
-      total_consistency_points = consistency_results$total_consistency_points[1],
-      total_points = total_indicator_points + total_consistency_points,  # Total points for the DQA
-      max_points = 2 * length(DQA_INDICATORS) + length(unique(consistency_data$ratio_type)),  # Maximum possible points
-      dqa_score = ifelse(total_points == max_points, 1, 0),  # Pass if all points are achieved
-      .groups = "drop"
+    left_join(consistency_results, by = c("facility_id", "year", "month", geo_cols)) %>%
+    mutate(
+      total_points = total_indicator_points + total_consistency_points,
+      max_points = 2 * length(DQA_INDICATORS) + length(unique(consistency_data$ratio_type)),
+      dqa_score = ifelse(total_points == max_points, 1, 0)
     )
   
   return(dqa_results)
 }
-
 
 # DQA Function Excluding Consistency Checks
 dqa_without_consistency <- function(
@@ -496,22 +492,18 @@ dqa_without_consistency <- function(
       outlier_pass = ifelse(outlier_flag == dqa_rules$outlier_flag, 1, 0)
     )
   
-  # Calculate total points for indicators (completeness + outliers)
-  dqa_scores <- merged_data %>%
-    group_by(
-      facility_id, year, month, !!!syms(geo_cols)
-    ) %>%
+  # Aggregate results
+  dqa_results <- merged_data %>%
+    group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
-      total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),  # Up to 2 points per indicator
-      max_points = 2 * length(DQA_INDICATORS),  # Maximum points possible without consistency checks
-      dqa_score = ifelse(total_indicator_points == max_points, 1, 0),  # Pass if all points achieved
+      total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),
+      max_points = 2 * length(DQA_INDICATORS),  # Max points for indicators
+      dqa_score = ifelse(total_indicator_points == max_points, 1, 0),
       .groups = "drop"
     )
   
-  return(dqa_scores)
+  return(dqa_results)
 }
-
-
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
 
