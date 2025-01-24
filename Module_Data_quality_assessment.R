@@ -302,10 +302,9 @@ expand_consistency_results <- function(consistency_data, completeness_data) {
 }
 
 
-# PART 3-A COMPLETENESS   ---------------------------------------------------------------------------------------
-# PART 3-A COMPLETENESS ---------------------------------------------------------------------------------------
+# PART 3-A COMPLETENESS ----------------------------------------------------------------------------------------
 completeness_analysis <- function(data, geo_cols) {
-  print("Performing completeness analysis (facility-month completeness based on NA values)...")
+  print("Performing completeness analysis with smoothing for trailing missing data...")
   
   # Step 1: Identify the min and max month for EACH year in the dataset
   year_month_range <- data %>%
@@ -341,17 +340,29 @@ completeness_analysis <- function(data, geo_cols) {
   expanded_data <- expanded_data %>%
     mutate(
       date = as.Date(paste(year, month, "1", sep = "-")),
-      period_id = as.integer(paste0(year, sprintf("%02d", month)))
-    ) 
-  
-  # Step 6: Create completeness_flag and assess completeness (mark incomplete if `count` is NA)
-  expanded_data <- expanded_data %>%
-    mutate(
-      completeness_flag = ifelse(!is.na(count), 1, 0)  # Mark as complete if count is not NA, otherwise incomplete
+      period_id = as.integer(paste0(year, sprintf("%02d", month))),
+      negdate = as.integer(date) * -1  # Generate negative date for sorting
     )
   
-  # Step 7: Summarize monthly reported units
-  facility_month_data <- expanded_data %>%
+  # Step 6: Mark completeness (only NA is considered incomplete)
+  expanded_data <- expanded_data %>%
+    mutate(
+      completeness_flag = ifelse(!is.na(count), 1, 0)  # NA is incomplete, 0 is fine
+    )
+  
+  # Step 7: Smoothing the reporting time frame
+  smoothed_data <- expanded_data %>%
+    group_by(panelvar = paste(indicator_common_id, facility_id, sep = "_")) %>%
+    arrange(panelvar, date) %>%
+    mutate(
+      first_occurrence = cumsum(completeness_flag),  # Identify first occurrence of completeness
+      num1 = ifelse(first_occurrence == 0, row_number(), NA_integer_)  # Count rows before the first occurrence
+    ) %>%
+    ungroup() %>%
+    filter(is.na(num1) | num1 <= 12)  # Keep data within 12 months before the first occurrence
+  
+  # Step 8: Summarize monthly reported units
+  facility_month_data <- smoothed_data %>%
     group_by(
       facility_id, 
       indicator_common_id, 
@@ -361,14 +372,14 @@ completeness_analysis <- function(data, geo_cols) {
       across(all_of(geo_cols))
     ) %>%
     summarise(
-      reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Count complete months
+      reported_facility_months = sum(completeness_flag, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     mutate(
-      completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Mark facility as complete if any months are complete
+      completeness_flag = ifelse(reported_facility_months > 0, 1, 0)
     )
   
-  # Step 10: Return results
+  # Step 9: Return results
   return(facility_month_data)
 }
 
