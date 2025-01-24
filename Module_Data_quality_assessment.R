@@ -17,7 +17,7 @@ DQA_INDICATORS <- c("opd", "penta1", "anc1") # Specify which indicators are subj
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
 
-# --------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------
 # Outlier Analysis Parameters
 outlier_params <- list(
   outlier_pc_threshold = OUTLIER_PROPORTION_THRESHOLD,  # Threshold for proportional contribution to flag outliers
@@ -50,7 +50,7 @@ dqa_rules <- list(
 )
 
 
-# ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
+# ------------------------------------- KEY OUTPUTS ----------------------------------------------------------
 # FILE: M1_output_outliers.csv             # Detailed facility-level data with identified outliers and adjusted volumes.
 # FILE: M1_completeness_long_format.csv    # Facility-level completeness data in a detailed long format, including reported and expected months.
 # FILE: M1_output_consistency_geo.csv      # District-level consistency results - use in visualizer
