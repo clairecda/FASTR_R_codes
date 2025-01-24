@@ -1,7 +1,7 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100      # Minimum count threshold for consideration
 GEOLEVEL <- "admin_area_3" 
-DQA_INDICATORS <- c("opd", "penta1", "anc1") # Specify which indicators are subjected to DQA (default: opd, penta1, anc1)
+DQA_INDICATORS <- c("penta1") # Specify which indicators are subjected to DQA (default: opd, penta1, anc1)
 
 #------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
@@ -379,7 +379,6 @@ completeness_analysis <- function(data, geo_cols) {
 }
 
 
-
 # PART 4 DQA ----------------------------------------------------------------------------------------------------
 # 1. dqa_with_consistency: Includes consistency checks
 # 2. dqa_without_consistency: Excludes consistency checks
@@ -524,7 +523,7 @@ dqa_without_consistency <- function(
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
 
-inputs <- load_and_preprocess_data("sierraleone_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
