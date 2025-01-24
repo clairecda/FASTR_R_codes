@@ -1,5 +1,3 @@
-
-
 # CB - R code FASTR PROJECT
 # Module: DYNAMIC ADJUSTMENT
 # Last edit: 2025 Jan 24
@@ -10,7 +8,21 @@
 
 
 
-# DATA: sierraleone_imported_dataset.csv
+# DATA: M1_output_outliers.csv + M1_completeness_long_format.csv
+
+# -------------------------- Ensure Required Data Exists ------------------------------------------------------
+
+if (!exists("outlier_data_main")) {
+  stop("Please run Module 1: Data Quality Assessment. `outlier_data_main` is required for adjustments.")
+} else {
+  outlier_data <- outlier_data_main
+}
+
+if (!exists("completeness_results")) {
+  stop("Please run Module 1: Data Quality Assessment. `completeness_results` is required for adjustments.")
+} else {
+  completeness_data <- completeness_results
+}
 
 # -------------------------- KEY OUTPUT ----------------------------------------------------------------------
 # FILE: M2_adjusted_data.csv    # Dataset including facility-level adjusted volumes for all adjustment scenarios.
@@ -21,14 +33,9 @@
 library(tidyverse)
 library(zoo)  # For rolling averages
 
-# Inputs: Read directly from the environment
-outlier_data <- outlier_data_main
-completeness_data <- completeness_results
-
-# Ensure `data`, `outlier_data`, and `completeness_data` are available in the environment.
 
 # Define Functions ------------------------------------------------------------------------------------------
-# Define Adjustment Function
+# Function to Apply Adjustments
 apply_adjustments <- function(data,
                               outlier_data,
                               completeness_data,
@@ -110,20 +117,10 @@ apply_adjustments <- function(data,
   data_merged <- data_merged %>%
     mutate(count_final = count_working)
   
-  # Step 8: Debugging Logs
-  cat("Summary of adjustments applied:\n")
-  print(data_merged %>%
-          summarise(
-            total_outliers_flagged = sum(outlier_flag == 1, na.rm = TRUE),
-            total_completeness_issues = sum(completeness_flag == 0, na.rm = TRUE),
-            adjustments_applied = sum(count != count_final, na.rm = TRUE)
-          ))
-  
-  # Step 9: Return the merged dataset with adjustments
   return(data_merged)
 }
 
-# Define Adjustment Scenarios
+# Function to Apply Adjustments for Different Scenarios
 apply_adjustments_scenarios <- function(data, outlier_data, completeness_data, geo_cols) {
   join_cols <- c(geo_cols, "facility_id", "indicator_common_id", "year", "month")
   
@@ -153,26 +150,29 @@ apply_adjustments_scenarios <- function(data, outlier_data, completeness_data, g
   })
   
   # Merge results into one dataset
-  df_merged <- Reduce(function(x, y) left_join(x, y, by = join_cols), results)
+  df_adjusted <- Reduce(function(x, y) left_join(x, y, by = join_cols), results)
   
-  return(df_merged)
+  # Join back with the original columns in `data` while maintaining the order
+  df_final <- data %>%
+    left_join(df_adjusted, by = join_cols)
+  
+  return(df_final)
 }
-
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
 
 print("Running adjustments analysis...")
 
-adjusted_data <- apply_adjustments_scenarios(
+# Run Adjustment Scenarios
+adjusted_data_final <- apply_adjustments_scenarios(
   data = data,
   outlier_data = outlier_data,
   completeness_data = completeness_data,
-  geo_cols = geo_cols
+  geo_cols = c("admin_area_1", "admin_area_2", "admin_area_3")
 )
 
 # Save Outputs
-print("Saving adjusted data...")
-write.csv(adjusted_data, "M2_adjusted_data.csv", row.names = FALSE)
+write.csv(adjusted_data_final, "M2_adjusted_data.csv", row.names = FALSE)
 
 print("Adjustments completed and saved.")
 
