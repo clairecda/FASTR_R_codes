@@ -96,15 +96,21 @@ map_adjusted_volumes <- function(data) {
 
 # PART 3 - Extend Survey Data for Missing Years -----------------------------------
 extend_survey_data <- function(survey_data, min_year = 2000, max_year = 2025, prefix) {
-  full_year_range <- seq(min_year, max_year) # Define complete year range
+  survey_data <- survey_data %>%
+    filter(year >= min_year & year <= max_year)  # Ensure year range is valid
+  full_year_range <- seq(min_year, max_year)
   
   survey_data %>%
     group_by(admin_area_1) %>%
-    complete(year = full_year_range) %>% # Ensure full year coverage
+    complete(year = full_year_range) %>%
     arrange(admin_area_1, year) %>%
-    fill(starts_with(prefix), .direction = "downup") %>% # Fill forward and backward
-    mutate(across(starts_with(prefix), ~ if_else(is.na(.x), 0.5, .x))) %>% # Assign fallback of 0.5 for missing values
-    filter(year >= min_year) %>% # Explicitly filter years before 2000
+    mutate(
+      across(
+        starts_with(prefix),
+        ~ zoo::na.locf(.x, na.rm = FALSE),  # Forward fill
+        .names = "{.col}_carry"
+      )
+    ) %>%
     ungroup()
 }
 
@@ -113,7 +119,7 @@ extend_survey_data <- function(survey_data, min_year = 2000, max_year = 2025, pr
 create_survey_averages <- function(data) {
   data <- data %>%
     mutate(
-      # Create survey averages (note = DHS takes priority over MICS)
+      # DHS prioritized over MICS
       avgsurvey_anc1 = coalesce(dhsanc1, micsanc1),
       avgsurvey_anc4 = coalesce(dhsanc4, micsanc4),
       avgsurvey_delivery = coalesce(dhsdelivery, micsdelivery),
@@ -123,10 +129,10 @@ create_survey_averages <- function(data) {
       avgsurvey_nmr = coalesce(dhsnmr, micsnmr),
       avgsurvey_imr = coalesce(dhsimr, micsimr),
       
-      # Calculate postnatal mortality
+      # Postnatal mortality rate
       postnmr = avgsurvey_imr - avgsurvey_nmr,
       
-      # Assign data source
+      # Data source tracking
       datasource_anc1 = if_else(!is.na(dhsanc1), "DHS", "MICS"),
       datasource_delivery = if_else(!is.na(dhsdelivery), "DHS", "MICS"),
       datasource_bcg = if_else(!is.na(dhsbcg), "DHS", "MICS"),
@@ -136,41 +142,41 @@ create_survey_averages <- function(data) {
   return(data)
 }
 
-# PART 5.A - Carry Forward Survey Data ---------------------------------------------
+# PART 5 - Carry Forward Survey Data ----------------------------------------------
 carry_forward_survey_data <- function(data, survey_vars) {
+  # Ensure the function processes only existing survey variables
   existing_vars <- intersect(survey_vars, colnames(data))
+  
   if (length(existing_vars) == 0) {
     warning("No survey variables found to carry forward.")
     return(data)
   }
   
   data %>%
-    arrange(admin_area_1, year) %>%
-    group_by(admin_area_1) %>%
-    mutate(across(
-      all_of(existing_vars),
-      ~ zoo::na.locf(.x, na.rm = FALSE), 
-      .names = "{sub('^avgsurvey_', '', .col)}carry"
-    )) %>%
-    mutate(across(all_of(existing_vars), ~ if_else(is.na(.x), 0.5, .x))) %>%
+    arrange(admin_area_1, year) %>%  # Ensure data is sorted for carryforward
+    group_by(admin_area_1) %>%      # Group by admin area for proper carryforward
+    mutate(
+      across(
+        all_of(existing_vars),
+        ~ zoo::na.locf(.x, na.rm = FALSE),  # Forward fill missing values
+        .names = "{.col}_carry"
+      ),
+      across(
+        all_of(existing_vars),
+        ~ zoo::na.locf(.x, na.rm = FALSE, fromLast = TRUE),  # Backward fill if needed
+        .names = "{.col}_carry"
+      )
+    ) %>%
+    mutate(
+      # Assign fallback of 0.5 if still missing after carryforward
+      across(
+        ends_with("_carry"),
+        ~ if_else(is.na(.x), 0.5, .x)
+      )
+    ) %>%
     ungroup()
 }
 
-
-# PART 5.B - Create Datasource Columns ---------------------------------------------
-create_datasource_columns <- function(data) {
-  data %>%
-    mutate(
-      datasource_anc1 = if_else(!is.na(dhsanc1), "DHS", if_else(!is.na(micsanc1), "MICS", NA_character_)),
-      datasource_anc4 = if_else(!is.na(dhsanc4), "DHS", if_else(!is.na(micsanc4), "MICS", NA_character_)),
-      datasource_delivery = if_else(!is.na(dhsdelivery), "DHS", if_else(!is.na(micsdelivery), "MICS", NA_character_)),
-      datasource_bcg = if_else(!is.na(dhsbcg), "DHS", if_else(!is.na(micsbcg), "MICS", NA_character_)),
-      datasource_penta1 = if_else(!is.na(dhspenta1), "DHS", if_else(!is.na(micspenta1), "MICS", NA_character_)),
-      datasource_penta3 = if_else(!is.na(dhspenta3), "DHS", if_else(!is.na(micspenta3), "MICS", NA_character_)),
-      datasource_nmr = if_else(!is.na(dhsnmr), "DHS", if_else(!is.na(micsnmr), "MICS", "Calculated")),
-      datasource_imr = if_else(!is.na(dhsimr), "DHS", if_else(!is.na(micsimr), "MICS", "Calculated"))
-    )
-}
 
 # PART 6.1 - Calculate HMIS derived-denominators ------------------------------------------------
 calculate_hmis_denominators <- function(data, adjustment_factors) {
@@ -354,33 +360,64 @@ calculate_wpp_denominators <- function(data, adjustment_factors) {
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
 adjusted_volume <- map_adjusted_volumes(adjusted_volume_data)
+hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevant Countries from HMIS Data
 
-# 2. Adjust Names for Consistency
+# 2. Aggregate HMIS Data to Annual Level
+annual_hmis <- adjusted_volume %>%
+  group_by(admin_area_1, year) %>%
+  summarise(
+    across(starts_with("count"), ~ if_else(all(is.na(.)), NA_real_, sum(., na.rm = TRUE))),  # Proper handling of NAs
+    nummonth = sum(!is.na(month)),  # Only count non-missing months
+    .groups = "drop"
+  )
+
+# 3. Adjust Names for Consistency
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
-wpp_data <- read_dta(wpp_data_path) %>%
+
+# 4. Apply filtering to ensure only relevant countries are included
+mics_data_filtered <- read_dta(mics_data_path) %>%
   rename(admin_area_1 = country) %>%
-  adjust_names_for_merging("admin_area_1", name_replacements)
-mics_data <- read_dta(mics_data_path) %>%
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+
+dhs_data_filtered <- read_dta(dhs_data_path) %>%
   rename(admin_area_1 = country) %>%
-  adjust_names_for_merging("admin_area_1", name_replacements)
-dhs_data <- read_dta(dhs_data_path) %>%
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+
+wpp_data_filtered <- read_dta(wpp_data_path) %>%
   rename(admin_area_1 = country) %>%
-  adjust_names_for_merging("admin_area_1", name_replacements)
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+
 
 # 3. Extend Survey Data
-mics_data_extended <- extend_survey_data(mics_data, prefix = "mics")
-dhs_data_extended <- extend_survey_data(dhs_data, prefix = "dhs")
+mics_data_extended <- extend_survey_data(mics_data_filtered, prefix = "mics")
+dhs_data_extended <- extend_survey_data(dhs_data_filtered, prefix = "dhs")
+wpp_data_extended <- extend_survey_data(wpp_data_filtered, prefix = "wpp")
 
 # 4. Merge and Process Data
-data <- adjusted_volume %>%
-  left_join(mics_data_extended, by = c("admin_area_1", "year")) %>%
-  left_join(dhs_data_extended, by = c("admin_area_1", "year")) %>%
-  left_join(wpp_data, by = c("admin_area_1", "year")) %>%
+data <- annual_hmis %>%
+  full_join(mics_data_extended, by = c("admin_area_1", "year")) %>%
+  full_join(dhs_data_extended, by = c("admin_area_1", "year")) %>%
+  full_join(wpp_data_extended, by = c("admin_area_1", "year")) %>%
+  filter(year >= 2000 & year <= 2025) %>%  # Restrict to the desired year range
   create_survey_averages() %>%
   carry_forward_survey_data(survey_vars)
 
-# 5. Map Data Sources
-data <- create_datasource_columns(data)
+# Combine carry variables into unified columns
+data <- data %>%
+  mutate(
+    anc1carry = coalesce(dhsanc1_carry, micsanc1_carry),
+    anc4carry = coalesce(dhsanc4_carry, micsanc4_carry),
+    deliverycarry = coalesce(dhsdelivery_carry, micsdelivery_carry),
+    bcgcarry = coalesce(dhsbcg_carry, micsbcg_carry),
+    penta1carry = coalesce(dhspenta1_carry, micspenta1_carry),
+    penta3carry = coalesce(dhspenta3_carry, micspenta3_carry),
+    nmrcarry = coalesce(dhsnmr_carry, micsnmr_carry),
+    imrcarry = coalesce(dhsimr_carry, micsimr_carry)
+  )
+
 
 # 6. Calculate Denominators
 data <- calculate_hmis_denominators(data, adjustment_factors)
