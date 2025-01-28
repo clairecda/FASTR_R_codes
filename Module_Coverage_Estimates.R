@@ -1,7 +1,6 @@
 #PLACEHOLDER FOR PARAMETERS - UI
 
 
-#------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Jan 27
 # Module: Coverage Estimates
@@ -56,10 +55,8 @@ survey_vars <- c(
 # ------------------------------ Define Functions --------------------------------
 # PART 1 - Adjust Names for Merging ----------------------------------------------
 adjust_names_for_merging <- function(data, column, replacements) {
-  data %>%
-    mutate(
-      !!sym(column) := recode(!!sym(column), !!!replacements)
-    )
+  data[[column]] <- recode(data[[column]], !!!replacements)
+  return(data)
 }
 
 # PART 2 - Map Adjusted Volumes to Indicators -------------------------------------
@@ -180,29 +177,27 @@ carry_forward_survey_data <- function(data, survey_vars) {
 
 # PART 6.1 - Calculate HMIS derived-denominators ------------------------------------------------
 calculate_hmis_denominators <- function(data, adjustment_factors) {
-  # Dynamically detect available indicators
-  available_indicators <- intersect(c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr"), 
-                                    colnames(data) %>% str_remove("^count"))
-  
-  # Check for missing required carry columns
-  carry_columns <- paste0(available_indicators, "carry")
-  missing_carry <- setdiff(carry_columns, colnames(data))
-  if (length(missing_carry) > 0) {
-    warning("The following carry columns are missing: ", paste(missing_carry, collapse = ", "))
-  }
-  
-  # Calculate denominators dynamically based on available indicators
-  for (indicator in available_indicators) {
+  for (indicator in c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3")) {
     count_col <- paste0("count", indicator)
     carry_col <- paste0(indicator, "carry")
     denom_col_base <- paste0("d", indicator)
     
-    # Generate specific denominators for each indicator
+    # Skip if the required columns are missing
+    if (!count_col %in% colnames(data)) {
+      message(paste("Missing count column for indicator:", indicator))
+      next
+    }
+    if (!carry_col %in% colnames(data)) {
+      message(paste("Missing carry column for indicator:", indicator))
+      next
+    }
+    
     if (indicator == "anc1") {
+      # ANC1 denominators
       data <- data %>%
         mutate(
           !!paste0(denom_col_base, "_livebirth") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 - adjustment_factors$preg_loss) *
               (1 + adjustment_factors$twin_rate) *
@@ -210,42 +205,27 @@ calculate_hmis_denominators <- function(data, adjustment_factors) {
             NA_real_
           ),
           !!paste0(denom_col_base, "_dpt") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 - adjustment_factors$preg_loss) /
               (1 - (adjustment_factors$twin_rate / 2)) *
               (1 - adjustment_factors$stillbirth) *
               (1 - adjustment_factors$nmr),
             NA_real_
-          ),
-          !!paste0("dmcv_", indicator) := if_else(
-            !is.na(.data[[count_col]]),
-            (.data[[count_col]] / (.data[[carry_col]] / 100)) *
-              (1 - adjustment_factors$preg_loss) *
-              (1 + adjustment_factors$twin_rate) *
-              (1 - adjustment_factors$stillbirth) *
-              (1 - adjustment_factors$imr),
-            NA_real_
           )
         )
     } else if (indicator == "delivery") {
+      # Delivery denominators
       data <- data %>%
         mutate(
           !!paste0(denom_col_base, "_pregnancy") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) /
               (1 - adjustment_factors$preg_loss),
             NA_real_
           ),
-          !!paste0(denom_col_base, "_livebirth") := if_else(
-            !is.na(.data[[count_col]]),
-            (.data[[count_col]] / (.data[[carry_col]] / 100)) *
-              (1 + adjustment_factors$twin_rate) *
-              (1 - adjustment_factors$stillbirth),
-            NA_real_
-          ),
           !!paste0(denom_col_base, "_dpt") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 + adjustment_factors$twin_rate) *
               (1 - adjustment_factors$stillbirth) *
@@ -253,7 +233,7 @@ calculate_hmis_denominators <- function(data, adjustment_factors) {
             NA_real_
           ),
           !!paste0(denom_col_base, "_mcv") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 + adjustment_factors$twin_rate) *
               (1 - adjustment_factors$stillbirth) *
@@ -262,29 +242,25 @@ calculate_hmis_denominators <- function(data, adjustment_factors) {
           )
         )
     } else if (indicator == "bcg") {
+      # BCG denominators
       data <- data %>%
         mutate(
           !!paste0(denom_col_base, "_pregnancy") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) /
               (1 - adjustment_factors$preg_loss) /
               (1 + adjustment_factors$twin_rate) /
               (1 - adjustment_factors$stillbirth),
             NA_real_
           ),
-          !!paste0(denom_col_base, "_livebirth") := if_else(
-            !is.na(.data[[count_col]]),
-            (.data[[count_col]] / (.data[[carry_col]] / 100)),
-            NA_real_
-          ),
           !!paste0(denom_col_base, "_dpt") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 - adjustment_factors$nmr),
             NA_real_
           ),
           !!paste0(denom_col_base, "_mcv") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 - adjustment_factors$nmr) *
               (1 - adjustment_factors$pnmr),
@@ -292,10 +268,11 @@ calculate_hmis_denominators <- function(data, adjustment_factors) {
           )
         )
     } else if (indicator == "penta1") {
+      # Penta1 denominators
       data <- data %>%
         mutate(
           !!paste0(denom_col_base, "_pregnancy") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) /
               (1 - adjustment_factors$preg_loss) /
               (1 + adjustment_factors$twin_rate) /
@@ -304,35 +281,28 @@ calculate_hmis_denominators <- function(data, adjustment_factors) {
             NA_real_
           ),
           !!paste0(denom_col_base, "_livebirth") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) /
               (1 + adjustment_factors$twin_rate) /
               (1 - adjustment_factors$stillbirth) /
               (1 - adjustment_factors$nmr),
             NA_real_
           ),
-          !!paste0(denom_col_base, "_dpt") := if_else(
-            !is.na(.data[[count_col]]),
-            (.data[[count_col]] / (.data[[carry_col]] / 100)),
-            NA_real_
-          ),
           !!paste0(denom_col_base, "_mcv") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) *
               (1 - adjustment_factors$pnmr),
             NA_real_
           )
         )
     } else if (indicator == "penta3") {
+      # Penta3 denominators
       data <- data %>%
         mutate(
           !!paste0(denom_col_base, "_pregnancy") := if_else(
-            !is.na(.data[[count_col]]),
+            !is.na(.data[[count_col]]) & !is.na(.data[[carry_col]]) & .data[[carry_col]] > 0,
             (.data[[count_col]] / (.data[[carry_col]] / 100)) /
-              (1 - adjustment_factors$preg_loss) /
-              (1 + adjustment_factors$twin_rate) /
-              (1 - adjustment_factors$stillbirth) /
-              (1 - adjustment_factors$nmr),
+              (1 - adjustment_factors$preg_loss),
             NA_real_
           )
         )
@@ -356,6 +326,162 @@ calculate_wpp_denominators <- function(data, adjustment_factors) {
 }
 
 
+# PART 7 - Calculate Coverage for Each Indicator Based on Denominators ---------------
+calculate_coverage <- function(data) {
+  data <- data %>%
+    mutate(
+      cov_anc1_livebirth = if_else(
+        !is.na(countanc1) & !is.na(danc1_livebirth) & danc1_livebirth != 0, 
+        (countanc1 / danc1_livebirth) * 100, 
+        NA_real_
+      ),
+      cov_anc1_dpt = if_else(
+        !is.na(countanc1) & !is.na(danc1_dpt) & danc1_dpt != 0,
+        (countanc1 / danc1_dpt) * 100, 
+        NA_real_
+      ),
+      cov_delivery_pregnancy = if_else(
+        !is.na(countdelivery) & !is.na(ddelivery_pregnancy) & ddelivery_pregnancy != 0, 
+        (countdelivery / ddelivery_pregnancy) * 100, 
+        NA_real_
+      ),
+      cov_delivery_dpt = if_else(
+        !is.na(countdelivery) & !is.na(ddelivery_dpt) & ddelivery_dpt != 0,
+        (countdelivery / ddelivery_dpt) * 100, 
+        NA_real_
+      ),
+      cov_bcg_pregnancy = if_else(
+        !is.na(countbcg) & !is.na(dbcg_pregnancy) & dbcg_pregnancy != 0, 
+        (countbcg / dbcg_pregnancy) * 100, 
+        NA_real_
+      ),
+      cov_bcg_dpt = if_else(
+        !is.na(countbcg) & !is.na(dbcg_dpt) & dbcg_dpt != 0, 
+        (countbcg / dbcg_dpt) * 100, 
+        NA_real_
+      ),
+      cov_penta1_pregnancy = if_else(
+        !is.na(countpenta1) & !is.na(dpenta1_pregnancy) & dpenta1_pregnancy != 0, 
+        (countpenta1 / dpenta1_pregnancy) * 100, 
+        NA_real_
+      ),
+      cov_penta1_livebirth = if_else(
+        !is.na(countpenta1) & !is.na(dpenta1_livebirth) & dpenta1_livebirth != 0, 
+        (countpenta1 / dpenta1_livebirth) * 100, 
+        NA_real_
+      ),
+      cov_penta3_pregnancy = if_else(
+        !is.na(countpenta3) & !is.na(dpenta3_pregnancy) & dpenta3_pregnancy != 0, 
+        (countpenta3 / dpenta3_pregnancy) * 100, 
+        NA_real_
+      )
+    )
+  return(data)
+}
+
+
+
+# PART 7.2 - Extrapolate Coverage Trends for Missing Years -----------------------------------
+extrapolate_coverage_trends <- function(data) {
+  data %>%
+    group_by(admin_area_1) %>%
+    arrange(year) %>%
+    mutate(
+      # Use lag for intermediate years, then fill missing at the start and end
+      projected_cov_anc1 = zoo::na.locf(
+        zoo::na.locf(
+          if_else(is.na(cov_anc1_livebirth), lag(cov_anc1_livebirth), cov_anc1_livebirth), 
+          na.rm = FALSE
+        ), 
+        fromLast = TRUE, na.rm = FALSE
+      ),
+      
+      projected_cov_delivery = zoo::na.locf(
+        zoo::na.locf(
+          if_else(is.na(cov_delivery_pregnancy), lag(cov_delivery_pregnancy), cov_delivery_pregnancy), 
+          na.rm = FALSE
+        ), 
+        fromLast = TRUE, na.rm = FALSE
+      ),
+      projected_cov_bcg = zoo::na.locf(
+        zoo::na.locf(
+          if_else(is.na(cov_bcg_pregnancy), lag(cov_bcg_pregnancy), cov_bcg_pregnancy), 
+          na.rm = FALSE
+        ), 
+        fromLast = TRUE, na.rm = FALSE
+      ),
+      projected_cov_penta1 = zoo::na.locf(
+        zoo::na.locf(
+          if_else(is.na(cov_penta1_pregnancy), lag(cov_penta1_pregnancy), cov_penta1_pregnancy), 
+          na.rm = FALSE
+        ), 
+        fromLast = TRUE, na.rm = FALSE
+      ),
+      projected_cov_penta3 = zoo::na.locf(
+        zoo::na.locf(
+          if_else(is.na(cov_penta3_pregnancy), lag(cov_penta3_pregnancy), cov_penta3_pregnancy), 
+          na.rm = FALSE
+        ), 
+        fromLast = TRUE, na.rm = FALSE
+      )
+    ) %>%
+    ungroup()
+}
+
+# PART 8 - Combine HMIS-Based and Survey-Based Coverage --------------------------------------
+combine_coverage_sources <- function(data) {
+  data %>%
+    mutate(
+      final_cov_anc1 = coalesce(cov_anc1_livebirth, anc1carry, projected_cov_anc1),
+      final_cov_delivery = coalesce(cov_delivery_pregnancy, deliverycarry, projected_cov_delivery),
+      final_cov_bcg = coalesce(cov_bcg_pregnancy, bcgcarry, projected_cov_bcg),
+      final_cov_penta1 = coalesce(cov_penta1_pregnancy, penta1carry, projected_cov_penta1),
+      final_cov_penta3 = coalesce(cov_penta3_pregnancy, penta3carry, projected_cov_penta3)
+    )
+}
+
+# PART 9 - Select Best Denominator for Each Indicator -------------------------------------------------
+select_best_denominator <- function(data, indicators) {
+  for (indicator in indicators) {
+    # Define coverage and error columns for each indicator
+    coverage_cols <- grep(paste0("^cov_", indicator), colnames(data), value = TRUE)
+    if (length(coverage_cols) == 0) {
+      print(paste("No coverage columns found for indicator:", indicator))
+      next
+    }
+    
+    # Create error columns for coverage estimates
+    for (coverage_col in coverage_cols) {
+      error_col <- paste0("error_", gsub("cov_", "", coverage_col))
+      data <- data %>%
+        mutate(
+          !!error_col := if_else(
+            !is.na(.data[[coverage_col]]) & !is.na(.data[[paste0(indicator, "carry")]]),
+            (.data[[coverage_col]] - .data[[paste0(indicator, "carry")]])^2, 
+            NA_real_
+          )
+        )
+    }
+    
+    # Select the best denominator based on minimal error (squared error)
+    error_cols <- grep(paste0("^error_", indicator), colnames(data), value = TRUE)
+    if (length(error_cols) > 0) {
+      data <- data %>%
+        mutate(
+          best_error = pmin(!!!syms(error_cols), na.rm = TRUE),
+          best_source = case_when(
+            !!sym(error_cols[1]) == best_error ~ coverage_cols[1],
+            !!sym(error_cols[2]) == best_error ~ coverage_cols[2],
+            !!sym(error_cols[3]) == best_error ~ coverage_cols[3],
+            TRUE ~ NA_character_
+          )
+        )
+    }
+  }
+  return(data)
+}
+
+
 
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
@@ -374,7 +500,7 @@ annual_hmis <- adjusted_volume %>%
 # 3. Adjust Names for Consistency
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
 
-# 4. Apply filtering to ensure only relevant countries are included
+# 4. Apply Filtering to Ensure Only Relevant Countries are Included
 mics_data_filtered <- read_dta(mics_data_path) %>%
   rename(admin_area_1 = country) %>%
   adjust_names_for_merging("admin_area_1", name_replacements) %>%
@@ -390,13 +516,12 @@ wpp_data_filtered <- read_dta(wpp_data_path) %>%
   adjust_names_for_merging("admin_area_1", name_replacements) %>%
   filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
 
-
-# 3. Extend Survey Data
+# 5. Extend Survey Data
 mics_data_extended <- extend_survey_data(mics_data_filtered, prefix = "mics")
 dhs_data_extended <- extend_survey_data(dhs_data_filtered, prefix = "dhs")
 wpp_data_extended <- extend_survey_data(wpp_data_filtered, prefix = "wpp")
 
-# 4. Merge and Process Data
+# 6. Merge and Process Data
 data <- annual_hmis %>%
   full_join(mics_data_extended, by = c("admin_area_1", "year")) %>%
   full_join(dhs_data_extended, by = c("admin_area_1", "year")) %>%
@@ -405,7 +530,7 @@ data <- annual_hmis %>%
   create_survey_averages() %>%
   carry_forward_survey_data(survey_vars)
 
-# Combine carry variables into unified columns
+# 7. Combine Carry Variables
 data <- data %>%
   mutate(
     anc1carry = coalesce(dhsanc1_carry, micsanc1_carry),
@@ -418,8 +543,20 @@ data <- data %>%
     imrcarry = coalesce(dhsimr_carry, micsimr_carry)
   )
 
-
-# 6. Calculate Denominators
+# 8. Calculate Denominators
 data <- calculate_hmis_denominators(data, adjustment_factors)
 data <- calculate_wpp_denominators(data, adjustment_factors)
+
+# 9. Calculate Coverage for Each Indicator
+data <- calculate_coverage(data)
+
+# 10. Extrapolate Coverage Trends for Missing Years
+data <- extrapolate_coverage_trends(data)
+
+# 11. Combine HMIS-Based and Survey-Based Coverage
+data <- combine_coverage_sources(data)
+
+# 12. Select the Best Denominator for Each Indicator
+data <- select_best_denominator(data, indicators = c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3"))
+
 
