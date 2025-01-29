@@ -18,13 +18,13 @@
 
 # ------------------------------ Load Required Libraries -------------------------
 library(tidyverse)  # For data manipulation and visualization
-library(haven)      # For reading Stata .dta files -- remove once the data load in platform
+library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the data load in platform
 library(zoo)        # For carryforward functionality
 library(stringr)    # For string manipulation
 
 # ------------------------------ Define File Paths -------------------------------
 # Input Datasets
-adjusted_volume_data <- adjusted_data_final  # Using data directly from the environment
+adjusted_volume_data <- "M2_adjusted_data.csv"
 wpp_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/UNWPP/WPP.dta"
 mics_data_path       <- "~/Desktop/FASTR/Coverage_Analysis/MICS/MICS.dta"
 dhs_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS.dta"
@@ -356,54 +356,54 @@ calculate_all_denominators <- function(data, adjustment_factors) {
 }
 
 # PART 7 - Calculate Coverage for Each Indicator Based on Denominators ---------------
-calculate_coverage <- function(data) {
-  data <- data %>%
-    mutate(
-      # ANC1 Coverage - Pregnancy (renamed to cov_anc1)
-      cov_anc1 = if_else(
-        !is.na(countanc1) & !is.na(danc1_pregnancy) & danc1_pregnancy != 0, 
-        (countanc1 / danc1_pregnancy) * 100, 
-        NA_real_
-      ),
-      
-      # ANC4 Coverage - Pregnancy (renamed to cov_anc4)
-      cov_anc4 = if_else(
-        !is.na(countanc4) & !is.na(danc4_pregnancy) & danc4_pregnancy != 0, 
-        (countanc4 / danc4_pregnancy) * 100, 
-        NA_real_
-      ),
-      
-      # Delivery Coverage - Livebirth (renamed to cov_delivery)
-      cov_delivery = if_else(
-        !is.na(countdelivery) & !is.na(ddelivery_livebirth) & ddelivery_livebirth != 0, 
-        (countdelivery / ddelivery_livebirth) * 100, 
-        NA_real_
-      ),
-      
-      # BCG Coverage - Livebirth (renamed to cov_bcg)
-      cov_bcg = if_else(
-        !is.na(countbcg) & !is.na(dbcg_livebirth) & dbcg_livebirth != 0, 
-        (countbcg / dbcg_livebirth) * 100, 
-        NA_real_
-      ),
-      
-      # Penta1 Coverage - DPT (renamed to cov_penta1)
-      cov_penta1 = if_else(
-        !is.na(countpenta1) & !is.na(dpenta1_dpt) & dpenta1_dpt != 0, 
-        (countpenta1 / dpenta1_dpt) * 100, 
-        NA_real_
-      ),
-      
-      # Penta3 Coverage - DPT (renamed to cov_penta3)
-      cov_penta3 = if_else(
-        !is.na(countpenta3) & !is.na(dpenta3_dpt) & dpenta3_dpt != 0, 
-        (countpenta3 / dpenta3_dpt) * 100, 
-        NA_real_
-      )
-    )
-  
-  return(data)
-}
+# calculate_coverage <- function(data) {
+#   data <- data %>%
+#     mutate(
+#       # ANC1 Coverage - Pregnancy (renamed to cov_anc1)
+#       cov_anc1 = if_else(
+#         !is.na(countanc1) & !is.na(danc1_pregnancy) & danc1_pregnancy != 0, 
+#         (countanc1 / danc1_pregnancy) * 100, 
+#         NA_real_
+#       ),
+#       
+#       # ANC4 Coverage - Pregnancy (renamed to cov_anc4)
+#       cov_anc4 = if_else(
+#         !is.na(countanc4) & !is.na(danc4_pregnancy) & danc4_pregnancy != 0, 
+#         (countanc4 / danc4_pregnancy) * 100, 
+#         NA_real_
+#       ),
+#       
+#       # Delivery Coverage - Livebirth (renamed to cov_delivery)
+#       cov_delivery = if_else(
+#         !is.na(countdelivery) & !is.na(ddelivery_livebirth) & ddelivery_livebirth != 0, 
+#         (countdelivery / ddelivery_livebirth) * 100, 
+#         NA_real_
+#       ),
+#       
+#       # BCG Coverage - Livebirth (renamed to cov_bcg)
+#       cov_bcg = if_else(
+#         !is.na(countbcg) & !is.na(dbcg_livebirth) & dbcg_livebirth != 0, 
+#         (countbcg / dbcg_livebirth) * 100, 
+#         NA_real_
+#       ),
+#       
+#       # Penta1 Coverage - DPT (renamed to cov_penta1)
+#       cov_penta1 = if_else(
+#         !is.na(countpenta1) & !is.na(dpenta1_dpt) & dpenta1_dpt != 0, 
+#         (countpenta1 / dpenta1_dpt) * 100, 
+#         NA_real_
+#       ),
+#       
+#       # Penta3 Coverage - DPT (renamed to cov_penta3)
+#       cov_penta3 = if_else(
+        # !is.na(countpenta3) & !is.na(dpenta3_dpt) & dpenta3_dpt != 0,
+#         (countpenta3 / dpenta3_dpt) * 100, 
+#         NA_real_
+#       )
+#     )
+#   
+#   return(data)
+# }
 
 # PART 8 - Extrapolate Coverage Trends for Missing Years -----------------------------------
 extrapolate_coverage_trends <- function(data) {
@@ -572,13 +572,13 @@ data <- calculate_all_denominators(data, adjustment_factors)
 # 9. Calculate Coverage for Each Indicator
 data <- calculate_coverage(data)
 
-# 10. Extrapolate Coverage Trends for Missing Years
-data <- extrapolate_coverage_trends(data)
-
-# 11. Combine HMIS-Based and Survey-Based Coverage
-data <- combine_coverage_sources(data)
-
-# 12. Select the Best Denominator for Each Indicator
-data <- select_best_denominator(data, indicators = c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3"))
-
+# # 10. Extrapolate Coverage Trends for Missing Years
+# data <- extrapolate_coverage_trends(data)
+# 
+# # 11. Combine HMIS-Based and Survey-Based Coverage
+# data <- combine_coverage_sources(data)
+# 
+# # 12. Select the Best Denominator for Each Indicator
+# data <- select_best_denominator(data, indicators = c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3"))
+# 
 
