@@ -587,14 +587,6 @@ facility_consistency_results <- facility_consistency_results %>%
   ) %>%
   select(-c(year.y, admin_area_1.y, admin_area_2.y, admin_area_3.y))  # Remove duplicate columns
 
-# Display Available Indicators in Data
-cat("Available indicators in the dataset:\n")
-print(unique(data$indicator_common_id))
-
-# Prompt User to Adjust DQA_INDICATORS if Necessary
-cat("\nNOTE: Please review the above indicators and adjust the `DQA_INDICATORS` parameter if needed.\n")
-cat("Current DQA_INDICATORS: ", paste(DQA_INDICATORS, collapse = ", "), "\n\n")
-
 
 # RUN Data Quality Assessment (DQA)
 if (!is.null(facility_consistency_results)) {
