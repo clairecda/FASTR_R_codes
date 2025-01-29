@@ -352,69 +352,76 @@ calculate_all_denominators <- function(data, adjustment_factors) {
 
 # PART 7 - Calculate Coverage for Each Indicator Based on Denominators ---------------
 calculate_coverage_dynamic <- function(data) {
-  # Define indicators and denominator types
   indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3")
   denominator_types <- c("pregnancy", "livebirth", "dpt", "mcv")
   
-  # Ensure unique column names to prevent duplicate errors
-  colnames(data) <- make.unique(colnames(data))
-  
-  # Create an empty tibble to store coverage results
   coverage_results <- tibble()
   
-  # Loop through each indicator and denominator type
   for (indicator in indicators) {
     for (denominator in denominator_types) {
-      # Construct column names dynamically
+      # Construct column names
       denominator_col <- paste0("d", indicator, "_", denominator)
       count_col <- paste0("count", indicator)
       
-      # Check if the denominator column exists
-      if (denominator_col %in% colnames(data)) {
-        # Compute coverage only where numerator and denominator are available
-        coverage_subset <- data %>%
-          filter(!is.na(.data[[count_col]]) & !is.na(.data[[denominator_col]]) & .data[[denominator_col]] > 0) %>%
-          mutate(
-            coverage = (.data[[count_col]] / .data[[denominator_col]]) * 100,
-            indicator_common_id = indicator,
-            denominator_type = denominator
-          ) %>%
-          select(admin_area_1, year, indicator_common_id, coverage, denominator_type)
-        
-        # Append the results to coverage_results
-        coverage_results <- bind_rows(coverage_results, coverage_subset)
+      # **Check if both columns exist before using them**
+      if (!(denominator_col %in% colnames(data)) || !(count_col %in% colnames(data))) {
+        next  # Skip this iteration if either column is missing
       }
+      
+      # Compute coverage safely
+      coverage_subset <- data %>%
+        filter(!is.na(.data[[count_col]]) & !is.na(.data[[denominator_col]]) & .data[[denominator_col]] != 0) %>%
+        mutate(
+          coverage = (.data[[count_col]] / .data[[denominator_col]]) * 100,
+          denominator_type = denominator
+        ) %>%
+        select(admin_area_1, year, indicator_common_id, coverage, denominator_type)
+      
+      # Append results
+      coverage_results <- bind_rows(coverage_results, coverage_subset)
     }
   }
+  
+  # Remove duplicates
+  coverage_results <- coverage_results %>%
+    arrange(admin_area_1, year, indicator_common_id, denominator_type) %>%
+    distinct()
   
   return(coverage_results)
 }
 
 # PART 8 - Select Best Denominator ---------------------------------------------------
 select_best_denominator <- function(coverage_long, data) {
-  # Add reference values directly without joining
+  # Extract carry values and ensure unique matching per indicator/year
+  carry_values <- data %>%
+    select(admin_area_1, year, ends_with("carry")) %>%
+    pivot_longer(cols = ends_with("carry"), 
+                 names_to = "indicator_common_id", 
+                 values_to = "reference_value") %>%
+    mutate(indicator_common_id = str_replace(indicator_common_id, "carry$", "")) %>%
+    distinct(admin_area_1, year, indicator_common_id, reference_value)  # Ensure uniqueness
+  
+  # Debug: Print if there are duplicate matches in carry_values
+  print(carry_values %>%
+          count(admin_area_1, year, indicator_common_id) %>%
+          filter(n > 1))
+  
+  # Join carry values to `coverage_long` and propagate the reference values down
   debug_denominator <- coverage_long %>%
-    mutate(
-      reference_value = case_when(
-        indicator_common_id == "anc1" ~ data$anc1carry,
-        indicator_common_id == "anc4" ~ data$anc4carry,
-        indicator_common_id == "delivery" ~ data$deliverycarry,
-        indicator_common_id == "penta1" ~ data$penta1carry,
-        indicator_common_id == "penta3" ~ data$penta3carry,
-        indicator_common_id == "bcg" ~ data$bcgcarry,
-        TRUE ~ NA_real_
-      )
-    ) %>%
+    left_join(carry_values, by = c("admin_area_1", "year", "indicator_common_id")) %>%
+    group_by(admin_area_1, year, indicator_common_id) %>%
+    mutate(reference_value = first(reference_value)) %>%  # Fill down reference values
+    ungroup() %>%
     mutate(
       squared_error = if_else(!is.na(reference_value), (coverage - reference_value)^2, NA_real_)
     )
   
-  # Print out unique counts before filtering to debug duplicates
+  # Debug: Print any duplicate rows
   print(debug_denominator %>%
           count(admin_area_1, year, indicator_common_id, denominator_type) %>%
           filter(n > 1))
   
-  # Select the best denominator with the lowest squared error
+  # Select the denominator with the lowest squared error
   best_denominator <- debug_denominator %>%
     group_by(admin_area_1, year, indicator_common_id) %>%
     slice_min(order_by = squared_error, with_ties = FALSE) %>%
@@ -423,7 +430,6 @@ select_best_denominator <- function(coverage_long, data) {
   
   return(best_denominator)
 }
-
 
 
 # ------------------------------ Main Execution -----------------------------------
@@ -496,12 +502,11 @@ data <- calculate_all_denominators(data, adjustment_factors)
 # # 9. Calculate Coverage for Each Indicator
 coverage_long <- calculate_coverage_dynamic(data)
 
-#rapid check 
-coverage_long %>% filter(coverage_long$indicator_common_id == "penta1" & year == 2022)
 
 # Select Best Denominator 
 best_coverage <- select_best_denominator(coverage_long, data)
-# extrapolate
+
+
 
 
 
