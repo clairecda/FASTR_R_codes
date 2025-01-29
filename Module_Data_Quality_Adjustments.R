@@ -1,6 +1,6 @@
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
-# Last edit: 2025 Jan 24
+# Last edit: 2025 Jan 29
 
 # This script dynamically adjusts raw data for:
 #   1. Outliers: Replaces flagged counts with 12-month rolling averages.
@@ -27,17 +27,17 @@ apply_adjustments <- function(data, outlier_data, completeness_data, geo_cols,
                               adjust_outliers = FALSE, adjust_completeness = FALSE) {
   cat("Applying dynamic adjustments...\n")
   
-  # Step 1: Merge outlier flags into the main data
+  # Step 1: Append outlier_flag to the main data without duplicating columns
   data_merged <- data %>%
-    left_join(outlier_data %>%
-                select(facility_id, indicator_common_id, year, month, outlier_flag, everything()),
-              by = c("facility_id", "indicator_common_id", "year", "month"))
+    left_join(outlier_data %>% select(facility_id, indicator_common_id, year, month, outlier_flag),
+              by = c("facility_id", "indicator_common_id", "year", "month")) %>%
+    mutate(outlier_flag = replace_na(outlier_flag, 0))  # Ensure NA outlier_flag is set to 0
   
-  # Step 2: Merge completeness flags into the main data
+  # Step 2: Append completeness_flag to the main data without duplicating columns
   data_merged <- data_merged %>%
-    left_join(completeness_data %>%
-                select(facility_id, indicator_common_id, year, month, completeness_flag),
-              by = c("facility_id", "indicator_common_id", "year", "month"))
+    left_join(completeness_data %>% select(facility_id, indicator_common_id, year, month, completeness_flag),
+              by = c("facility_id", "indicator_common_id", "year", "month")) %>%
+    mutate(completeness_flag = replace_na(completeness_flag, 1))  # Assume completeness by default
   
   # Step 3: Create working count column
   data_merged <- data_merged %>%
@@ -47,51 +47,34 @@ apply_adjustments <- function(data, outlier_data, completeness_data, geo_cols,
   if (adjust_outliers) {
     cat(" -> Adjusting outliers...\n")
     
-    if("facility_type" %in% colnames(data_merged)) {
+    if ("facility_type" %in% colnames(data_merged) & any(!is.na(data_merged$facility_type))) {
       # Option 1: Group by facility_type (if it exists) and compute mean of non-outliers
       data_merged <- data_merged %>%
         group_by(across(all_of(c(geo_cols, "indicator_common_id", "facility_type", "year", "month")))) %>%
         mutate(
           avg_non_outlier = mean(count[is.na(outlier_flag) | outlier_flag == 0], na.rm = TRUE),
-          volume_adjust = if_else(!is.na(outlier_flag) & outlier_flag == 1, avg_non_outlier, count_working)
+          count_working = if_else(!is.na(outlier_flag) & outlier_flag == 1, avg_non_outlier, count_working, missing = count_working)
+        ) %>%
+        ungroup()
+    } else {
+      # Option 2: If facility_type is missing, use rolling average
+      data_merged <- data_merged %>%
+        group_by(facility_id, indicator_common_id) %>%
+        arrange(year, month) %>%
+        mutate(
+          rolling_avg = rollapply(count, width = 12, FUN = mean, fill = NA, align = "center", na.rm = TRUE),
+          count_working = if_else(
+            !is.na(outlier_flag) & outlier_flag == 1 & !is.na(rolling_avg),
+            rolling_avg, count_working, missing = count_working
+          )
         ) %>%
         ungroup()
     }
-    
-    # Option 2: If facility_type is missing, use rolling average
-    data_merged <- data_merged %>%
-      group_by(facility_id, indicator_common_id) %>%
-      arrange(year, month) %>%
-      mutate(
-        rolling_avg = rollapply(count, width = 12, FUN = mean, fill = NA, align = "center", na.rm = TRUE),
-        volume_adjust = if_else((!"facility_type" %in% colnames(data_merged) | is.na(facility_type)) &
-                                  !is.na(outlier_flag) & outlier_flag == 1 & !is.na(rolling_avg),
-                                rolling_avg, volume_adjust)
-      ) %>%
-      ungroup()
   }
-  
-  # Step 5: Apply Completeness Adjustments
-  if (adjust_completeness) {
-    cat(" -> Adjusting for completeness issues with rolling averages...\n")
-    
-    data_merged <- data_merged %>%
-      group_by(facility_id, indicator_common_id) %>%
-      arrange(year, month) %>%
-      mutate(
-        rolling_avg_clean = rollapply(volume_adjust[!is.na(completeness_flag) & completeness_flag == 1], 
-                                      width = 12, FUN = mean, fill = NA, align = "center", na.rm = TRUE),
-        count_working = if_else(!is.na(completeness_flag) & completeness_flag == 0 & !is.na(rolling_avg_clean),
-                                rolling_avg_clean, volume_adjust)
-      ) %>%
-      ungroup()
-  }
-  
-  # Final Adjusted Count
-  data_merged <- data_merged %>% mutate(count_final = count_working)
   
   return(data_merged)
 }
+
 
 # PART 2 - Apply Adjustments for Different Scenarios --------------------------------------------------------
 apply_adjustments_scenarios <- function(data, outlier_data, completeness_data, geo_cols) {
@@ -117,8 +100,8 @@ apply_adjustments_scenarios <- function(data, outlier_data, completeness_data, g
       adjust_outliers = adjustment$adjust_outliers,
       adjust_completeness = adjustment$adjust_completeness
     ) %>%
-      select(all_of(join_cols), count_final) %>%
-      rename_with(~ paste0("count_final_", name), "count_final")
+      select(all_of(join_cols), count_working) %>%
+      rename_with(~ paste0("count_final_", name), "count_working")
     return(data_adjusted)
   })
   
