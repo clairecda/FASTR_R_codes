@@ -2,7 +2,7 @@
 
 
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 27
+# Last edit: 2025 Jan 29
 # Module: Coverage Estimates
 
 # Description:
@@ -24,7 +24,7 @@ library(stringr)    # For string manipulation
 
 # ------------------------------ Define File Paths -------------------------------
 # Input Datasets
-adjusted_volume_data <- "M2_adjusted_data.csv"
+adjusted_volume_data <- read_csv("M2_adjusted_data.csv")
 wpp_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/UNWPP/WPP.dta"
 mics_data_path       <- "~/Desktop/FASTR/Coverage_Analysis/MICS/MICS.dta"
 dhs_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS.dta"
@@ -180,26 +180,28 @@ carry_forward_survey_data <- function(data, survey_vars) {
 calculate_anc1_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
-      # danc1_livebirth
+      danc1_pregnancy = if_else(
+        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(micsanc1_carry),
+        countanc1 / (micsanc1_carry / 100),
+        NA_real_
+      ),
       danc1_livebirth = if_else(
         indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
-        (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
+        (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) * 
           (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth),
         NA_real_
       ),
-      # danc1_dpt
       danc1_dpt = if_else(
         indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
         (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) /
-          (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) *
+          (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) * 
           (1 - adjustment_factors$nmr),
         NA_real_
       ),
-      # dmcv_anc1
-      dmcv_anc1 = if_else(
+      danc1_mcv = if_else(
         indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
         (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
-          (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) *
+          (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) * 
           (1 - adjustment_factors$imr),
         NA_real_
       )
@@ -211,23 +213,26 @@ calculate_anc1_denominators <- function(data, adjustment_factors) {
 calculate_delivery_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
-      # ddelivery_pregnancy
       ddelivery_pregnancy = if_else(
         indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
         (countdelivery / (deliverycarry / 100)) / (1 - adjustment_factors$preg_loss),
         NA_real_
       ),
-      # ddelivery_dpt
+      ddelivery_livebirth = if_else(
+        indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
+        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+          (1 - adjustment_factors$stillbirth),
+        NA_real_
+      ),
       ddelivery_dpt = if_else(
         indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
-        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) *
+        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
           (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$nmr),
         NA_real_
       ),
-      # ddelivery_mcv
       ddelivery_mcv = if_else(
         indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
-        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) *
+        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
           (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$imr),
         NA_real_
       )
@@ -239,23 +244,26 @@ calculate_delivery_denominators <- function(data, adjustment_factors) {
 calculate_bcg_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
-      # dbcg_pregnancy
       dbcg_pregnancy = if_else(
         indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
         (countbcg / (bcgcarry / 100)) / (1 - adjustment_factors$preg_loss) /
           (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth),
         NA_real_
       ),
-      # dbcg_dpt
+      dbcg_livebirth = if_else(
+        indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
+        (countbcg / (bcgcarry / 100)),
+        NA_real_
+      ),
       dbcg_dpt = if_else(
         indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
         (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
         NA_real_
       ),
-      # dbcg_mcv
       dbcg_mcv = if_else(
         indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
-        (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * (1 - adjustment_factors$pnmr),
+        (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
+          (1 - adjustment_factors$pnmr),
         NA_real_
       )
     )
@@ -266,22 +274,24 @@ calculate_bcg_denominators <- function(data, adjustment_factors) {
 calculate_penta1_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
-      # dpenta1_pregnancy
       dpenta1_pregnancy = if_else(
         indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
         (countpenta1 / (penta1carry / 100)) / (1 - adjustment_factors$preg_loss) /
-          (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) /
+          (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) / 
           (1 - adjustment_factors$nmr),
         NA_real_
       ),
-      # dpenta1_livebirth
       dpenta1_livebirth = if_else(
         indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
-        (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) /
+        (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) / 
           (1 - adjustment_factors$stillbirth) / (1 - adjustment_factors$nmr),
         NA_real_
       ),
-      # dpenta1_mcv
+      dpenta1_dpt = if_else(
+        indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
+        (countpenta1 / (penta1carry / 100)),
+        NA_real_
+      ),
       dpenta1_mcv = if_else(
         indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
         (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
@@ -292,54 +302,41 @@ calculate_penta1_denominators <- function(data, adjustment_factors) {
 }
 
 # Function to calculate denominators for Penta3
-calculate_penta3_denominators <- function(data, adjustment_factors) {
-  data <- data %>%
-    mutate(
-      # dpenta3_pregnancy
-      dpenta3_pregnancy = if_else(
-        indicator_common_id == "penta3" & !is.na(countpenta3) & !is.na(penta3carry),
-        (countpenta3 / (penta3carry / 100)) / (1 - adjustment_factors$preg_loss),
-        NA_real_
-      ),
-      # dpenta3_mcv
-      dpenta3_mcv = if_else(
-        indicator_common_id == "penta3" & !is.na(countpenta3) & !is.na(penta3carry),
-        (countpenta3 / (penta3carry / 100)) * (1 - adjustment_factors$pnmr),
-        NA_real_
-      )
-    )
-  return(data)
-}
+# ??? no denominators from Penta3??
 
 # Function to calculate denominators for WPP (World Population Prospects)
 calculate_wpp_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
-      # dwpp_pregnancy
+      # dwpp_pregnancy: Estimated pregnancies based on crude birth rate and total population
       dwpp_pregnancy = if_else(
-        !is.na(wppCBR) & !is.na(wpptotpop),
-        (wppCBR / 1000) * wpptotpop / (1 + adjustment_factors$twin_rate),
+        !is.na(wppCBR) & !is.na(wpptotpop) & !is.na(nummonth) & nummonth > 0,
+        (wppCBR / 1000) * wpptotpop / (1 + adjustment_factors$twin_rate) * (12 / nummonth),
         NA_real_
       ),
-      # dwpp_livebirth
+      
+      # dwpp_livebirth: Adjusted for number of months reported
       dwpp_livebirth = if_else(
-        !is.na(wpplivebirth),
-        wpplivebirth,
+        !is.na(wpplivebirth) & !is.na(nummonth) & nummonth > 0,
+        wpplivebirth * (12 / nummonth),
         NA_real_
       ),
-      # dwpp_dpt
+      
+      # dwpp_dpt: Estimated eligible infants for DPT1, adjusted for reporting months
       dwpp_dpt = if_else(
-        !is.na(wpptotu1pop),
-        wpptotu1pop,
+        !is.na(wpptotu1pop) & !is.na(nummonth) & nummonth > 0,
+        wpptotu1pop * (12 / nummonth),
         NA_real_
       ),
-      # dwpp_mcv
+      
+      # dwpp_mcv: Estimated eligible infants for MCV, adjusted for reporting months
       dwpp_mcv = if_else(
-        !is.na(wpptotu5pop),
-        wpptotu5pop,
+        !is.na(wpptotu5pop) & !is.na(nummonth) & nummonth > 0,
+        wpptotu5pop * (12 / nummonth),
         NA_real_
       )
     )
+  
   return(data)
 }
 
@@ -349,155 +346,82 @@ calculate_all_denominators <- function(data, adjustment_factors) {
   data <- calculate_delivery_denominators(data, adjustment_factors)
   data <- calculate_bcg_denominators(data, adjustment_factors)
   data <- calculate_penta1_denominators(data, adjustment_factors)
-  data <- calculate_penta3_denominators(data, adjustment_factors)
   data <- calculate_wpp_denominators(data, adjustment_factors)
-  
   return(data)
 }
 
 # PART 7 - Calculate Coverage for Each Indicator Based on Denominators ---------------
-# calculate_coverage <- function(data) {
-#   data <- data %>%
-#     mutate(
-#       # ANC1 Coverage - Pregnancy (renamed to cov_anc1)
-#       cov_anc1 = if_else(
-#         !is.na(countanc1) & !is.na(danc1_pregnancy) & danc1_pregnancy != 0, 
-#         (countanc1 / danc1_pregnancy) * 100, 
-#         NA_real_
-#       ),
-#       
-#       # ANC4 Coverage - Pregnancy (renamed to cov_anc4)
-#       cov_anc4 = if_else(
-#         !is.na(countanc4) & !is.na(danc4_pregnancy) & danc4_pregnancy != 0, 
-#         (countanc4 / danc4_pregnancy) * 100, 
-#         NA_real_
-#       ),
-#       
-#       # Delivery Coverage - Livebirth (renamed to cov_delivery)
-#       cov_delivery = if_else(
-#         !is.na(countdelivery) & !is.na(ddelivery_livebirth) & ddelivery_livebirth != 0, 
-#         (countdelivery / ddelivery_livebirth) * 100, 
-#         NA_real_
-#       ),
-#       
-#       # BCG Coverage - Livebirth (renamed to cov_bcg)
-#       cov_bcg = if_else(
-#         !is.na(countbcg) & !is.na(dbcg_livebirth) & dbcg_livebirth != 0, 
-#         (countbcg / dbcg_livebirth) * 100, 
-#         NA_real_
-#       ),
-#       
-#       # Penta1 Coverage - DPT (renamed to cov_penta1)
-#       cov_penta1 = if_else(
-#         !is.na(countpenta1) & !is.na(dpenta1_dpt) & dpenta1_dpt != 0, 
-#         (countpenta1 / dpenta1_dpt) * 100, 
-#         NA_real_
-#       ),
-#       
-#       # Penta3 Coverage - DPT (renamed to cov_penta3)
-#       cov_penta3 = if_else(
-        # !is.na(countpenta3) & !is.na(dpenta3_dpt) & dpenta3_dpt != 0,
-#         (countpenta3 / dpenta3_dpt) * 100, 
-#         NA_real_
-#       )
-#     )
-#   
-#   return(data)
-# }
-
-# PART 8 - Extrapolate Coverage Trends for Missing Years -----------------------------------
-extrapolate_coverage_trends <- function(data) {
-  data %>%
-    group_by(admin_area_1) %>%
-    arrange(year) %>%
-    mutate(
-      # Extrapolate missing ANC1 coverage using last observation carried forward
-      projected_cov_anc1 = zoo::na.locf(cov_anc1, na.rm = FALSE, fromLast = TRUE),
-      
-      # Extrapolate missing delivery coverage using last observation carried forward
-      projected_cov_delivery = zoo::na.locf(cov_delivery, na.rm = FALSE, fromLast = TRUE),
-      
-      # Extrapolate missing BCG coverage using last observation carried forward
-      projected_cov_bcg = zoo::na.locf(cov_bcg, na.rm = FALSE, fromLast = TRUE),
-      
-      # Extrapolate missing Penta1 coverage using last observation carried forward
-      projected_cov_penta1 = zoo::na.locf(cov_penta1, na.rm = FALSE, fromLast = TRUE),
-      
-      # Extrapolate missing Penta3 coverage using last observation carried forward
-      projected_cov_penta3 = zoo::na.locf(cov_penta3, na.rm = FALSE, fromLast = TRUE)
-    ) %>%
-    ungroup()
-}
-
-# PART 9 - Combine HMIS-Based and Survey-Based Coverage --------------------------------------
-combine_coverage_sources <- function(data) {
-  data %>%
-    mutate(
-      final_cov_anc1 = coalesce(cov_anc1_livebirth, anc1carry, projected_cov_anc1), 
-      final_cov_delivery = coalesce(cov_delivery_pregnancy, deliverycarry, projected_cov_delivery),
-      final_cov_bcg = coalesce(cov_bcg_pregnancy, bcgcarry, projected_cov_bcg),
-      final_cov_penta1 = coalesce(cov_penta1_pregnancy, penta1carry, projected_cov_penta1),
-      final_cov_penta3 = coalesce(cov_penta3_pregnancy, penta3carry, projected_cov_penta3)
-    )
-}
-
-# PART 10 - Select Best Denominator for Each Indicator -------------------------------------------------
-select_best_denominator <- function(data, indicators) {
+calculate_coverage_dynamic <- function(data) {
+  # Define indicators and denominator types
+  indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3")
+  denominator_types <- c("pregnancy", "livebirth", "dpt", "mcv")
+  
+  # Ensure unique column names to prevent duplicate errors
+  colnames(data) <- make.unique(colnames(data))
+  
+  # Create an empty tibble to store coverage results
+  coverage_results <- tibble()
+  
+  # Loop through each indicator and denominator type
   for (indicator in indicators) {
-    # Define coverage and error columns for each indicator
-    coverage_cols <- grep(paste0("^cov_", indicator), colnames(data), value = TRUE)
-    
-    print(paste("Coverage Columns for", indicator, ":", paste(coverage_cols, collapse = ", ")))
-    
-    if (length(coverage_cols) == 0) {
-      print(paste("No coverage columns found for indicator:", indicator))
-      next
+    for (denominator in denominator_types) {
+      # Construct column names dynamically
+      denominator_col <- paste0("d", indicator, "_", denominator)
+      count_col <- paste0("count", indicator)
+      
+      # Check if the denominator column exists
+      if (denominator_col %in% colnames(data)) {
+        # Compute coverage only where numerator and denominator are available
+        coverage_subset <- data %>%
+          filter(!is.na(.data[[count_col]]) & !is.na(.data[[denominator_col]]) & .data[[denominator_col]] > 0) %>%
+          mutate(
+            coverage = (.data[[count_col]] / .data[[denominator_col]]) * 100,
+            indicator_common_id = indicator,
+            denominator_type = denominator
+          ) %>%
+          select(admin_area_1, year, indicator_common_id, coverage, denominator_type)
+        
+        # Append the results to coverage_results
+        coverage_results <- bind_rows(coverage_results, coverage_subset)
+      }
     }
-    
-    # Create error columns for coverage estimates
-    for (coverage_col in coverage_cols) {
-      error_col <- paste0("error_", gsub("cov_", "", coverage_col))
-      data <- data %>%
-        mutate(
-          !!error_col := if_else(
-            !is.na(.data[[coverage_col]]) & !is.na(.data[[paste0(indicator, "carry")]]),
-            (.data[[coverage_col]] - .data[[paste0(indicator, "carry")]])^2, 
-            NA_real_
-          )
-        )
-      print(paste("Created Error Column:", error_col))
-    }
-    
-    # Select the best denominator based on minimal error (squared error)
-    error_cols <- grep(paste0("^error_", indicator), colnames(data), value = TRUE)
-    
-    print(paste("Error Columns for", indicator, ":", paste(error_cols, collapse = ", ")))
-    
-    # Filter out invalid error columns (NA or empty columns)
-    error_cols <- error_cols[!is.na(error_cols) & error_cols != ""]
-    
-    if (length(error_cols) == 0) {
-      print(paste("No valid error columns found for indicator:", indicator))
-      next
-    }
-    
-    # Proceed only if there are valid error columns to compare
-    data <- data %>%
-      mutate(
-        best_error = pmin(!!!syms(error_cols), na.rm = TRUE), # Calculate the minimum error
-        best_source = case_when(
-          !is.na(.data[[error_cols[1]]]) & .data[[error_cols[1]]] == .data$best_error ~ coverage_cols[1],
-          !is.na(.data[[error_cols[2]]]) & .data[[error_cols[2]]] == .data$best_error ~ coverage_cols[2],
-          !is.na(.data[[error_cols[3]]]) & .data[[error_cols[3]]] == .data$best_error ~ coverage_cols[3],
-          TRUE ~ NA_character_
-        )
-      )
-    
-    print(paste("Best Error (head) for", indicator, ":", paste(head(data$best_error), collapse = ", ")))
-    print(paste("Best Source (head) for", indicator, ":", paste(head(data$best_source), collapse = ", ")))
   }
   
-  return(data)
+  return(coverage_results)
+}
+
+# PART 8 - Select Best Denominator ---------------------------------------------------
+select_best_denominator <- function(coverage_long, data) {
+  # Add reference values directly without joining
+  debug_denominator <- coverage_long %>%
+    mutate(
+      reference_value = case_when(
+        indicator_common_id == "anc1" ~ data$anc1carry,
+        indicator_common_id == "anc4" ~ data$anc4carry,
+        indicator_common_id == "delivery" ~ data$deliverycarry,
+        indicator_common_id == "penta1" ~ data$penta1carry,
+        indicator_common_id == "penta3" ~ data$penta3carry,
+        indicator_common_id == "bcg" ~ data$bcgcarry,
+        TRUE ~ NA_real_
+      )
+    ) %>%
+    mutate(
+      squared_error = if_else(!is.na(reference_value), (coverage - reference_value)^2, NA_real_)
+    )
+  
+  # Print out unique counts before filtering to debug duplicates
+  print(debug_denominator %>%
+          count(admin_area_1, year, indicator_common_id, denominator_type) %>%
+          filter(n > 1))
+  
+  # Select the best denominator with the lowest squared error
+  best_denominator <- debug_denominator %>%
+    group_by(admin_area_1, year, indicator_common_id) %>%
+    slice_min(order_by = squared_error, with_ties = FALSE) %>%
+    select(admin_area_1, year, indicator_common_id, coverage, denominator_type, squared_error) %>%
+    ungroup()
+  
+  return(best_denominator)
 }
 
 
@@ -569,16 +493,15 @@ data <- data %>%
 # 8. Calculate Denominators
 data <- calculate_all_denominators(data, adjustment_factors)
 
-# 9. Calculate Coverage for Each Indicator
-data <- calculate_coverage(data)
+# # 9. Calculate Coverage for Each Indicator
+coverage_long <- calculate_coverage_dynamic(data)
 
-# # 10. Extrapolate Coverage Trends for Missing Years
-# data <- extrapolate_coverage_trends(data)
-# 
-# # 11. Combine HMIS-Based and Survey-Based Coverage
-# data <- combine_coverage_sources(data)
-# 
-# # 12. Select the Best Denominator for Each Indicator
-# data <- select_best_denominator(data, indicators = c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3"))
-# 
+#rapid check 
+coverage_long %>% filter(coverage_long$indicator_common_id == "penta1" & year == 2022)
+
+# Select Best Denominator 
+best_coverage <- select_best_denominator(coverage_long, data)
+# extrapolate
+
+
 
