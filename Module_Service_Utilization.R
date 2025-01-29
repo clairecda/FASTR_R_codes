@@ -2,11 +2,8 @@
 # Last edit: 2025 Jan 24
 # Module: SERVICE UTILIZATION
 
+#Read input
+data <- M2.adjusted_data_final.csv
 
-
-# Check if adjusted_data exists in the environment
-if (!exists("adjusted_data_final")) {
-  warning("Please run Module 2: Dynamic Adjustment. It is needed to generate the adjusted data.")
-} else {
-  data <- adjusted_data_final
-}
+#Write Output
+write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
