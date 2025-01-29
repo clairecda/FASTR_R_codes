@@ -1,5 +1,5 @@
 # CB - R code FASTR PROJECT
-# Module: DYNAMIC ADJUSTMENT
+# Module: DATA QUALITY ADJUSTMENT
 # Last edit: 2025 Jan 24
 
 # This script dynamically adjusts raw data for:
@@ -7,22 +7,8 @@
 #   2. Completeness: Substitutes rolling averages where completeness issues are detected.
 
 
-
-# DATA: M1_output_outliers.csv + M1_completeness_long_format.csv
-
-# -------------------------- Ensure Required Data Exists ------------------------------------------------------
-
-if (!exists("outlier_data_main")) {
-  stop("Please run Module 1: Data Quality Assessment. `outlier_data_main` is required for adjustments.")
-} else {
-  outlier_data <- outlier_data_main
-}
-
-if (!exists("completeness_results")) {
-  stop("Please run Module 1: Data Quality Assessment. `completeness_results` is required for adjustments.")
-} else {
-  completeness_data <- completeness_results
-}
+outlier_data <- M1_output_outliers.csv
+completeness_data <- M1_completeness_long_format.csv
 
 # -------------------------- KEY OUTPUT ----------------------------------------------------------------------
 # FILE: M2_adjusted_data.csv    # Dataset including facility-level adjusted volumes for all adjustment scenarios.
@@ -76,7 +62,7 @@ apply_adjustments <- function(data,
         width = 12,
         FUN = mean,
         fill = NA,
-        align = "right",
+        align = "centre",
         na.rm = TRUE
       ),
       rolling_avg = ifelse(is.na(rolling_avg), mean(count, na.rm = TRUE), rolling_avg)  # Fallback to mean
