@@ -180,7 +180,7 @@ carry_forward_survey_data <- function(data) {
     return(data)
   }
   
-  data <- data %>%
+  data %>%
     arrange(admin_area_1, year) %>%  # Ensure data is sorted correctly
     group_by(admin_area_1) %>%       # Group by admin area for correct carryforward
     mutate(
@@ -558,9 +558,6 @@ annual_hmis <- adjusted_volume %>%
   ) %>%
   select(-starts_with("count_final")) 
 
-
-
-
 # 3. Adjust Names for Consistency
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
 
@@ -610,12 +607,3 @@ coverage_long <- calculate_coverage(data)
 carry_values <- extract_reference_values(data)
 merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
 best_coverage <- select_best_denominator(merged_coverage)
-
-
-
-
-
-
-
-
-
