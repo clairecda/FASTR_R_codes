@@ -6,8 +6,8 @@
 #   1. Outliers: Replaces flagged counts with 12-month rolling averages.
 #   2. Completeness: Substitutes rolling averages where completeness issues are detected.
 
-outlier_data <- read_csv("M1_output_outliers.csv")
-completeness_data <- read_csv("M1_completeness_long_format.csv")
+outlier_data <- read.csv("M1_output_outliers.csv")
+completeness_data <- read.csv("M1_completeness_long_format.csv")
 
 
 # -------------------------- KEY OUTPUT ----------------------------------------------------------------------

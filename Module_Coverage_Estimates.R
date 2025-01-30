@@ -1,6 +1,11 @@
-#PLACEHOLDER FOR PARAMETERS - UI
+SELECTED_COUNT_VARIABLE <- "count_final_both"  # Options: "count_final_none", "count_final_outlier", "count_final_completeness", "count_final_both"
+VALID_COUNT_VARIABLES <- c("count_final_none", "count_final_outlier", "count_final_completeness", "count_final_both")
+
+CURRENT_YEAR <- as.numeric(format(Sys.Date(), "%Y"))  # Dynamically get current year
+MIN_YEAR <- 2000  # Set a fixed minimum year for filtering
 
 
+library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the data load in platform
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Jan 29
 # Module: Coverage Estimates
@@ -18,13 +23,12 @@
 
 # ------------------------------ Load Required Libraries -------------------------
 library(tidyverse)  # For data manipulation and visualization
-library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the data load in platform
 library(zoo)        # For carryforward functionality
-library(stringr)    # For string manipulation
+library(data.table) # For coverage calculations
 
 # ------------------------------ Define File Paths -------------------------------
 # Input Datasets
-adjusted_volume_data <- read_csv("M2_adjusted_data.csv")
+adjusted_volume_data <- read.csv("M2_adjusted_data.csv")
 wpp_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/UNWPP/WPP.dta"
 mics_data_path       <- "~/Desktop/FASTR/Coverage_Analysis/MICS/MICS.dta"
 dhs_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS.dta"
@@ -45,11 +49,11 @@ coverage_params <- list(
   indicators = c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")
 )
 
-# List of survey variables to carry forward
+# List of survey variables to carry forward - as per stata 
 survey_vars <- c(
   "avgsurvey_anc1", "avgsurvey_anc4", "avgsurvey_delivery",
   "avgsurvey_bcg", "avgsurvey_penta1", "avgsurvey_penta3",
-  "postnmr", "avgsurvey_imr", "avgsurvey_nmr", "micsstill"
+  "postnmr", "avgsurvey_imr", "avgsurvey_nmr", "micsstill" 
 )
 
 # ------------------------------ Define Functions --------------------------------
@@ -74,17 +78,17 @@ map_adjusted_volumes <- function(data) {
     }
   }
   
-  # Map the existing indicators
+  # Map the existing indicators dynamically using SELECTED_COUNT_VARIABLE
   data <- data %>%
     mutate(
-      countanc1 = if_else(indicator_common_id == "anc1", count_final_outliers, NA_real_),
-      countanc4 = if_else(indicator_common_id == "anc4", count_final_outliers, NA_real_),
-      countdelivery = if_else(indicator_common_id == "delivery", count_final_outliers, NA_real_),
-      countbcg = if_else(indicator_common_id == "bcg", count_final_outliers, NA_real_),
-      countpenta1 = if_else(indicator_common_id == "penta1", count_final_outliers, NA_real_),
-      countpenta3 = if_else(indicator_common_id == "penta3", count_final_outliers, NA_real_),
-      countnmr = if_else(indicator_common_id == "nmr", count_final_outliers, NA_real_),
-      countimr = if_else(indicator_common_id == "imr", count_final_outliers, NA_real_)
+      countanc1 = if_else(indicator_common_id == "anc1", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countanc4 = if_else(indicator_common_id == "anc4", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countdelivery = if_else(indicator_common_id == "delivery", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countbcg = if_else(indicator_common_id == "bcg", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countpenta1 = if_else(indicator_common_id == "penta1", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countpenta3 = if_else(indicator_common_id == "penta3", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countnmr = if_else(indicator_common_id == "nmr", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
+      countimr = if_else(indicator_common_id == "imr", !!sym(SELECTED_COUNT_VARIABLE), NA_real_)
     )
   
   return(data)
@@ -92,9 +96,10 @@ map_adjusted_volumes <- function(data) {
 
 
 # PART 3 - Extend Survey Data for Missing Years -----------------------------------
-extend_survey_data <- function(survey_data, min_year = 2000, max_year = 2025, prefix) {
+extend_survey_data <- function(survey_data, min_year = MIN_YEAR, max_year = CURRENT_YEAR, prefix) {
   survey_data <- survey_data %>%
     filter(year >= min_year & year <= max_year)  # Ensure year range is valid
+  
   full_year_range <- seq(min_year, max_year)
   
   survey_data %>%
@@ -103,8 +108,8 @@ extend_survey_data <- function(survey_data, min_year = 2000, max_year = 2025, pr
     arrange(admin_area_1, year) %>%
     mutate(
       across(
-        starts_with(prefix),
-        ~ zoo::na.locf(.x, na.rm = FALSE),  # Forward fill
+        matches(paste0("^avgsurvey_", prefix)),  # ONLY forward-fill avgsurvey_* variables
+        ~ zoo::na.locf(.x, na.rm = FALSE),
         .names = "{.col}_carry"
       )
     ) %>%
@@ -116,8 +121,8 @@ extend_survey_data <- function(survey_data, min_year = 2000, max_year = 2025, pr
 create_survey_averages <- function(data) {
   data <- data %>%
     mutate(
-      # DHS prioritized over MICS
-      avgsurvey_anc1 = coalesce(dhsanc1, micsanc1),
+      # DHS prioritized over MICS (if DHS is available, use it; otherwise, use MICS)
+      avgsurvey_anc1 = coalesce(dhsanc1, micsanc1), #coalesce works row-wise
       avgsurvey_anc4 = coalesce(dhsanc4, micsanc4),
       avgsurvey_delivery = coalesce(dhsdelivery, micsdelivery),
       avgsurvey_bcg = coalesce(dhsbcg, micsbcg),
@@ -126,22 +131,48 @@ create_survey_averages <- function(data) {
       avgsurvey_nmr = coalesce(dhsnmr, micsnmr),
       avgsurvey_imr = coalesce(dhsimr, micsimr),
       
-      # Postnatal mortality rate
+      # Postnatal mortality rate (IMR - NMR)
       postnmr = avgsurvey_imr - avgsurvey_nmr,
       
-      # Data source tracking
-      datasource_anc1 = if_else(!is.na(dhsanc1), "DHS", "MICS"),
-      datasource_delivery = if_else(!is.na(dhsdelivery), "DHS", "MICS"),
-      datasource_bcg = if_else(!is.na(dhsbcg), "DHS", "MICS"),
-      datasource_penta1 = if_else(!is.na(dhspenta1), "DHS", "MICS"),
-      datasource_penta3 = if_else(!is.na(dhspenta3), "DHS", "MICS")
+      # Map the data source directly based on which value was used
+      datasource_anc1 = if_else(!is.na(dhsanc1) & dhsanc1 == avgsurvey_anc1, "DHS", 
+                                if_else(!is.na(micsanc1) & micsanc1 == avgsurvey_anc1, "MICS", NA_character_)),
+      
+      datasource_anc4 = if_else(!is.na(dhsanc4) & dhsanc4 == avgsurvey_anc4, "DHS", 
+                                if_else(!is.na(micsanc4) & micsanc4 == avgsurvey_anc4, "MICS", NA_character_)),
+      
+      datasource_delivery = if_else(!is.na(dhsdelivery) & dhsdelivery == avgsurvey_delivery, "DHS", 
+                                    if_else(!is.na(micsdelivery) & micsdelivery == avgsurvey_delivery, "MICS", NA_character_)),
+      
+      datasource_bcg = if_else(!is.na(dhsbcg) & dhsbcg == avgsurvey_bcg, "DHS", 
+                               if_else(!is.na(micsbcg) & micsbcg == avgsurvey_bcg, "MICS", NA_character_)),
+      
+      datasource_penta1 = if_else(!is.na(dhspenta1) & dhspenta1 == avgsurvey_penta1, "DHS", 
+                                  if_else(!is.na(micspenta1) & micspenta1 == avgsurvey_penta1, "MICS", NA_character_)),
+      
+      datasource_penta3 = if_else(!is.na(dhspenta3) & dhspenta3 == avgsurvey_penta3, "DHS", 
+                                  if_else(!is.na(micspenta3) & micspenta3 == avgsurvey_penta3, "MICS", NA_character_)),
+      
+      datasource_nmr = if_else(!is.na(dhsnmr) & dhsnmr == avgsurvey_nmr, "DHS", 
+                               if_else(!is.na(micsnmr) & micsnmr == avgsurvey_nmr, "MICS", NA_character_)),
+      
+      datasource_imr = if_else(!is.na(dhsimr) & dhsimr == avgsurvey_imr, "DHS", 
+                               if_else(!is.na(micsimr) & micsimr == avgsurvey_imr, "MICS", NA_character_))
     )
+  
   return(data)
 }
 
-# PART 5 - Carry Forward Survey Data ----------------------------------------------
-carry_forward_survey_data <- function(data, survey_vars) {
-  # Ensure the function processes only existing survey variables
+# PART 5.1 - Carry Forward Survey Data --------------------------------------------
+carry_forward_survey_data <- function(data) {
+  # Identify ONLY the expected survey variables
+  survey_vars <- c(
+    "avgsurvey_anc1", "avgsurvey_anc4", "avgsurvey_delivery",
+    "avgsurvey_bcg", "avgsurvey_penta1", "avgsurvey_penta3",
+    "avgsurvey_nmr", "avgsurvey_imr", "postnmr"
+  )
+  
+  # Ensure we only process these variables
   existing_vars <- intersect(survey_vars, colnames(data))
   
   if (length(existing_vars) == 0) {
@@ -149,31 +180,39 @@ carry_forward_survey_data <- function(data, survey_vars) {
     return(data)
   }
   
-  data %>%
-    arrange(admin_area_1, year) %>%  # Ensure data is sorted for carryforward
-    group_by(admin_area_1) %>%      # Group by admin area for proper carryforward
+  data <- data %>%
+    arrange(admin_area_1, year) %>%  # Ensure data is sorted correctly
+    group_by(admin_area_1) %>%       # Group by admin area for correct carryforward
     mutate(
       across(
-        all_of(existing_vars),
-        ~ zoo::na.locf(.x, na.rm = FALSE),  # Forward fill missing values
-        .names = "{.col}_carry"
-      ),
-      across(
-        all_of(existing_vars),
-        ~ zoo::na.locf(.x, na.rm = FALSE, fromLast = TRUE),  # Backward fill if needed
-        .names = "{.col}_carry"
+        all_of(existing_vars),  # Ensure only avgsurvey_* variables are carried forward
+        ~ zoo::na.locf(.x, na.rm = FALSE)
       )
     ) %>%
     mutate(
-      # Assign fallback of 0.5 if still missing after carryforward
       across(
-        ends_with("_carry"),
+        all_of(existing_vars),
         ~ if_else(is.na(.x), 0.5, .x)
       )
     ) %>%
     ungroup()
+  
+  return(data)
 }
 
+# PART 5.2 - Assign Carried Survey Data -------------------------------------------
+assign_carried_survey_data <- function(data) {
+  # Define the mapping of avgsurvey_* to _carry variables
+  carry_vars <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")
+  
+  # Dynamically create carry variables
+  for (var in carry_vars) {
+    data <- data %>%
+      mutate(!!paste0(var, "carry") := .data[[paste0("avgsurvey_", var)]])
+  }
+  
+  return(data)
+}
 
 # PART 6 - Calculate HMIS AND WPP-derived-denominators -------------------------------
 # Function to calculate denominators for ANC1
@@ -181,8 +220,8 @@ calculate_anc1_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
       danc1_pregnancy = if_else(
-        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(micsanc1_carry),
-        countanc1 / (micsanc1_carry / 100),
+        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
+        countanc1 / (anc1carry / 100),
         NA_real_
       ),
       danc1_livebirth = if_else(
@@ -302,7 +341,7 @@ calculate_penta1_denominators <- function(data, adjustment_factors) {
 }
 
 # Function to calculate denominators for Penta3
-# ??? no denominators from Penta3??
+# ??? no denominators from Penta3 ??
 
 # Function to calculate denominators for WPP (World Population Prospects)
 calculate_wpp_denominators <- function(data, adjustment_factors) {
@@ -351,82 +390,144 @@ calculate_all_denominators <- function(data, adjustment_factors) {
 }
 
 # PART 7 - Calculate Coverage for Each Indicator Based on Denominators ---------------
-calculate_coverage_dynamic <- function(data) {
-  indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3")
-  denominator_types <- c("pregnancy", "livebirth", "dpt", "mcv")
+calculate_coverage <- function(data) {
+  # Step 1: Create the Denominator Table
   
-  coverage_results <- tibble()
+  # Select valid denominator columns
+  denominator_cols <- names(data)[str_detect(names(data), "^d.*_(pregnancy|livebirth|dpt)$")]
   
-  for (indicator in indicators) {
-    for (denominator in denominator_types) {
-      # Construct column names
-      denominator_col <- paste0("d", indicator, "_", denominator)
-      count_col <- paste0("count", indicator)
-      
-      # **Check if both columns exist before using them**
-      if (!(denominator_col %in% colnames(data)) || !(count_col %in% colnames(data))) {
-        next  # Skip this iteration if either column is missing
-      }
-      
-      # Compute coverage safely
-      coverage_subset <- data %>%
-        filter(!is.na(.data[[count_col]]) & !is.na(.data[[denominator_col]]) & .data[[denominator_col]] != 0) %>%
-        mutate(
-          coverage = (.data[[count_col]] / .data[[denominator_col]]) * 100,
-          denominator_type = denominator
-        ) %>%
-        select(admin_area_1, year, indicator_common_id, coverage, denominator_type)
-      
-      # Append results
-      coverage_results <- bind_rows(coverage_results, coverage_subset)
-    }
-  }
+  # Pivot denominator columns into long format
+  denominator_long <- data %>%
+    select(admin_area_1, year, all_of(denominator_cols)) %>%
+    pivot_longer(
+      cols = all_of(denominator_cols),
+      names_to = "denominator",
+      values_to = "denominator_value"
+    ) %>%
+    drop_na(denominator_value) %>%
+    distinct() %>%
+    mutate(
+      denominator_type = case_when(
+        str_detect(denominator, "_pregnancy$") ~ "pregnancy",
+        str_detect(denominator, "_livebirth$") ~ "livebirth",
+        str_detect(denominator, "_dpt$") ~ "dpt",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    mutate(
+      indicator_to_match_on = case_when(
+        denominator_type == "pregnancy" ~ list(c("anc1", "anc4")),
+        denominator_type == "livebirth" ~ list(c("delivery", "bcg")),
+        denominator_type == "dpt" ~ list(c("penta1", "penta3")),
+        TRUE ~ list(NA_character_)
+      )
+    ) %>%
+    unnest(indicator_to_match_on)
   
-  # Remove duplicates
-  coverage_results <- coverage_results %>%
-    arrange(admin_area_1, year, indicator_common_id, denominator_type) %>%
-    distinct()
+  # Step 2: Create the Numerator Table
   
-  return(coverage_results)
+  # Select valid numerator columns (exclude "count" and "count_final")
+  num_cols <- names(data)[str_detect(names(data), "^count(?!$|.*final)")]
+  num_cols <- setdiff(num_cols, "count")
+  
+  # Pivot numerators into long format
+  numerator_long <- data %>%
+    select(admin_area_1, year, all_of(num_cols)) %>%
+    pivot_longer(
+      cols = all_of(num_cols),
+      names_to = "numerator_col",
+      values_to = "numerator"
+    ) %>%
+    mutate(
+      indicator_common_id = str_replace(numerator_col, "^count", ""),
+      numerator_col = NULL
+    ) %>%
+    drop_na(numerator)
+  
+  # Step 3: Join Numerator & Denominator
+  
+  # Ensure that numerator_long is expanded properly for each year-indicator combo
+  expanded_numerator <- numerator_long %>%
+    rename(indicator_to_match_on = indicator_common_id)
+  
+  # Full join on admin_area_1, year, and indicator_to_match_on
+  coverage_data <- full_join(denominator_long, expanded_numerator, 
+                             by = c("admin_area_1", "year", "indicator_to_match_on"))
+  
+  # Step 4: Calculate Coverage
+  coverage_data <- coverage_data %>%
+    mutate(
+      coverage = case_when(
+        denominator_type == "pregnancy" & indicator_to_match_on %in% c("anc1", "anc4") ~ (numerator / denominator_value) * 100,
+        denominator_type == "livebirth" & indicator_to_match_on %in% c("delivery", "bcg") ~ (numerator / denominator_value) * 100,
+        denominator_type == "dpt" & indicator_to_match_on %in% c("penta1", "penta3") ~ (numerator / denominator_value) * 100,
+        TRUE ~ NA_real_
+      )
+    ) %>%
+    drop_na(coverage) #tbc
+  
+  return(coverage_data)
 }
 
+
 # PART 8 - Select Best Denominator ---------------------------------------------------
-select_best_denominator <- function(coverage_long, data) {
-  # Extract carry values and ensure unique matching per indicator/year
+# Step 1: Extract reference values
+extract_reference_values <- function(data) {
+  # Find all "carry" columns
+  carry_cols <- grep("carry$", names(data), value = TRUE)
+  
+  if (length(carry_cols) == 0) {
+    stop("No '_carry' columns found in data! Check column names.")
+  }
+  
+  # Pivot 'carry' columns into long format
   carry_values <- data %>%
-    select(admin_area_1, year, ends_with("carry")) %>%
-    pivot_longer(cols = ends_with("carry"), 
-                 names_to = "indicator_common_id", 
-                 values_to = "reference_value") %>%
-    mutate(indicator_common_id = str_replace(indicator_common_id, "carry$", "")) %>%
-    distinct(admin_area_1, year, indicator_common_id, reference_value)  # Ensure uniqueness
+    select(admin_area_1, year, all_of(carry_cols)) %>%
+    pivot_longer(cols = all_of(carry_cols), names_to = "indicator_to_match_on", values_to = "reference_value") %>%
+    mutate(indicator_to_match_on = gsub("carry$", "", indicator_to_match_on)) %>%
+    drop_na(reference_value)
   
-  # Debug: Print if there are duplicate matches in carry_values
-  print(carry_values %>%
-          count(admin_area_1, year, indicator_common_id) %>%
-          filter(n > 1))
+  return(carry_values)
+}
+# Step 2: Merge survey estimates
+merge_survey_estimates <- function(coverage_long, carry_values) {
+  # Expand carry_values to match all relevant indicator-year pairs
+  expanded_carry_values <- coverage_long %>%
+    select(admin_area_1, year, indicator_to_match_on) %>%
+    distinct() %>%  # Ensure no duplicate rows
+    left_join(carry_values, by = c("admin_area_1", "year", "indicator_to_match_on")) %>%
+    drop_na(reference_value)  # Drop missing reference values
   
-  # Join carry values to `coverage_long` and propagate the reference values down
-  debug_denominator <- coverage_long %>%
-    left_join(carry_values, by = c("admin_area_1", "year", "indicator_common_id")) %>%
-    group_by(admin_area_1, year, indicator_common_id) %>%
-    mutate(reference_value = first(reference_value)) %>%  # Fill down reference values
-    ungroup() %>%
+  # Ensure no duplicate reference values
+  expanded_carry_values <- expanded_carry_values %>%
+    distinct(admin_area_1, year, indicator_to_match_on, reference_value)
+  
+  # Now merge with coverage_long
+  merged_data <- left_join(
+    coverage_long, expanded_carry_values,
+    by = c("admin_area_1", "year", "indicator_to_match_on")
+  )
+  
+  # Compute Squared Error (Distance from Reference Survey Value)
+  merged_data <- merged_data %>%
     mutate(
-      squared_error = if_else(!is.na(reference_value), (coverage - reference_value)^2, NA_real_)
+      squared_error = ifelse(
+        !is.na(reference_value) & !is.na(coverage),
+        (coverage - reference_value)^2,
+        NA_real_
+      )
     )
   
-  # Debug: Print any duplicate rows
-  print(debug_denominator %>%
-          count(admin_area_1, year, indicator_common_id, denominator_type) %>%
-          filter(n > 1))
-  
-  # Select the denominator with the lowest squared error
-  best_denominator <- debug_denominator %>%
+  return(merged_data)
+}
+# Step 3: Select best denominator
+select_best_denominator <- function(merged_data) {
+  best_denominator <- merged_data %>%
+    filter(!is.na(squared_error)) %>%  # Ensure squared_error is valid
     group_by(admin_area_1, year, indicator_common_id) %>%
-    slice_min(order_by = squared_error, with_ties = FALSE) %>%
-    select(admin_area_1, year, indicator_common_id, coverage, denominator_type, squared_error) %>%
-    ungroup()
+    slice_min(squared_error, with_ties = FALSE) %>%  # Select row with min squared_error
+    ungroup() %>%
+    select(admin_area_1, year, indicator_common_id, coverage, denominator_type, squared_error)
   
   return(best_denominator)
 }
@@ -439,16 +540,24 @@ hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevan
 
 # 2. Aggregate HMIS Data to Annual Level
 annual_hmis <- adjusted_volume %>%
-  group_by(admin_area_1, year, indicator_common_id) %>%  # Ensure indicator_common_id is kept
+  group_by(admin_area_1, year, indicator_common_id) %>%  # Keep key identifiers
   summarise(
-    # Summing the count columns while ignoring NA values
-    across(starts_with("count"), ~ if_else(all(is.na(.)), NA_real_, sum(., na.rm = TRUE))),
+    # Sum valid count columns (excluding count_final_x)
+    across(
+      starts_with("count"), 
+      ~ if_else(all(is.na(.)), NA_real_, sum(., na.rm = TRUE)), 
+      .names = "{.col}"
+    ),
     
-    # Calculating the number of months that are not missing
-    nummonth = sum(!is.na(month)),
+    # Correctly count the number of unique non-missing months (is that for each indicator ?? or overall)
+    nummonth = n_distinct(month[!is.na(month)]),  
     
-    .groups = "drop"  # Drop the grouping
-  )
+    .groups = "drop"
+  ) %>%
+  select(-starts_with("count_final")) 
+
+
+
 
 # 3. Adjust Names for Consistency
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
@@ -474,37 +583,34 @@ mics_data_extended <- extend_survey_data(mics_data_filtered, prefix = "mics")
 dhs_data_extended <- extend_survey_data(dhs_data_filtered, prefix = "dhs")
 wpp_data_extended <- extend_survey_data(wpp_data_filtered, prefix = "wpp")
 
-# 6. Merge and Process Data
+
+# 6. Merge All Data Sources (Post-Filtering)
 data <- annual_hmis %>%
   full_join(mics_data_extended, by = c("admin_area_1", "year")) %>%
   full_join(dhs_data_extended, by = c("admin_area_1", "year")) %>%
   full_join(wpp_data_extended, by = c("admin_area_1", "year")) %>%
-  filter(year >= 2000 & year <= 2025) %>%  # Restrict to the desired year range
-  create_survey_averages() %>%
-  carry_forward_survey_data(survey_vars)
+  filter(year >= MIN_YEAR & year <= CURRENT_YEAR) %>%
+  create_survey_averages()
 
-# 7. Combine Carry Variables
-data <- data %>%
-  mutate(
-    anc1carry = coalesce(dhsanc1_carry, micsanc1_carry),
-    anc4carry = coalesce(dhsanc4_carry, micsanc4_carry),
-    deliverycarry = coalesce(dhsdelivery_carry, micsdelivery_carry),
-    bcgcarry = coalesce(dhsbcg_carry, micsbcg_carry),
-    penta1carry = coalesce(dhspenta1_carry, micspenta1_carry),
-    penta3carry = coalesce(dhspenta3_carry, micspenta3_carry),
-    nmrcarry = coalesce(dhsnmr_carry, micsnmr_carry),
-    imrcarry = coalesce(dhsimr_carry, micsimr_carry)
-  )
+# 5. Apply Carry Forward Survey Data
+data <- carry_forward_survey_data(data)
 
-# 8. Calculate Denominators
+# 6. Assign Carried Survey Data 
+data <- assign_carried_survey_data(data)
+
+# 7. Calculate Denominators
 data <- calculate_all_denominators(data, adjustment_factors)
 
-# # 9. Calculate Coverage for Each Indicator
-coverage_long <- calculate_coverage_dynamic(data)
+# 8. Calculate Coverage for Each Indicator
+coverage_long <- calculate_coverage(data)
+
+#9. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
+carry_values <- extract_reference_values(data)
+merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
+best_coverage <- select_best_denominator(merged_coverage)
 
 
-# Select Best Denominator 
-best_coverage <- select_best_denominator(coverage_long, data)
+
 
 
 
