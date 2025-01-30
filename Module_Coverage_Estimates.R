@@ -523,14 +523,16 @@ merge_survey_estimates <- function(coverage_long, carry_values) {
 # Step 3: Select best denominator
 select_best_denominator <- function(merged_data) {
   best_denominator <- merged_data %>%
-    filter(!is.na(squared_error)) %>%  # Ensure squared_error is valid
-    group_by(admin_area_1, year, indicator_common_id) %>%
+    filter(!is.na(squared_error)) %>%  # Remove rows where squared_error is NA
+    group_by(admin_area_1, year, indicator_to_match_on) %>%
     slice_min(squared_error, with_ties = FALSE) %>%  # Select row with min squared_error
     ungroup() %>%
-    select(admin_area_1, year, indicator_common_id, coverage, denominator_type, squared_error)
+    rename(indicator_common_id = indicator_to_match_on) %>%  # Rename column
+    select(admin_area_1, year, indicator_common_id, coverage, denominator, denominator_value, denominator_type, squared_error)
   
   return(best_denominator)
 }
+
 
 
 # ------------------------------ Main Execution -----------------------------------
@@ -604,10 +606,11 @@ data <- calculate_all_denominators(data, adjustment_factors)
 # 8. Calculate Coverage for Each Indicator
 coverage_long <- calculate_coverage(data)
 
-#9. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
+# 9. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
 carry_values <- extract_reference_values(data)
 merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
 best_coverage <- select_best_denominator(merged_coverage)
+
 
 
 
