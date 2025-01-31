@@ -91,6 +91,9 @@ map_adjusted_volumes <- function(data) {
       countimr = if_else(indicator_common_id == "imr", !!sym(SELECTED_COUNT_VARIABLE), NA_real_)
     )
   
+  data <- data %>%
+    arrange(admin_area_1, year, indicator_common_id)
+  
   return(data)
 }
 
@@ -180,19 +183,14 @@ carry_forward_survey_data <- function(data) {
     return(data)
   }
   
-  data %>%
+  data <- data %>%
     arrange(admin_area_1, year) %>%  # Ensure data is sorted correctly
     group_by(admin_area_1) %>%       # Group by admin area for correct carryforward
+    complete(year = full_seq(year, 1)) %>% # Ensure all sequential years are present
     mutate(
       across(
-        all_of(existing_vars),  # Ensure only avgsurvey_* variables are carried forward
+        all_of(existing_vars),       # Ensure only avgsurvey_* variables are carried forward
         ~ zoo::na.locf(.x, na.rm = FALSE)
-      )
-    ) %>%
-    mutate(
-      across(
-        all_of(existing_vars),
-        ~ if_else(is.na(.x), 0.5, .x)
       )
     ) %>%
     ungroup()
@@ -215,133 +213,100 @@ assign_carried_survey_data <- function(data) {
 }
 
 # PART 6 - Calculate HMIS AND WPP-derived-denominators -------------------------------
-# Function to calculate denominators for ANC1
-calculate_anc1_denominators <- function(data, adjustment_factors) {
+calculate_denominators <- function(data, adjustment_factors) {
   data <- data %>%
     mutate(
-      danc1_pregnancy = if_else(
-        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
-        countanc1 / (anc1carry / 100),
-        NA_real_
+      # # ANC1 Denominators
+      # danc1_pregnancy = if_else(!is.na(countanc1) & !is.na(anc1carry),
+      #                           countanc1 / (anc1carry / 100),
+      #                           NA_real_
+      # ),
+      # danc1_livebirth = if_else(!is.na(countanc1) & !is.na(anc1carry),
+      #                           (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) * 
+      #                             (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth),
+      #                           NA_real_
+      # ),
+      # danc1_dpt = if_else(!is.na(countanc1) & !is.na(anc1carry),
+      #                     (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) /
+      #                       (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) * 
+      #                       (1 - adjustment_factors$nmr),
+      #                     NA_real_
+      # ),
+      # danc1_mcv = if_else(!is.na(countanc1) & !is.na(anc1carry),
+      #                     (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
+      #                       (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) * 
+      #                       (1 - adjustment_factors$imr),
+      #                     NA_real_
+      # ),
+      
+      # Delivery Denominators
+      ddelivery_pregnancy = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                    (countdelivery / (deliverycarry / 100)) / (1 - adjustment_factors$preg_loss),
+                                    NA_real_
       ),
-      danc1_livebirth = if_else(
-        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
-        (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) * 
-          (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth),
-        NA_real_
+      ddelivery_livebirth = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                    (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+                                      (1 - adjustment_factors$stillbirth),
+                                    NA_real_
       ),
-      danc1_dpt = if_else(
-        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
-        (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) /
-          (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) * 
-          (1 - adjustment_factors$nmr),
-        NA_real_
+      ddelivery_dpt = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                              (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+                                (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$nmr),
+                              NA_real_
       ),
-      danc1_mcv = if_else(
-        indicator_common_id == "anc1" & !is.na(countanc1) & !is.na(anc1carry),
-        (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
-          (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) * 
-          (1 - adjustment_factors$imr),
-        NA_real_
+      ddelivery_mcv = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                              (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+                                (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$imr),
+                              NA_real_
+      ),
+      
+      # BCG Denominators
+      dbcg_pregnancy = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                               (countbcg / (bcgcarry / 100)) / (1 - adjustment_factors$preg_loss) /
+                                 (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth),
+                               NA_real_
+      ),
+      dbcg_livebirth = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                               countbcg / (bcgcarry / 100),
+                               NA_real_
+      ),
+      dbcg_dpt = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                         (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
+                         NA_real_
+      ),
+      dbcg_mcv = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                         (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
+                           (1 - adjustment_factors$pnmr),
+                         NA_real_
+      ),
+      
+      # Penta1 Denominators
+      dpenta1_pregnancy = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                  (countpenta1 / (penta1carry / 100)) / (1 - adjustment_factors$preg_loss) /
+                                    (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) / 
+                                    (1 - adjustment_factors$nmr),
+                                  NA_real_
+      ),
+      dpenta1_livebirth = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                  (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) / 
+                                    (1 - adjustment_factors$stillbirth) / (1 - adjustment_factors$nmr),
+                                  NA_real_
+      ),
+      dpenta1_dpt = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                            countpenta1 / (penta1carry / 100),
+                            NA_real_
+      ),
+      dpenta1_mcv = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                            (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
+                            NA_real_
       )
     )
   return(data)
 }
 
-# Function to calculate denominators for Delivery
-calculate_delivery_denominators <- function(data, adjustment_factors) {
-  data <- data %>%
-    mutate(
-      ddelivery_pregnancy = if_else(
-        indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
-        (countdelivery / (deliverycarry / 100)) / (1 - adjustment_factors$preg_loss),
-        NA_real_
-      ),
-      ddelivery_livebirth = if_else(
-        indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
-        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-          (1 - adjustment_factors$stillbirth),
-        NA_real_
-      ),
-      ddelivery_dpt = if_else(
-        indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
-        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-          (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$nmr),
-        NA_real_
-      ),
-      ddelivery_mcv = if_else(
-        indicator_common_id == "delivery" & !is.na(countdelivery) & !is.na(deliverycarry),
-        (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-          (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$imr),
-        NA_real_
-      )
-    )
-  return(data)
-}
 
-# Function to calculate denominators for BCG
-calculate_bcg_denominators <- function(data, adjustment_factors) {
-  data <- data %>%
-    mutate(
-      dbcg_pregnancy = if_else(
-        indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
-        (countbcg / (bcgcarry / 100)) / (1 - adjustment_factors$preg_loss) /
-          (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth),
-        NA_real_
-      ),
-      dbcg_livebirth = if_else(
-        indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
-        (countbcg / (bcgcarry / 100)),
-        NA_real_
-      ),
-      dbcg_dpt = if_else(
-        indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
-        (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
-        NA_real_
-      ),
-      dbcg_mcv = if_else(
-        indicator_common_id == "bcg" & !is.na(countbcg) & !is.na(bcgcarry),
-        (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
-          (1 - adjustment_factors$pnmr),
-        NA_real_
-      )
-    )
-  return(data)
-}
+#For most recent year - we need to check nummonth and if less than 12 x 12/last month record if march 12/3 , if sept 12/9
 
-# Function to calculate denominators for Penta1
-calculate_penta1_denominators <- function(data, adjustment_factors) {
-  data <- data %>%
-    mutate(
-      dpenta1_pregnancy = if_else(
-        indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
-        (countpenta1 / (penta1carry / 100)) / (1 - adjustment_factors$preg_loss) /
-          (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) / 
-          (1 - adjustment_factors$nmr),
-        NA_real_
-      ),
-      dpenta1_livebirth = if_else(
-        indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
-        (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) / 
-          (1 - adjustment_factors$stillbirth) / (1 - adjustment_factors$nmr),
-        NA_real_
-      ),
-      dpenta1_dpt = if_else(
-        indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
-        (countpenta1 / (penta1carry / 100)),
-        NA_real_
-      ),
-      dpenta1_mcv = if_else(
-        indicator_common_id == "penta1" & !is.na(countpenta1) & !is.na(penta1carry),
-        (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
-        NA_real_
-      )
-    )
-  return(data)
-}
-
-# Function to calculate denominators for Penta3
-# ??? no denominators from Penta3 ??
 
 # Function to calculate denominators for WPP (World Population Prospects)
 calculate_wpp_denominators <- function(data, adjustment_factors) {
@@ -381,11 +346,8 @@ calculate_wpp_denominators <- function(data, adjustment_factors) {
 
 # Main function to call all of the above functions
 calculate_all_denominators <- function(data, adjustment_factors) {
-  data <- calculate_anc1_denominators(data, adjustment_factors)
-  data <- calculate_delivery_denominators(data, adjustment_factors)
-  data <- calculate_bcg_denominators(data, adjustment_factors)
-  data <- calculate_penta1_denominators(data, adjustment_factors)
-  data <- calculate_wpp_denominators(data, adjustment_factors)
+  data <- calculate_denominators(data, adjustment_factors)  # Apply all indicator-based denominator calculations
+  data <- calculate_wpp_denominators(data, adjustment_factors)  # Apply WPP-based denominators
   return(data)
 }
 
@@ -471,7 +433,7 @@ calculate_coverage <- function(data) {
 
 
 # PART 8 - Select Best Denominator ---------------------------------------------------
-# Step 1: Extract reference values
+# Step 1: Extract reference values for each year independently
 extract_reference_values <- function(data) {
   # Find all "carry" columns
   carry_cols <- grep("carry$", names(data), value = TRUE)
@@ -480,16 +442,20 @@ extract_reference_values <- function(data) {
     stop("No '_carry' columns found in data! Check column names.")
   }
   
-  # Pivot 'carry' columns into long format
+  # Pivot 'carry' columns into long format per year
   carry_values <- data %>%
     select(admin_area_1, year, all_of(carry_cols)) %>%
-    pivot_longer(cols = all_of(carry_cols), names_to = "indicator_to_match_on", values_to = "reference_value") %>%
+    pivot_longer(cols = all_of(carry_cols), 
+                 names_to = "indicator_to_match_on", 
+                 values_to = "reference_value") %>%
     mutate(indicator_to_match_on = gsub("carry$", "", indicator_to_match_on)) %>%
-    drop_na(reference_value)
+    drop_na(reference_value) %>%
+    arrange(admin_area_1, year, indicator_to_match_on)  # Ensure year-wise processing
   
   return(carry_values)
 }
-# Step 2: Merge survey estimates
+
+# Step 2: Merge survey estimates for each year independently
 merge_survey_estimates <- function(coverage_long, carry_values) {
   # Expand carry_values to match all relevant indicator-year pairs
   expanded_carry_values <- coverage_long %>%
@@ -498,15 +464,16 @@ merge_survey_estimates <- function(coverage_long, carry_values) {
     left_join(carry_values, by = c("admin_area_1", "year", "indicator_to_match_on")) %>%
     drop_na(reference_value)  # Drop missing reference values
   
-  # Ensure no duplicate reference values
+  # Ensure no duplicate reference values within the same year
   expanded_carry_values <- expanded_carry_values %>%
     distinct(admin_area_1, year, indicator_to_match_on, reference_value)
   
-  # Now merge with coverage_long
+  # Now merge with coverage_long for each year independently
   merged_data <- left_join(
     coverage_long, expanded_carry_values,
     by = c("admin_area_1", "year", "indicator_to_match_on")
-  )
+  ) %>%
+    arrange(admin_area_1, year, indicator_to_match_on)  # Ensure order is year-wise
   
   # Compute Squared Error (Distance from Reference Survey Value)
   merged_data <- merged_data %>%
@@ -520,7 +487,8 @@ merge_survey_estimates <- function(coverage_long, carry_values) {
   
   return(merged_data)
 }
-# Step 3: Select best denominator
+
+# Step 3: Select best denominator for each year independently
 select_best_denominator <- function(merged_data) {
   best_denominator <- merged_data %>%
     filter(!is.na(squared_error)) %>%  # Remove rows where squared_error is NA
@@ -534,7 +502,6 @@ select_best_denominator <- function(merged_data) {
 }
 
 
-
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
 adjusted_volume <- map_adjusted_volumes(adjusted_volume_data)
@@ -542,21 +509,35 @@ hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevan
 
 # 2. Aggregate HMIS Data to Annual Level
 annual_hmis <- adjusted_volume %>%
-  group_by(admin_area_1, year, indicator_common_id) %>%  # Keep key identifiers
+  select(admin_area_1, year, indicator_common_id, count, month) %>%  
+  group_by(admin_area_1, year, indicator_common_id) %>%
   summarise(
-    # Sum valid count columns (excluding count_final_x)
-    across(
-      starts_with("count"), 
-      ~ if_else(all(is.na(.)), NA_real_, sum(., na.rm = TRUE)), 
-      .names = "{.col}"
-    ),
-    
-    # Correctly count the number of unique non-missing months (is that for each indicator ?? or overall)
-    nummonth = n_distinct(month[!is.na(month)]),  
-    
+    count = sum(count, na.rm = TRUE),  # Sum counts across all months
     .groups = "drop"
-  ) %>%
-  select(-starts_with("count_final")) 
+  )
+
+# Step 2: Count number of unique months per `admin_area_1` and `year`
+nummonth_data <- adjusted_volume %>%
+  select(admin_area_1, year, month) %>%
+  distinct() %>%  # Keep only unique month entries per area-year
+  group_by(admin_area_1, year) %>%
+  summarise(nummonth = n_distinct(month[!is.na(month)]), .groups = "drop")  # Count unique months
+
+
+annual_hmis <- annual_hmis %>%
+  pivot_wider(
+    names_from = indicator_common_id,  
+    values_from = count,  
+    names_prefix = "count",  # Prefix column names with "count"
+    values_fill = list(count = 0)  # Fill missing values with 0
+  )
+
+annual_hmis <- annual_hmis %>%
+  left_join(nummonth_data, by = c("admin_area_1", "year"))
+
+
+annual_hmis <- annual_hmis %>%
+  arrange(admin_area_1, year)
 
 # 3. Adjust Names for Consistency
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
@@ -591,22 +572,103 @@ data <- annual_hmis %>%
   filter(year >= MIN_YEAR & year <= CURRENT_YEAR) %>%
   create_survey_averages()
 
-# 5. Apply Carry Forward Survey Data
+# 7. Apply Carry Forward Survey Data
 data <- carry_forward_survey_data(data)
 
-# 6. Assign Carried Survey Data 
+# 8. Assign Carried Survey Data 
 data <- assign_carried_survey_data(data)
 
-# 7. Calculate Denominators
+# 9. Calculate Denominators
 data <- calculate_all_denominators(data, adjustment_factors)
 
-# 8. Calculate Coverage for Each Indicator
+# 10. Calculate Coverage for Each Indicator
 coverage_long <- calculate_coverage(data)
 
-# 9. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
+# 11. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
 carry_values <- extract_reference_values(data)
 merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
 best_coverage <- select_best_denominator(merged_coverage)
 
 
+
+### continue ##
+
+# Function to compute coverage delta
+detect_coverage_delta <- function(best_coverage) {
+  coverage_table <- best_coverage %>%
+    select(admin_area_1, year, indicator_common_id, coverage, denominator, denominator_value, denominator_type) %>%
+    rename(
+      best_coverage = coverage,
+      best_denominator = denominator,
+      best_denominator_value = denominator_value,
+      best_denominator_type = denominator_type
+    ) %>%
+    arrange(admin_area_1, indicator_common_id, year) %>%
+    group_by(admin_area_1, indicator_common_id) %>%
+    mutate(
+      coverage_delta = if_else(
+        !is.na(best_coverage) & !is.na(lag(best_coverage)), 
+        best_coverage - lag(best_coverage), 
+        NA_real_
+      ),
+      # Ensure missing deltas don't block propagation
+      coverage_delta = ifelse(is.na(coverage_delta), 0, coverage_delta)
+    ) %>%
+    ungroup()
+  
+  return(coverage_table)
+}
+
+# Function to calculate avg survey projections based on coverage deltas and reference values
+calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
+  
+  # Merge coverage_table with carry_values (reference values) using 'indicator_common_id' and 'year'
+  coverage_table <- left_join(coverage_table, carry_values, by = c("admin_area_1", "year", "indicator_common_id" = "indicator_to_match_on"))
+  
+  # Ensure the data is ordered by year for each admin area and indicator
+  coverage_table <- coverage_table %>%
+    arrange(admin_area_1, indicator_common_id, year)
+  
+  # Calculate the avg survey projection using reference_value and coverage_delta
+  coverage_table <- coverage_table %>%
+    group_by(admin_area_1, indicator_common_id) %>%
+    mutate(
+      avgsurveyprojection = reference_value + cumsum(coverage_delta) # Add coverage_delta to reference_value over time
+    ) %>%
+    ungroup()
+  
+  return(coverage_table)
+}
+
+
+
+coverage_table <- detect_coverage_delta(best_coverage)
+coverage_table_with_projection <- calculate_avgsurveyprojection(coverage_table, carry_values)
+
+#prepare results
+annual_hmis_long <- annual_hmis %>%
+  pivot_longer(cols = starts_with("count"), 
+               names_to = "indicator_common_id", 
+               values_to = "count") %>%
+  mutate(indicator_common_id = gsub("count", "", indicator_common_id))  # Clean the column names
+
+combined_data <- coverage_table_with_projection %>%
+  select(admin_area_1, year, indicator_common_id, avgsurveyprojection, reference_value) %>%
+  pivot_longer(cols = c("avgsurveyprojection", "reference_value"), 
+               names_to = "source", 
+               values_to = "coverage") %>%
+  bind_rows(
+    best_coverage %>%
+      select(admin_area_1, year, indicator_common_id, coverage) %>%
+      mutate(source = "cov")
+  ) %>%
+  bind_rows(
+    annual_hmis_long %>%
+      select(admin_area_1, year, indicator_common_id, count) %>%
+      mutate(source = "count", coverage = count) %>%
+      select(-count)
+  ) %>%
+  arrange(admin_area_1, year, indicator_common_id, source)
+
+write.csv(combined_data, "M4_Coverage_estimation.csv", row.names = FALSE)   
 
