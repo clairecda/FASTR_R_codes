@@ -4,8 +4,17 @@ VALID_COUNT_VARIABLES <- c("count_final_none", "count_final_outlier", "count_fin
 CURRENT_YEAR <- as.numeric(format(Sys.Date(), "%Y"))  # Dynamically get current year
 MIN_YEAR <- 2000  # Set a fixed minimum year for filtering
 
+PREGNANCY_LOSS_RATE <- 0.03      
+TWIN_RATE <- 0.015               
+STILLBIRTH_RATE <- 0.02          
+NEONATAL_MORTALITY_RATE <- 0.03  
+POSTNEONATAL_MORTALITY_RATE <- 0.02  
+INFANT_MORTALITY_RATE <- 0.05   
+
+
 
 library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the data load in platform
+
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Jan 29
 # Module: Coverage Estimates
@@ -18,7 +27,7 @@ library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL 
 
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
-# FILE(S): ....
+# FILE(S): M4_Coverage_estimation.csv #long format with source column to differentiate what type of coverate estimate it is
 
 
 # ------------------------------ Load Required Libraries -------------------------
@@ -213,97 +222,6 @@ assign_carried_survey_data <- function(data) {
 }
 
 # PART 6 - Calculate HMIS AND WPP-derived-denominators -------------------------------
-# calculate_denominators <- function(data, adjustment_factors) {
-#   data <- data %>%
-#     mutate(
-#       # ANC1 Denominators
-#       danc1_pregnancy = if_else(!is.na(countanc1) & !is.na(anc1carry),
-#                                 countanc1 / (anc1carry / 100),
-#                                 NA_real_
-#       ),
-#       danc1_livebirth = if_else(!is.na(countanc1) & !is.na(anc1carry),
-#                                 (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
-#                                   (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth),
-#                                 NA_real_
-#       ),
-#       danc1_dpt = if_else(!is.na(countanc1) & !is.na(anc1carry),
-#                           (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) /
-#                             (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) *
-#                             (1 - adjustment_factors$nmr),
-#                           NA_real_
-#       ),
-#       danc1_mcv = if_else(!is.na(countanc1) & !is.na(anc1carry),
-#                           (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
-#                             (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) *
-#                             (1 - adjustment_factors$imr),
-#                           NA_real_
-#       ),
-#       
-#       # Delivery Denominators
-#       ddelivery_pregnancy = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-#                                     (countdelivery / (deliverycarry / 100)) / (1 - adjustment_factors$preg_loss),
-#                                     NA_real_
-#       ),
-#       ddelivery_livebirth = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-#                                     (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-#                                       (1 - adjustment_factors$stillbirth),
-#                                     NA_real_
-#       ),
-#       ddelivery_dpt = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-#                               (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-#                                 (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$nmr),
-#                               NA_real_
-#       ),
-#       ddelivery_mcv = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-#                               (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-#                                 (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$imr),
-#                               NA_real_
-#       ),
-#       
-#       # BCG Denominators
-#       dbcg_pregnancy = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-#                                (countbcg / (bcgcarry / 100)) / (1 - adjustment_factors$preg_loss) /
-#                                  (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth),
-#                                NA_real_
-#       ),
-#       dbcg_livebirth = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-#                                countbcg / (bcgcarry / 100),
-#                                NA_real_
-#       ),
-#       dbcg_dpt = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-#                          (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
-#                          NA_real_
-#       ),
-#       dbcg_mcv = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-#                          (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
-#                            (1 - adjustment_factors$pnmr),
-#                          NA_real_
-#       ),
-#       
-#       # Penta1 Denominators
-#       dpenta1_pregnancy = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-#                                   (countpenta1 / (penta1carry / 100)) / (1 - adjustment_factors$preg_loss) /
-#                                     (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) / 
-#                                     (1 - adjustment_factors$nmr),
-#                                   NA_real_
-#       ),
-#       dpenta1_livebirth = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-#                                   (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) / 
-#                                     (1 - adjustment_factors$stillbirth) / (1 - adjustment_factors$nmr),
-#                                   NA_real_
-#       ),
-#       dpenta1_dpt = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-#                             countpenta1 / (penta1carry / 100),
-#                             NA_real_
-#       ),
-#       dpenta1_mcv = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-#                             (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
-#                             NA_real_
-#       )
-#     )
-#   return(data)
-# }
-
 calculate_denominators <- function(data, adjustment_factors) {
   
   # Define indicator names and their required columns
@@ -327,6 +245,7 @@ calculate_denominators <- function(data, adjustment_factors) {
   }
   
   # Apply transformations safely
+  # Apply calculations safely
   data <- data %>%
     mutate(
       # ANC1 Denominators
@@ -336,59 +255,59 @@ calculate_denominators <- function(data, adjustment_factors) {
       
       danc1_livebirth = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                                     (countanc1 / (anc1carry / 100)) * 
-                                                      (1 - adjustment_factors$preg_loss) * 
-                                                      (1 + adjustment_factors$twin_rate) * 
-                                                      (1 - adjustment_factors$stillbirth),
+                                                      (1 - PREGNANCY_LOSS_RATE) * 
+                                                      (1 + TWIN_RATE) * 
+                                                      (1 - STILLBIRTH_RATE),
                                                     NA_real_)),
       
       danc1_dpt = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                               (countanc1 / (anc1carry / 100)) * 
-                                                (1 - adjustment_factors$preg_loss) /
-                                                (1 - (adjustment_factors$twin_rate / 2)) * 
-                                                (1 - adjustment_factors$stillbirth) * 
-                                                (1 - adjustment_factors$nmr),
+                                                (1 - PREGNANCY_LOSS_RATE) /
+                                                (1 - (TWIN_RATE / 2)) * 
+                                                (1 - STILLBIRTH_RATE) * 
+                                                (1 - NEONATAL_MORTALITY_RATE),
                                               NA_real_)),
       
       danc1_mcv = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                               (countanc1 / (anc1carry / 100)) * 
-                                                (1 - adjustment_factors$preg_loss) *
-                                                (1 + adjustment_factors$twin_rate) * 
-                                                (1 - adjustment_factors$stillbirth) *
-                                                (1 - adjustment_factors$imr),
+                                                (1 - PREGNANCY_LOSS_RATE) *
+                                                (1 + TWIN_RATE) * 
+                                                (1 - STILLBIRTH_RATE) *
+                                                (1 - INFANT_MORTALITY_RATE),
                                               NA_real_)),
       
       # Delivery Denominators
       ddelivery_pregnancy = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
                                                             (countdelivery / (deliverycarry / 100)) / 
-                                                              (1 - adjustment_factors$preg_loss),
+                                                              (1 - PREGNANCY_LOSS_RATE),
                                                             NA_real_)),
       
       ddelivery_livebirth = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
                                                             (countdelivery / (deliverycarry / 100)) * 
-                                                              (1 + adjustment_factors$twin_rate) * 
-                                                              (1 - adjustment_factors$stillbirth),
+                                                              (1 + TWIN_RATE) * 
+                                                              (1 - STILLBIRTH_RATE),
                                                             NA_real_)),
       
       ddelivery_dpt = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
                                                       (countdelivery / (deliverycarry / 100)) * 
-                                                        (1 + adjustment_factors$twin_rate) * 
-                                                        (1 - adjustment_factors$stillbirth) * 
-                                                        (1 - adjustment_factors$nmr),
+                                                        (1 + TWIN_RATE) * 
+                                                        (1 - STILLBIRTH_RATE) * 
+                                                        (1 - NEONATAL_MORTALITY_RATE),
                                                       NA_real_)),
       
       ddelivery_mcv = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
                                                       (countdelivery / (deliverycarry / 100)) * 
-                                                        (1 + adjustment_factors$twin_rate) * 
-                                                        (1 - adjustment_factors$stillbirth) * 
-                                                        (1 - adjustment_factors$imr),
+                                                        (1 + TWIN_RATE) * 
+                                                        (1 - STILLBIRTH_RATE) * 
+                                                        (1 - INFANT_MORTALITY_RATE),
                                                       NA_real_)),
       
       # BCG Denominators
       dbcg_pregnancy = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
                                                   (countbcg / (bcgcarry / 100)) / 
-                                                    (1 - adjustment_factors$preg_loss) /
-                                                    (1 + adjustment_factors$twin_rate) /
-                                                    (1 - adjustment_factors$stillbirth),
+                                                    (1 - PREGNANCY_LOSS_RATE) /
+                                                    (1 + TWIN_RATE) /
+                                                    (1 - STILLBIRTH_RATE),
                                                   NA_real_)),
       
       dbcg_livebirth = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
@@ -396,28 +315,28 @@ calculate_denominators <- function(data, adjustment_factors) {
                                                   NA_real_)),
       
       dbcg_dpt = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                                            (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
+                                            (countbcg / (bcgcarry / 100)) * (1 - NEONATAL_MORTALITY_RATE),
                                             NA_real_)),
       
       dbcg_mcv = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                                            (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
-                                              (1 - adjustment_factors$pnmr),
+                                            (countbcg / (bcgcarry / 100)) * (1 - NEONATAL_MORTALITY_RATE) * 
+                                              (1 - POSTNEONATAL_MORTALITY_RATE),
                                             NA_real_)),
       
       # Penta1 Denominators
       dpenta1_pregnancy = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
                                                         (countpenta1 / (penta1carry / 100)) / 
-                                                          (1 - adjustment_factors$preg_loss) /
-                                                          (1 + adjustment_factors$twin_rate) /
-                                                          (1 - adjustment_factors$stillbirth) /
-                                                          (1 - adjustment_factors$nmr),
+                                                          (1 - PREGNANCY_LOSS_RATE) /
+                                                          (1 + TWIN_RATE) /
+                                                          (1 - STILLBIRTH_RATE) /
+                                                          (1 - NEONATAL_MORTALITY_RATE),
                                                         NA_real_)),
       
       dpenta1_livebirth = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
                                                         (countpenta1 / (penta1carry / 100)) / 
-                                                          (1 + adjustment_factors$twin_rate) / 
-                                                          (1 - adjustment_factors$stillbirth) / 
-                                                          (1 - adjustment_factors$nmr),
+                                                          (1 + TWIN_RATE) / 
+                                                          (1 - STILLBIRTH_RATE) / 
+                                                          (1 - NEONATAL_MORTALITY_RATE),
                                                         NA_real_)),
       
       dpenta1_dpt = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
@@ -425,7 +344,7 @@ calculate_denominators <- function(data, adjustment_factors) {
                                                   NA_real_)),
       
       dpenta1_mcv = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
-                                                  (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
+                                                  (countpenta1 / (penta1carry / 100)) * (1 - POSTNEONATAL_MORTALITY_RATE),
                                                   NA_real_))
     )
   
