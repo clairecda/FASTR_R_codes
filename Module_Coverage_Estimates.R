@@ -752,7 +752,3 @@ combined_data <- prepare_combined_coverage_data(data_survey, annual_hmis, covera
 # 14. Export the cleaned dataset
 print("Save the results..")
 write.csv(combined_data, "M4_Coverage_Estimation.csv", row.names = FALSE)
-
-print("all done!")
-
-
