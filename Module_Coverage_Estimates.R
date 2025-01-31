@@ -244,7 +244,6 @@ calculate_denominators <- function(data, adjustment_factors) {
     }
   }
   
-  # Apply transformations safely
   # Apply calculations safely
   data <- data %>%
     mutate(
@@ -348,11 +347,30 @@ calculate_denominators <- function(data, adjustment_factors) {
                                                   NA_real_))
     )
   
+  # Adjust the most recent year's coverage if `nummonth` is available and < 12
+  if ("nummonth" %in% available_vars) {
+    data <- data %>%
+      group_by(admin_area_1) %>%
+      mutate(
+        most_recent_year = max(year, na.rm = TRUE),
+        coverage_adjustment = if_else(year == most_recent_year & nummonth < 12, 12 / nummonth, 1),
+        
+        # Adjust denominators for the most recent year
+        danc1_pregnancy = if_else(year == most_recent_year, danc1_pregnancy * coverage_adjustment, danc1_pregnancy),
+        danc1_livebirth = if_else(year == most_recent_year, danc1_livebirth * coverage_adjustment, danc1_livebirth),
+        ddelivery_pregnancy = if_else(year == most_recent_year, ddelivery_pregnancy * coverage_adjustment, ddelivery_pregnancy),
+        ddelivery_livebirth = if_else(year == most_recent_year, ddelivery_livebirth * coverage_adjustment, ddelivery_livebirth),
+        dbcg_pregnancy = if_else(year == most_recent_year, dbcg_pregnancy * coverage_adjustment, dbcg_pregnancy),
+        dbcg_livebirth = if_else(year == most_recent_year, dbcg_livebirth * coverage_adjustment, dbcg_livebirth),
+        dpenta1_pregnancy = if_else(year == most_recent_year, dpenta1_pregnancy * coverage_adjustment, dpenta1_pregnancy),
+        dpenta1_livebirth = if_else(year == most_recent_year, dpenta1_livebirth * coverage_adjustment, dpenta1_livebirth)
+      ) %>%
+      ungroup() %>%
+      select(-most_recent_year, -coverage_adjustment)
+  }
+  
   return(data)
 }
-
-#For most recent year - we need to check nummonth and if less than 12 x 12/last month record if march 12/3 , if sept 12/9
-
 
 # Function to calculate denominators for WPP (World Population Prospects)
 calculate_wpp_denominators <- function(data, adjustment_factors) {
@@ -752,3 +770,4 @@ combined_data <- prepare_combined_coverage_data(data_survey, annual_hmis, covera
 # 14. Export the cleaned dataset
 print("Save the results..")
 write.csv(combined_data, "M4_Coverage_Estimation.csv", row.names = FALSE)
+
