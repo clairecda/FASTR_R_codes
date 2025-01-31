@@ -13,10 +13,10 @@ INFANT_MORTALITY_RATE <- 0.05
 
 
 
-library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the data load in platform
+library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the xtra datasets load in platform
 
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 29
+# Last edit: 2025 Jan 31
 # Module: Coverage Estimates
 
 # Description:
@@ -547,98 +547,7 @@ select_best_denominator <- function(merged_data) {
   return(best_denominator)
 }
 
-
-# ------------------------------ Main Execution -----------------------------------
-# 1. Load and Map Adjusted Volumes
-adjusted_volume <- map_adjusted_volumes(adjusted_volume_data)
-hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevant Countries from HMIS Data
-
-# 2. Aggregate HMIS Data to Annual Level
-annual_hmis <- adjusted_volume %>%
-  select(admin_area_1, year, indicator_common_id, count, month) %>%  
-  group_by(admin_area_1, year, indicator_common_id) %>%
-  summarise(
-    count = sum(count, na.rm = TRUE),  # Sum counts across all months
-    .groups = "drop"
-  )
-
-# Step 2: Count number of unique months per `admin_area_1` and `year`
-nummonth_data <- adjusted_volume %>%
-  select(admin_area_1, year, month) %>%
-  distinct() %>%  # Keep only unique month entries per area-year
-  group_by(admin_area_1, year) %>%
-  summarise(nummonth = n_distinct(month[!is.na(month)]), .groups = "drop")  # Count unique months
-
-
-annual_hmis <- annual_hmis %>%
-  pivot_wider(
-    names_from = indicator_common_id,  
-    values_from = count,  
-    names_prefix = "count",  # Prefix column names with "count"
-    values_fill = list(count = 0)  # Fill missing values with 0
-  )
-
-annual_hmis <- annual_hmis %>%
-  left_join(nummonth_data, by = c("admin_area_1", "year"))
-
-
-annual_hmis <- annual_hmis %>%
-  arrange(admin_area_1, year)
-
-# 3. Adjust Names for Consistency
-name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
-
-# 4. Apply Filtering to Ensure Only Relevant Countries are Included
-mics_data_filtered <- read_dta(mics_data_path) %>%
-  rename(admin_area_1 = country) %>%
-  adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
-
-dhs_data_filtered <- read_dta(dhs_data_path) %>%
-  rename(admin_area_1 = country) %>%
-  adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
-
-wpp_data_filtered <- read_dta(wpp_data_path) %>%
-  rename(admin_area_1 = country) %>%
-  adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
-
-# 5. Extend Survey Data
-mics_data_extended <- extend_survey_data(mics_data_filtered, prefix = "mics")
-dhs_data_extended <- extend_survey_data(dhs_data_filtered, prefix = "dhs")
-wpp_data_extended <- extend_survey_data(wpp_data_filtered, prefix = "wpp")
-
-
-# 6. Merge All Data Sources (Post-Filtering)
-data <- annual_hmis %>%
-  full_join(mics_data_extended, by = c("admin_area_1", "year")) %>%
-  full_join(dhs_data_extended, by = c("admin_area_1", "year")) %>%
-  full_join(wpp_data_extended, by = c("admin_area_1", "year")) %>%
-  filter(year >= MIN_YEAR & year <= CURRENT_YEAR) %>%
-  create_survey_averages()
-
-# 7. Apply Carry Forward Survey Data
-data_survey <- carry_forward_survey_data(data)
-
-# 8. Assign Carried Survey Data 
-data <- assign_carried_survey_data(data_survey)
-
-# 9. Calculate Denominators
-data <- calculate_all_denominators(data, adjustment_factors)
-
-# 10. Calculate Coverage for Each Indicator
-coverage_long <- calculate_coverage(data)
-
-# 11. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
-carry_values <- extract_reference_values(data)
-merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
-best_coverage <- select_best_denominator(merged_coverage)
-
-
-
-### continue here ###
-
+# PART 9 - Extrapolate  Estimates ----------------------------------------------------
 # Function to compute coverage delta
 detect_coverage_delta <- function(best_coverage) {
   coverage_table <- best_coverage %>%
@@ -686,49 +595,164 @@ calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
   return(coverage_table)
 }
 
+# PART 10 - Prepare Results (combine estimates) --------------------------------------
+prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_table_with_projection, best_coverage) {
+  
+  # 1. Transform official estimates from data_survey
+  official_estimate_long <- data_survey %>%
+    select(admin_area_1, year, starts_with("avgsurvey_"), starts_with("datasource_")) %>%
+    pivot_longer(cols = starts_with("avgsurvey_"), 
+                 names_to = "indicator_common_id", 
+                 values_to = "coverage") %>%
+    mutate(source = "official_estimate",
+           # Clean indicator names by removing "avgsurvey_" prefix
+           indicator_common_id = gsub("avgsurvey_", "", indicator_common_id)) %>%
+    filter(!indicator_common_id %in% c("nmr", "imr")) %>%
+    select(admin_area_1, year, indicator_common_id, coverage, source)
+  
+  # 2. Transform annual HMIS data
+  annual_hmis_long <- annual_hmis %>%
+    pivot_longer(cols = starts_with("count"), 
+                 names_to = "indicator_common_id", 
+                 values_to = "count") %>%
+    mutate(indicator_common_id = gsub("count", "", indicator_common_id))  # Clean indicator names
+  
+  # 3. Transform coverage_table_with_projection
+  coverage_projection_long <- coverage_table_with_projection %>%
+    select(admin_area_1, year, indicator_common_id, avgsurveyprojection, reference_value) %>%
+    pivot_longer(cols = c("avgsurveyprojection", "reference_value"), 
+                 names_to = "source", 
+                 values_to = "coverage")
+  
+  # 4. Transform best_coverage
+  best_coverage_long <- best_coverage %>%
+    select(admin_area_1, year, indicator_common_id, coverage) %>%
+    mutate(source = "cov")
+  
+  # 5. Transform annual_hmis_long and rename for merging
+  annual_hmis_long <- annual_hmis_long %>%
+    select(admin_area_1, year, indicator_common_id, count) %>%
+    mutate(source = "count", coverage = count) %>%
+    select(-count)
+  
+  # 6. Merge all datasets together
+  combined_data <- bind_rows(coverage_projection_long, 
+                             best_coverage_long, 
+                             annual_hmis_long, 
+                             official_estimate_long) %>%
+    arrange(admin_area_1, year, indicator_common_id, source) %>%
+    filter(source != "reference_value")  # Remove reference_value rows
+  
+  return(combined_data)
+}
+
+# ------------------------------ Main Execution -----------------------------------
+# 1. Load and Map Adjusted Volumes
+print("load HMIS adjusted volume...")
+adjusted_volume <- map_adjusted_volumes(adjusted_volume_data)
+hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevant Countries from HMIS Data
+
+# 2. Aggregate HMIS Data to Annual Level
+print("aggregate HMIS adjusted volume to annual level...")
+annual_hmis <- adjusted_volume %>%
+  select(admin_area_1, year, indicator_common_id, count, month) %>%  
+  group_by(admin_area_1, year, indicator_common_id) %>%
+  summarise(
+    count = sum(count, na.rm = TRUE),  # Sum counts across all months
+    .groups = "drop"
+  )
+
+# Step 2: Count number of unique months per `admin_area_1` and `year`
+nummonth_data <- adjusted_volume %>%
+  select(admin_area_1, year, month) %>%
+  distinct() %>%  # Keep only unique month entries per area-year
+  group_by(admin_area_1, year) %>%
+  summarise(nummonth = n_distinct(month[!is.na(month)]), .groups = "drop")  # Count unique months
+
+annual_hmis <- annual_hmis %>%
+  pivot_wider(
+    names_from = indicator_common_id,  
+    values_from = count,  
+    names_prefix = "count",  # Prefix column names with "count"
+    values_fill = list(count = 0)  # Fill missing values with 0
+  )
+
+annual_hmis <- annual_hmis %>%
+  left_join(nummonth_data, by = c("admin_area_1", "year"))
 
 
+annual_hmis <- annual_hmis %>%
+  arrange(admin_area_1, year)
+
+# 3. Adjust Names for Consistency
+
+name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
+
+# 4. Apply Filtering to Ensure Only Relevant Countries are Included
+mics_data_filtered <- read_dta(mics_data_path) %>%
+  rename(admin_area_1 = country) %>%
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+
+dhs_data_filtered <- read_dta(dhs_data_path) %>%
+  rename(admin_area_1 = country) %>%
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+
+wpp_data_filtered <- read_dta(wpp_data_path) %>%
+  rename(admin_area_1 = country) %>%
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+
+# 5. Extend Survey Data
+print("Extend survey data...")
+mics_data_extended <- extend_survey_data(mics_data_filtered, prefix = "mics")
+dhs_data_extended <- extend_survey_data(dhs_data_filtered, prefix = "dhs")
+wpp_data_extended <- extend_survey_data(wpp_data_filtered, prefix = "wpp")
+
+
+# 6. Merge All Data Sources (Post-Filtering)
+print("Combine surveys...")
+data <- annual_hmis %>%
+  full_join(mics_data_extended, by = c("admin_area_1", "year")) %>%
+  full_join(dhs_data_extended, by = c("admin_area_1", "year")) %>%
+  full_join(wpp_data_extended, by = c("admin_area_1", "year")) %>%
+  filter(year >= MIN_YEAR & year <= CURRENT_YEAR) %>%
+  create_survey_averages()
+
+# 7. Apply Carry Forward Survey Data
+print("Carry fwd surveys...")
+data_survey <- carry_forward_survey_data(data)
+
+# 8. Assign Carried Survey Data 
+data <- assign_carried_survey_data(data_survey)
+
+# 9. Calculate Denominators
+print("Calculate denominators...")
+data <- calculate_all_denominators(data, adjustment_factors)
+
+# 10. Calculate Coverage for Each Indicator
+print("Calculate coverage for each indicator")
+coverage_long <- calculate_coverage(data)
+
+# 11. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
+print("Select best denominator...")
+carry_values <- extract_reference_values(data)
+merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
+best_coverage <- select_best_denominator(merged_coverage)
+
+# 12. Projection
+print("Extrapolate coverage estimates...")
 coverage_table <- detect_coverage_delta(best_coverage)
 coverage_table_with_projection <- calculate_avgsurveyprojection(coverage_table, carry_values)
 
-#prepare results
-official_estimate_long <- data_survey %>%
-  select(admin_area_1, year, starts_with("avgsurvey_"), starts_with("datasource_")) %>%
-  pivot_longer(cols = starts_with("avgsurvey_"), 
-               names_to = "indicator_common_id", 
-               values_to = "coverage") %>%
-  mutate(source = "official_estimate",
-         # Clean up the indicator names by removing the prefix 'avgsurvey_' and keeping it as the indicator name
-         indicator_common_id = gsub("avgsurvey_", "", indicator_common_id)) %>%
-  filter(!indicator_common_id %in% c("nmr", "imr")) %>% 
-  select(admin_area_1, year, indicator_common_id, coverage, source)
+# 13. Call function to generate the combined dataset
+combined_data <- prepare_combined_coverage_data(data_survey, annual_hmis, coverage_table_with_projection, best_coverage)
 
-annual_hmis_long <- annual_hmis %>%
-  pivot_longer(cols = starts_with("count"), 
-               names_to = "indicator_common_id", 
-               values_to = "count") %>%
-  mutate(indicator_common_id = gsub("count", "", indicator_common_id))  # Clean the column names
+# 14. Export the cleaned dataset
+print("Save the results..")
+write.csv(combined_data, "M4_Coverage_Estimation.csv", row.names = FALSE)
 
-combined_data <- coverage_table_with_projection %>%
-  select(admin_area_1, year, indicator_common_id, avgsurveyprojection, reference_value) %>%
-  pivot_longer(cols = c("avgsurveyprojection", "reference_value"), 
-               names_to = "source", 
-               values_to = "coverage") %>%
-  bind_rows(
-    best_coverage %>%
-      select(admin_area_1, year, indicator_common_id, coverage) %>%
-      mutate(source = "cov")
-  ) %>%
-  bind_rows(
-    annual_hmis_long %>%
-      select(admin_area_1, year, indicator_common_id, count) %>%
-      mutate(source = "count", coverage = count) %>%
-      select(-count)
-  ) %>%
-  bind_rows(official_estimate_long) %>%
-  arrange(admin_area_1, year, indicator_common_id, source)%>%
-  # Remove rows where source is "reference_value"
-  filter(source != "reference_value")
+print("all done!")
 
-write.csv(combined_data, "M4_Coverage_estimation.csv", row.names = FALSE)   
 
