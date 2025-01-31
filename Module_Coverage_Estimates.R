@@ -573,10 +573,10 @@ data <- annual_hmis %>%
   create_survey_averages()
 
 # 7. Apply Carry Forward Survey Data
-data <- carry_forward_survey_data(data)
+data_survey <- carry_forward_survey_data(data)
 
 # 8. Assign Carried Survey Data 
-data <- assign_carried_survey_data(data)
+data <- assign_carried_survey_data(data_survey)
 
 # 9. Calculate Denominators
 data <- calculate_all_denominators(data, adjustment_factors)
@@ -591,7 +591,7 @@ best_coverage <- select_best_denominator(merged_coverage)
 
 
 
-### continue ##
+### continue here ###
 
 # Function to compute coverage delta
 detect_coverage_delta <- function(best_coverage) {
@@ -646,6 +646,16 @@ coverage_table <- detect_coverage_delta(best_coverage)
 coverage_table_with_projection <- calculate_avgsurveyprojection(coverage_table, carry_values)
 
 #prepare results
+official_estimate_long <- data_survey %>%
+  select(admin_area_1, year, starts_with("avgsurvey_"), starts_with("datasource_")) %>%
+  pivot_longer(cols = starts_with("avgsurvey_"), 
+               names_to = "indicator_common_id", 
+               values_to = "coverage") %>%
+  mutate(source = "official_estimate",
+         # Clean up the indicator names by removing the prefix 'avgsurvey_' and keeping it as the indicator name
+         indicator_common_id = gsub("avgsurvey_", "", indicator_common_id)) %>%
+  select(admin_area_1, year, indicator_common_id, coverage, source)
+
 annual_hmis_long <- annual_hmis %>%
   pivot_longer(cols = starts_with("count"), 
                names_to = "indicator_common_id", 
@@ -668,7 +678,10 @@ combined_data <- coverage_table_with_projection %>%
       mutate(source = "count", coverage = count) %>%
       select(-count)
   ) %>%
-  arrange(admin_area_1, year, indicator_common_id, source)
+  bind_rows(official_estimate_long) %>%
+  arrange(admin_area_1, year, indicator_common_id, source)%>%
+  # Remove rows where source is "reference_value"
+  filter(source != "reference_value")
 
 write.csv(combined_data, "M4_Coverage_estimation.csv", row.names = FALSE)   
 
