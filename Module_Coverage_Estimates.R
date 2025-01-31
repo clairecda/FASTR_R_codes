@@ -213,97 +213,224 @@ assign_carried_survey_data <- function(data) {
 }
 
 # PART 6 - Calculate HMIS AND WPP-derived-denominators -------------------------------
+# calculate_denominators <- function(data, adjustment_factors) {
+#   data <- data %>%
+#     mutate(
+#       # ANC1 Denominators
+#       danc1_pregnancy = if_else(!is.na(countanc1) & !is.na(anc1carry),
+#                                 countanc1 / (anc1carry / 100),
+#                                 NA_real_
+#       ),
+#       danc1_livebirth = if_else(!is.na(countanc1) & !is.na(anc1carry),
+#                                 (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
+#                                   (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth),
+#                                 NA_real_
+#       ),
+#       danc1_dpt = if_else(!is.na(countanc1) & !is.na(anc1carry),
+#                           (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) /
+#                             (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) *
+#                             (1 - adjustment_factors$nmr),
+#                           NA_real_
+#       ),
+#       danc1_mcv = if_else(!is.na(countanc1) & !is.na(anc1carry),
+#                           (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
+#                             (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) *
+#                             (1 - adjustment_factors$imr),
+#                           NA_real_
+#       ),
+#       
+#       # Delivery Denominators
+#       ddelivery_pregnancy = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+#                                     (countdelivery / (deliverycarry / 100)) / (1 - adjustment_factors$preg_loss),
+#                                     NA_real_
+#       ),
+#       ddelivery_livebirth = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+#                                     (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+#                                       (1 - adjustment_factors$stillbirth),
+#                                     NA_real_
+#       ),
+#       ddelivery_dpt = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+#                               (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+#                                 (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$nmr),
+#                               NA_real_
+#       ),
+#       ddelivery_mcv = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+#                               (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
+#                                 (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$imr),
+#                               NA_real_
+#       ),
+#       
+#       # BCG Denominators
+#       dbcg_pregnancy = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+#                                (countbcg / (bcgcarry / 100)) / (1 - adjustment_factors$preg_loss) /
+#                                  (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth),
+#                                NA_real_
+#       ),
+#       dbcg_livebirth = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+#                                countbcg / (bcgcarry / 100),
+#                                NA_real_
+#       ),
+#       dbcg_dpt = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+#                          (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
+#                          NA_real_
+#       ),
+#       dbcg_mcv = if_else(!is.na(countbcg) & !is.na(bcgcarry),
+#                          (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
+#                            (1 - adjustment_factors$pnmr),
+#                          NA_real_
+#       ),
+#       
+#       # Penta1 Denominators
+#       dpenta1_pregnancy = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+#                                   (countpenta1 / (penta1carry / 100)) / (1 - adjustment_factors$preg_loss) /
+#                                     (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) / 
+#                                     (1 - adjustment_factors$nmr),
+#                                   NA_real_
+#       ),
+#       dpenta1_livebirth = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+#                                   (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) / 
+#                                     (1 - adjustment_factors$stillbirth) / (1 - adjustment_factors$nmr),
+#                                   NA_real_
+#       ),
+#       dpenta1_dpt = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+#                             countpenta1 / (penta1carry / 100),
+#                             NA_real_
+#       ),
+#       dpenta1_mcv = if_else(!is.na(countpenta1) & !is.na(penta1carry),
+#                             (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
+#                             NA_real_
+#       )
+#     )
+#   return(data)
+# }
+
 calculate_denominators <- function(data, adjustment_factors) {
+  
+  # Define indicator names and their required columns
+  indicator_vars <- list(
+    anc1 = c("countanc1", "anc1carry"),
+    delivery = c("countdelivery", "deliverycarry"),
+    bcg = c("countbcg", "bcgcarry"),
+    penta1 = c("countpenta1", "penta1carry")
+  )
+  
+  # Identify available columns in data
+  available_vars <- names(data)
+  
+  # Safe mutate function to avoid crashes
+  safe_mutate <- function(var_name, formula) {
+    if (all(indicator_vars[[var_name]] %in% available_vars)) {
+      return(formula)
+    } else {
+      return(NA_real_)
+    }
+  }
+  
+  # Apply transformations safely
   data <- data %>%
     mutate(
-      # # ANC1 Denominators
-      # danc1_pregnancy = if_else(!is.na(countanc1) & !is.na(anc1carry),
-      #                           countanc1 / (anc1carry / 100),
-      #                           NA_real_
-      # ),
-      # danc1_livebirth = if_else(!is.na(countanc1) & !is.na(anc1carry),
-      #                           (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) * 
-      #                             (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth),
-      #                           NA_real_
-      # ),
-      # danc1_dpt = if_else(!is.na(countanc1) & !is.na(anc1carry),
-      #                     (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) /
-      #                       (1 - (adjustment_factors$twin_rate / 2)) * (1 - adjustment_factors$stillbirth) * 
-      #                       (1 - adjustment_factors$nmr),
-      #                     NA_real_
-      # ),
-      # danc1_mcv = if_else(!is.na(countanc1) & !is.na(anc1carry),
-      #                     (countanc1 / (anc1carry / 100)) * (1 - adjustment_factors$preg_loss) *
-      #                       (1 + adjustment_factors$twin_rate) * (1 - adjustment_factors$stillbirth) * 
-      #                       (1 - adjustment_factors$imr),
-      #                     NA_real_
-      # ),
+      # ANC1 Denominators
+      danc1_pregnancy = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
+                                                    countanc1 / (anc1carry / 100),
+                                                    NA_real_)),
+      
+      danc1_livebirth = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
+                                                    (countanc1 / (anc1carry / 100)) * 
+                                                      (1 - adjustment_factors$preg_loss) * 
+                                                      (1 + adjustment_factors$twin_rate) * 
+                                                      (1 - adjustment_factors$stillbirth),
+                                                    NA_real_)),
+      
+      danc1_dpt = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
+                                              (countanc1 / (anc1carry / 100)) * 
+                                                (1 - adjustment_factors$preg_loss) /
+                                                (1 - (adjustment_factors$twin_rate / 2)) * 
+                                                (1 - adjustment_factors$stillbirth) * 
+                                                (1 - adjustment_factors$nmr),
+                                              NA_real_)),
+      
+      danc1_mcv = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
+                                              (countanc1 / (anc1carry / 100)) * 
+                                                (1 - adjustment_factors$preg_loss) *
+                                                (1 + adjustment_factors$twin_rate) * 
+                                                (1 - adjustment_factors$stillbirth) *
+                                                (1 - adjustment_factors$imr),
+                                              NA_real_)),
       
       # Delivery Denominators
-      ddelivery_pregnancy = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-                                    (countdelivery / (deliverycarry / 100)) / (1 - adjustment_factors$preg_loss),
-                                    NA_real_
-      ),
-      ddelivery_livebirth = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-                                    (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-                                      (1 - adjustment_factors$stillbirth),
-                                    NA_real_
-      ),
-      ddelivery_dpt = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-                              (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-                                (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$nmr),
-                              NA_real_
-      ),
-      ddelivery_mcv = if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-                              (countdelivery / (deliverycarry / 100)) * (1 + adjustment_factors$twin_rate) * 
-                                (1 - adjustment_factors$stillbirth) * (1 - adjustment_factors$imr),
-                              NA_real_
-      ),
+      ddelivery_pregnancy = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                                            (countdelivery / (deliverycarry / 100)) / 
+                                                              (1 - adjustment_factors$preg_loss),
+                                                            NA_real_)),
+      
+      ddelivery_livebirth = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                                            (countdelivery / (deliverycarry / 100)) * 
+                                                              (1 + adjustment_factors$twin_rate) * 
+                                                              (1 - adjustment_factors$stillbirth),
+                                                            NA_real_)),
+      
+      ddelivery_dpt = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                                      (countdelivery / (deliverycarry / 100)) * 
+                                                        (1 + adjustment_factors$twin_rate) * 
+                                                        (1 - adjustment_factors$stillbirth) * 
+                                                        (1 - adjustment_factors$nmr),
+                                                      NA_real_)),
+      
+      ddelivery_mcv = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                                      (countdelivery / (deliverycarry / 100)) * 
+                                                        (1 + adjustment_factors$twin_rate) * 
+                                                        (1 - adjustment_factors$stillbirth) * 
+                                                        (1 - adjustment_factors$imr),
+                                                      NA_real_)),
       
       # BCG Denominators
-      dbcg_pregnancy = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                               (countbcg / (bcgcarry / 100)) / (1 - adjustment_factors$preg_loss) /
-                                 (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth),
-                               NA_real_
-      ),
-      dbcg_livebirth = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                               countbcg / (bcgcarry / 100),
-                               NA_real_
-      ),
-      dbcg_dpt = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                         (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
-                         NA_real_
-      ),
-      dbcg_mcv = if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                         (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
-                           (1 - adjustment_factors$pnmr),
-                         NA_real_
-      ),
+      dbcg_pregnancy = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                                                  (countbcg / (bcgcarry / 100)) / 
+                                                    (1 - adjustment_factors$preg_loss) /
+                                                    (1 + adjustment_factors$twin_rate) /
+                                                    (1 - adjustment_factors$stillbirth),
+                                                  NA_real_)),
+      
+      dbcg_livebirth = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                                                  countbcg / (bcgcarry / 100),
+                                                  NA_real_)),
+      
+      dbcg_dpt = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                                            (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr),
+                                            NA_real_)),
+      
+      dbcg_mcv = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                                            (countbcg / (bcgcarry / 100)) * (1 - adjustment_factors$nmr) * 
+                                              (1 - adjustment_factors$pnmr),
+                                            NA_real_)),
       
       # Penta1 Denominators
-      dpenta1_pregnancy = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-                                  (countpenta1 / (penta1carry / 100)) / (1 - adjustment_factors$preg_loss) /
-                                    (1 + adjustment_factors$twin_rate) / (1 - adjustment_factors$stillbirth) / 
-                                    (1 - adjustment_factors$nmr),
-                                  NA_real_
-      ),
-      dpenta1_livebirth = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-                                  (countpenta1 / (penta1carry / 100)) / (1 + adjustment_factors$twin_rate) / 
-                                    (1 - adjustment_factors$stillbirth) / (1 - adjustment_factors$nmr),
-                                  NA_real_
-      ),
-      dpenta1_dpt = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-                            countpenta1 / (penta1carry / 100),
-                            NA_real_
-      ),
-      dpenta1_mcv = if_else(!is.na(countpenta1) & !is.na(penta1carry),
-                            (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
-                            NA_real_
-      )
+      dpenta1_pregnancy = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                                        (countpenta1 / (penta1carry / 100)) / 
+                                                          (1 - adjustment_factors$preg_loss) /
+                                                          (1 + adjustment_factors$twin_rate) /
+                                                          (1 - adjustment_factors$stillbirth) /
+                                                          (1 - adjustment_factors$nmr),
+                                                        NA_real_)),
+      
+      dpenta1_livebirth = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                                        (countpenta1 / (penta1carry / 100)) / 
+                                                          (1 + adjustment_factors$twin_rate) / 
+                                                          (1 - adjustment_factors$stillbirth) / 
+                                                          (1 - adjustment_factors$nmr),
+                                                        NA_real_)),
+      
+      dpenta1_dpt = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                                  countpenta1 / (penta1carry / 100),
+                                                  NA_real_)),
+      
+      dpenta1_mcv = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                                  (countpenta1 / (penta1carry / 100)) * (1 - adjustment_factors$pnmr),
+                                                  NA_real_))
     )
+  
   return(data)
 }
-
 
 #For most recent year - we need to check nummonth and if less than 12 x 12/last month record if march 12/3 , if sept 12/9
 
@@ -654,6 +781,7 @@ official_estimate_long <- data_survey %>%
   mutate(source = "official_estimate",
          # Clean up the indicator names by removing the prefix 'avgsurvey_' and keeping it as the indicator name
          indicator_common_id = gsub("avgsurvey_", "", indicator_common_id)) %>%
+  filter(!indicator_common_id %in% c("nmr", "imr")) %>% 
   select(admin_area_1, year, indicator_common_id, coverage, source)
 
 annual_hmis_long <- annual_hmis %>%
