@@ -43,16 +43,6 @@ mics_data_path       <- "~/Desktop/FASTR/Coverage_Analysis/MICS/MICS.dta"
 dhs_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS.dta"
 
 # ------------------------------ Define Parameters --------------------------------
-# Denominator Adjustment Factors
-adjustment_factors <- list(
-  preg_loss = 0.03,        # Default pregnancy loss
-  twin_rate = 0.015,       # Default twin rate
-  stillbirth = 0.02,       # Default stillbirth rate
-  nmr = 0.03,              # Default neonatal mortality rate
-  pnmr = 0.02,             # Default postnatal mortality rate
-  imr = 0.05               # Default infant mortality rate
-)
-
 # Coverage Estimation Parameters
 coverage_params <- list(
   indicators = c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")
