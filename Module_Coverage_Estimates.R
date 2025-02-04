@@ -124,14 +124,14 @@ create_survey_averages <- function(data) {
   data <- data %>%
     mutate(
       # DHS prioritized over MICS (if DHS is available, use it; otherwise, use MICS)
-      avgsurvey_anc1 = coalesce(dhsanc1, micsanc1), #coalesce works row-wise
-      avgsurvey_anc4 = coalesce(dhsanc4, micsanc4),
-      avgsurvey_delivery = coalesce(dhsdelivery, micsdelivery),
-      avgsurvey_bcg = coalesce(dhsbcg, micsbcg),
-      avgsurvey_penta1 = coalesce(dhspenta1, micspenta1),
-      avgsurvey_penta3 = coalesce(dhspenta3, micspenta3),
-      avgsurvey_nmr = coalesce(dhsnmr, micsnmr),
-      avgsurvey_imr = coalesce(dhsimr, micsimr),
+      avgsurvey_anc1 = coalesce(dhsanc1, micsanc1) /100, #coalesce works row-wise
+      avgsurvey_anc4 = coalesce(dhsanc4, micsanc4) /100,
+      avgsurvey_delivery = coalesce(dhsdelivery, micsdelivery) /100,
+      avgsurvey_bcg = coalesce(dhsbcg, micsbcg) /100,
+      avgsurvey_penta1 = coalesce(dhspenta1, micspenta1) /100,
+      avgsurvey_penta3 = coalesce(dhspenta3, micspenta3) /100,
+      avgsurvey_nmr = coalesce(dhsnmr, micsnmr) /100,
+      avgsurvey_imr = coalesce(dhsimr, micsimr) /100,
       
       # Postnatal mortality rate (IMR - NMR)
       postnmr = avgsurvey_imr - avgsurvey_nmr,
@@ -474,9 +474,9 @@ calculate_coverage <- function(data) {
   coverage_data <- coverage_data %>%
     mutate(
       coverage = case_when(
-        denominator_type == "pregnancy" & indicator_to_match_on %in% c("anc1", "anc4") ~ (numerator / denominator_value) * 100,
-        denominator_type == "livebirth" & indicator_to_match_on %in% c("delivery", "bcg") ~ (numerator / denominator_value) * 100,
-        denominator_type == "dpt" & indicator_to_match_on %in% c("penta1", "penta3") ~ (numerator / denominator_value) * 100,
+        denominator_type == "pregnancy" & indicator_to_match_on %in% c("anc1", "anc4") ~ (numerator / denominator_value),
+        denominator_type == "livebirth" & indicator_to_match_on %in% c("delivery", "bcg") ~ (numerator / denominator_value),
+        denominator_type == "dpt" & indicator_to_match_on %in% c("penta1", "penta3") ~ (numerator / denominator_value),
         TRUE ~ NA_real_
       )
     ) %>%
