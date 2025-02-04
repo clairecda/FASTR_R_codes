@@ -212,7 +212,7 @@ assign_carried_survey_data <- function(data) {
 }
 
 # PART 6 - Calculate HMIS AND WPP-derived-denominators -------------------------------
-calculate_denominators <- function(data, adjustment_factors) {
+calculate_denominators <- function(data) {
   
   # Define indicator names and their required columns
   indicator_vars <- list(
@@ -363,13 +363,13 @@ calculate_denominators <- function(data, adjustment_factors) {
 }
 
 # Function to calculate denominators for WPP (World Population Prospects)
-calculate_wpp_denominators <- function(data, adjustment_factors) {
+calculate_wpp_denominators <- function(data) {
   data <- data %>%
     mutate(
       # dwpp_pregnancy: Estimated pregnancies based on crude birth rate and total population
       dwpp_pregnancy = if_else(
         !is.na(wppCBR) & !is.na(wpptotpop) & !is.na(nummonth) & nummonth > 0,
-        (wppCBR / 1000) * wpptotpop / (1 + adjustment_factors$twin_rate) * (12 / nummonth),
+        (wppCBR / 1000) * wpptotpop / (1 + TWIN_RATE) * (12 / nummonth),   # Use hardcoded TWIN_RATE
         NA_real_
       ),
       
@@ -399,9 +399,9 @@ calculate_wpp_denominators <- function(data, adjustment_factors) {
 }
 
 # Main function to call all of the above functions
-calculate_all_denominators <- function(data, adjustment_factors) {
-  data <- calculate_denominators(data, adjustment_factors)  # Apply all indicator-based denominator calculations
-  data <- calculate_wpp_denominators(data, adjustment_factors)  # Apply WPP-based denominators
+calculate_all_denominators <- function(data) {
+  data <- calculate_denominators(data)  # Apply all indicator-based denominator calculations
+  data <- calculate_wpp_denominators(data)  # Apply WPP-based denominators
   return(data)
 }
 
@@ -651,9 +651,18 @@ prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_ta
     arrange(admin_area_1, year, indicator_common_id, source) %>%
     filter(source != "reference_value")  # Remove reference_value rows
   
-  return(combined_data)
+  # 7. Pivot to wide format to store results in a wide table
+  combined_data_wide <- combined_data %>%
+    pivot_wider(
+      id_cols = c(admin_area_1, year, indicator_common_id),
+      names_from = source,
+      values_from = coverage,
+      names_prefix = "coverage_",
+      values_fill = NA
+    )
+  
+  return(combined_data_wide)
 }
-
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
 print("load HMIS adjusted volume...")
@@ -737,7 +746,7 @@ data <- assign_carried_survey_data(data_survey)
 
 # 9. Calculate Denominators
 print("Calculate denominators...")
-data <- calculate_all_denominators(data, adjustment_factors)
+data <- calculate_all_denominators(data)
 
 # 10. Calculate Coverage for Each Indicator
 print("Calculate coverage for each indicator")
