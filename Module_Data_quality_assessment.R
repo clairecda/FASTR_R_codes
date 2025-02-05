@@ -143,7 +143,8 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   # Step 5: Output Only Outlier Data
   print("Returning dataset with outliers flagged...")
   outlier_data <- data %>%
-    select(facility_id, indicator_common_id, year, month, count, median_volume, 
+    mutate(period_id = as.integer(paste0(year, sprintf("%02d", month))),) %>%
+    select(facility_id, indicator_common_id, year, month, period_id, count, median_volume, 
            mad_volume, mad_residual, pc, outlier_flag, geo_cols)
   
   return(outlier_data)
