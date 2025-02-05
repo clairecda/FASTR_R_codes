@@ -241,13 +241,11 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   # Process each pair in isolation
   pair_results <- list()
   
+  
   for (pair_name in names(required_pairs)) {
     pair <- required_pairs[[pair_name]]
     col1 <- pair[1]
     col2 <- pair[2]
-    ratio_type <- pair_name
-    ratio_name <- "consistency_ratio"
-    sconsistency_name <- "sconsistency"
     
     if (all(c(col1, col2) %in% colnames(wide_data))) {
       # Retrieve consistency range for the current pair
@@ -257,15 +255,14 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
       
       pair_data <- wide_data %>%
         mutate(
+          ratio_type = pair_name,
           consistency_ratio = if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
           sconsistency = case_when(
-            pair_name != "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio > 1 ~ 1,  # ANC1/ANC4 and Penta1/Penta3
-            pair_name == "pair_delivery" & !is.na(consistency_ratio) & consistency_ratio >= lower_bound & consistency_ratio <= upper_bound ~ 1,  # BCG/Delivery
+            !is.na(consistency_ratio) & consistency_ratio >= lower_bound & consistency_ratio <= upper_bound ~ 1,
             !is.na(consistency_ratio) ~ 0,
             TRUE ~ NA_real_
-          ),
-          ratio_type = pair_name  # Assign the ratio type
-        ) %>%
+          )
+        )  %>%
         select(all_of(c(geo_cols, "year", "ratio_type", "consistency_ratio", "sconsistency")))
       
       pair_results[[pair_name]] <- pair_data
@@ -345,13 +342,17 @@ completeness_analysis <- function(data, geo_cols) {
     group_by(panelvar = paste(indicator_common_id, facility_id, sep = "_")) %>%
     arrange(date) %>%
     mutate(
-      # First and last valid report
-      first_valid_report = cumsum(completeness_flag) > 0,
+      first_valid_report = ifelse(completeness_flag == 1, 1, lag(cumsum(completeness_flag), default = 0)),
       last_valid_report = rev(cumsum(rev(completeness_flag)) > 0),  # Reverse cumsum for trailing data
-      trailing_months = lag(cumsum(first_valid_report), default = 0),
+      
+      # Calculate trailing months since last reported data
+      trailing_months = NA_integer_,
+      trailing_months = ifelse(completeness_flag == 1, 0, lag(trailing_months, default = 12) + 1),
+      
+      # Ensure include_flag only considers reasonable gaps
       include_flag = ifelse(
-        first_valid_report | (trailing_months <= 12 & last_valid_report), 1, 0
-      )  # Allow up to 12 trailing months but only within valid reporting range
+        first_valid_report == 1 | (trailing_months < 12 & last_valid_report), 1, 0
+      )
     ) %>%
     ungroup() %>%
     filter(include_flag == 1)  # Keep valid months only
