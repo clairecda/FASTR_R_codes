@@ -24,9 +24,7 @@ outlier_params <- list(
   count_threshold = MINIMUM_COUNT_THRESHOLD        # Minimum count to consider for outlier adjustment
 )
 
-geo_level <- GEOLEVEL  # Desired geographic level (district) for grouping when adjusting outliers (e.g., "admin_area_3").
-# If this level is not available in the dataset, the function will fall back to the lowest 
-# available level in `geo_cols` (e.g., "admin_area_2").
+geo_level <- GEOLEVEL  # Desired geographic level (district) for grouping when calculating consistency 
 
 # Consistency Analysis Parameters 
 consistency_params <- list(
@@ -48,7 +46,6 @@ dqa_rules <- list(
   outlier_flag = 0,   # Outliers must not be flagged
   sconsistency = 1    # Consistency must be flagged as 1
 )
-
 
 # ------------------------------------- KEY OUTPUTS ----------------------------------------------------------
 # FILE: M1_output_outliers.csv             # Detailed facility-level data with identified outliers and adjusted volumes.
@@ -97,7 +94,6 @@ validate_consistency_pairs <- function(consistency_params, data) {
   
   return(consistency_params)
 }
-
 
 # PART 1 OUTLIERS ----------------------------------------------------------------------------------------------
 outlier_analysis <- function(data, geo_cols, outlier_params) {
@@ -149,7 +145,6 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   
   return(outlier_data)
 }
-
 
 # PART 2-A Consistency Analysis - Geo Level -----------------------------------------------------------------
 geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
@@ -242,7 +237,6 @@ expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consiste
   
   return(facility_consistency_results)
 }
-
 
 # PART 3 COMPLETENESS ----------------------------------------------------------------------------------------
 completeness_analysis <- function(data, geo_cols, facility_metadata) {
@@ -402,7 +396,6 @@ dqa_with_consistency <- function(
   return(dqa_data)
 }
 
-
 # DQA Function Excluding Consistency Checks
 dqa_without_consistency <- function(
     completeness_data, 
@@ -444,9 +437,7 @@ dqa_without_consistency <- function(
   return(dqa_results)
 }
 
-
 # ------------------- Main Execution ----------------------------------------------------------------------------
-
 inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
@@ -457,7 +448,6 @@ consistency_params <- validate_consistency_pairs(consistency_params, data)
 # Run Outlier Analysis
 print("Running outlier analysis...")
 outlier_data_main <- outlier_analysis(data, geo_cols, outlier_params)
-
 
 # Run Completeness Analysis
 print("Running completeness analysis...")
@@ -477,7 +467,6 @@ if (length(consistency_params$consistency_pairs) > 0) {
   print("No valid consistency pairs found. Skipping consistency analysis...")
   geo_consistency_results <- NULL
 }
-
 
 # Expend consistency - join to facility
 facility_consistency_results <- expand_geo_consistency_to_facilities(
@@ -522,7 +511,6 @@ if (!is.null(facility_consistency_results)) {
     dqa_rules = dqa_rules
   )
 }
-
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
 print("Saving results from outlier analysis...")
