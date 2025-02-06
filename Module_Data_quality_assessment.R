@@ -1,7 +1,7 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100      # Minimum count threshold for consideration
 GEOLEVEL <- "admin_area_3" 
-DQA_INDICATORS <- c("penta1") # Specify which indicators are subjected to DQA (default: opd, penta1, anc1)
+DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 #------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
@@ -23,7 +23,9 @@ outlier_params <- list(
   count_threshold = MINIMUM_COUNT_THRESHOLD        # Minimum count to consider for outlier adjustment
 )
 
-geo_level <- GEOLEVEL  # Desired geographic level (district) for grouping when calculating consistency 
+geo_level <- GEOLEVEL
+
+
 
 # Consistency Analysis Parameters 
 consistency_params <- list(
@@ -40,6 +42,9 @@ consistency_params <- list(
 )
 
 # DQA Rules
+default_dqa_ind <- DQA_INDICATORS
+
+
 dqa_rules <- list(
   completeness = 1,   # Completeness must be flagged as 1
   outlier_flag = 0,   # Outliers must not be flagged
@@ -345,10 +350,10 @@ dqa_with_consistency <- function(
   
   # Step 1: Filter only relevant indicators for DQA
   completeness_data <- completeness_data %>%
-    filter(indicator_common_id %in% DQA_INDICATORS)
+    filter(indicator_common_id %in% dqa_indicators_to_use)
   
   outlier_data <- outlier_data %>%
-    filter(indicator_common_id %in% DQA_INDICATORS)
+    filter(indicator_common_id %in% dqa_indicators_to_use)
   
   # Step 2: Merge Completeness & Outlier Data at Facility-Month-Indicator Level
   merged_data <- completeness_data %>%
@@ -406,10 +411,10 @@ dqa_without_consistency <- function(
   
   # Step 1: Filter only specified indicators for DQA
   completeness_data <- completeness_data %>%
-    filter(indicator_common_id %in% DQA_INDICATORS)
+    filter(indicator_common_id %in% dqa_indicators_to_use)
   
   outlier_data <- outlier_data %>%
-    filter(indicator_common_id %in% DQA_INDICATORS)
+    filter(indicator_common_id %in% dqa_indicators_to_use)
   
   # Step 2: Merge completeness and outlier data (Fix: Fill `NA` outlier_flag with `0`)
   merged_data <- completeness_data %>%
@@ -441,8 +446,24 @@ inputs <- load_and_preprocess_data("guinea_imported_dataset_v2.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
+
 # Validate Consistency Pairs
 consistency_params <- validate_consistency_pairs(consistency_params, data)
+# Validate the DQA indicators 
+# Load and preprocess data
+inputs <- load_and_preprocess_data("guinea_imported_dataset_v2.csv")
+data <- inputs$data
+geo_cols <- inputs$geo_cols
+
+# Dynamically set DQA_INDICATORS based on available indicators
+dqa_indicators_to_use <- intersect(DQA_INDICATORS, unique(data$indicator_common_id))
+
+# Ensure DQA_INDICATORS is empty if none of the key indicators exist
+if (length(dqa_indicators_to_use) == 0) {
+  dqa_indicators_to_use <- character(0)  # Empty vector
+}
+
+print(paste("DQA indicators selected:", ifelse(length(dqa_indicators_to_use) > 0, paste(dqa_indicators_to_use, collapse = ", "), "None found")))
 
 # Run Outlier Analysis
 print("Running outlier analysis...")
