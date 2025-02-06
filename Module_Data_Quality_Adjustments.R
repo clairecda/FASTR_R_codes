@@ -1,10 +1,10 @@
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
-# Last edit: 2025 Jan 29
+# Last edit: 2025 Feb 6
 
 # This script dynamically adjusts raw data for:
-#   1. Outliers: Replaces flagged counts with 12-month rolling averages.
-#   2. Completeness: Substitutes rolling averages where completeness issues are detected.
+#   1. Outliers: Replaces flagged outliers with 12-month rolling averages (excluding outliers).
+#   2. Completeness: Replaces missing count with 12-month rolling averages (excluding outliers).
 
 outlier_data <- read.csv("M1_output_outliers.csv")
 completeness_data <- read.csv("M1_completeness_long_format.csv")
@@ -33,14 +33,21 @@ apply_adjustments <- function(data, outlier_data, completeness_data, geo_cols,
   setDT(outlier_data)
   setDT(completeness_data)
   
-  # Merge Outlier and Completeness Flags
+  # Start with completeness_data to ensure all facility-month combinations exist
+  data <- merge(completeness_data[, .(facility_id, indicator_common_id, year, month, completeness_flag)], 
+                data[, .(facility_id, indicator_common_id, year, month, count)], 
+                by = c("facility_id", "indicator_common_id", "year", "month"), 
+                all.x = TRUE)  # Preserve all rows from completeness_data
+  
+  # Set missing counts to NA (ensures completeness rows without observed data are correctly marked)
+  data[, count := fifelse(is.na(count), NA_real_, count)]
+  
+  # Merge Outlier Flags & Replace NAs with 0
   data <- merge(data, outlier_data[, .(facility_id, indicator_common_id, year, month, outlier_flag)], 
-                by = c("facility_id", "indicator_common_id", "year", "month"), all.x = TRUE)
+                by = c("facility_id", "indicator_common_id", "year", "month"), 
+                all.x = TRUE)
   data[, outlier_flag := fifelse(is.na(outlier_flag), 0, outlier_flag)]
   
-  data <- merge(data, completeness_data[, .(facility_id, indicator_common_id, year, month, completeness_flag)], 
-                by = c("facility_id", "indicator_common_id", "year", "month"), all.x = TRUE)
-  data[, completeness_flag := fifelse(is.na(completeness_flag), 1, completeness_flag)]
   
   # Initialize working count column
   data[, count_working := as.numeric(count)]
@@ -72,22 +79,27 @@ apply_adjustments <- function(data, outlier_data, completeness_data, geo_cols,
   if (adjust_completeness) {
     cat(" -> Adjusting completeness issues...\n")
     
-    data[, rolling_avg_completeness := frollapply(
-      count_working * (outlier_flag == 0), 
-      n = 12, 
-      FUN = function(x) mean(x[x > 0], na.rm = TRUE), 
-      fill = NA, align = "center"), 
+    data[, rolling_avg_completeness := rollapplyr(
+      count_working, width = 12, FUN = function(x) {
+        valid_x <- x[!is.na(x) & x > 0]  # Remove NAs and zeros
+        if (length(valid_x) >= 6) {
+          return(mean(valid_x, na.rm = TRUE))
+        } else {
+          return(NA_real_)
+        }
+      }, fill = NA, partial = TRUE, align = "center"),
       by = .(facility_id, indicator_common_id)]
     
-    data[completeness_flag == 0 & !is.na(rolling_avg_completeness), count_working := rolling_avg_completeness]
+    data[completeness_flag == 0 & is.na(count_working) & !is.na(rolling_avg_completeness), 
+         count_working := rolling_avg_completeness]
   }
   
   return(data)
 }
 
 # Function to Apply Adjustments Across Scenarios ------------------------------------------------------------
-apply_adjustments_scenarios <- function(data, outlier_data, completeness_data, geo_cols) {
-  join_cols <- c(geo_cols, "facility_id", "indicator_common_id", "year", "month")
+apply_adjustments_scenarios <- function(data, outlier_data, completeness_data) {
+  join_cols <- c("facility_id", "indicator_common_id", "year", "month")
   
   scenarios <- list(
     none = list(adjust_outliers = FALSE, adjust_completeness = FALSE),
@@ -96,29 +108,36 @@ apply_adjustments_scenarios <- function(data, outlier_data, completeness_data, g
     both = list(adjust_outliers = TRUE, adjust_completeness = TRUE)
   )
   
-  results <- lapply(names(scenarios), function(name) {
+  results <- list()  # Store scenario results
+  
+  for (name in names(scenarios)) {
     cat("Processing scenario:", name, "\n")
+    
     adjustment <- scenarios[[name]]
     
     data_adjusted <- apply_adjustments(
-      data = copy(data),
+      data = copy(data),  # Ensure data is copied properly
       outlier_data = outlier_data,
       completeness_data = completeness_data,
-      geo_cols = geo_cols,
       adjust_outliers = adjustment$adjust_outliers,
       adjust_completeness = adjustment$adjust_completeness
-    )[, .SD, .SDcols = c(join_cols, "count_working")]
+    )[, c(join_cols, "count_working"), with = FALSE]  # Select only necessary columns
     
     setnames(data_adjusted, "count_working", paste0("count_final_", name))
-    return(data_adjusted)
-  })
+    results[[name]] <- data_adjusted
+  }
   
-  df_adjusted <- Reduce(function(x, y) merge(x, y, by = join_cols, all.x = TRUE), results)
+  # Merge all scenario results together
+  df_adjusted <- Reduce(function(x, y) merge(x, y, by = join_cols, all.x = TRUE, all.y = TRUE), results)
   
-  df_final <- merge(data, df_adjusted, by = join_cols, all.x = TRUE)
+  # Ensure completeness rows are kept, even when merging
+  df_final <- merge(data, df_adjusted, by = join_cols, all.x = TRUE, all.y = TRUE)
+  df_final <- df_final %>%
+    select(-any_of(c("indicator_label", "mapped_raw_indicator_ids", "count")))
   
   return(df_final)
 }
+
 
 # ------------------- Main Execution ------------------------------------------------------------------------
 print("Running adjustments analysis...")
@@ -127,8 +146,7 @@ print("Running adjustments analysis...")
 adjusted_data_final <- apply_adjustments_scenarios(
   data = data,
   outlier_data = outlier_data,
-  completeness_data = completeness_data,
-  geo_cols = c("admin_area_1", "admin_area_2", "admin_area_3")
+  completeness_data = completeness_data
 )
 
 # Save Outputs
