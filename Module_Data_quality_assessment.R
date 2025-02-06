@@ -1,11 +1,11 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
-MINIMUM_COUNT_THRESHOLD <- 100      # Minimum count threshold for consideration
-GEOLEVEL <- "admin_area_3" 
+MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
+GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 #------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 29
+# Last edit: 2025 Feb 6
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to handle datasets where the available indicators are limited 
@@ -24,8 +24,6 @@ outlier_params <- list(
 )
 
 geo_level <- GEOLEVEL
-
-
 
 # Consistency Analysis Parameters 
 consistency_params <- list(
@@ -516,6 +514,7 @@ if (length(consistency_params$consistency_pairs) > 0) {
   geo_consistency_results <- NULL
 }
 
+
 # Expend consistency - join to facility
 facility_consistency_results <- expand_geo_consistency_to_facilities(
   facility_metadata = data,  
@@ -563,19 +562,19 @@ if (!is.null(facility_consistency_results)) {
 }
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
-# print("Saving results from outlier analysis...")
-# write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
-# 
-# if (length(consistency_params$consistency_pairs) > 0) {
-#   print("Saving all data outputs from consistency analysis...")
-#   write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
-#   write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
-# }
-# 
-# print("Saving results from completeness analysis...")
-# write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
-# 
-# print("Saving results from DQA analysis...")
-# write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
-# 
-# print("DQA Analysis completed. All outputs saved.")
+print("Saving results from outlier analysis...")
+write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
+
+if (length(consistency_params$consistency_pairs) > 0) {
+  print("Saving all data outputs from consistency analysis...")
+  write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
+  write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
+}
+
+print("Saving results from completeness analysis...")
+write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
+
+print("Saving results from DQA analysis...")
+write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
+
+print("DQA Analysis completed. All outputs saved.")
