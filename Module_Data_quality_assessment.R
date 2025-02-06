@@ -252,18 +252,19 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   return(combined_data)
 }
 
-expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consistency_results) {
-  print("Expanding geo-level consistency results to facility level...")
+expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consistency_results, geo_level) {
+  print(paste("Expanding geo-level consistency results using:", geo_level, "..."))
   
-  # Step 1: Start with a list of all facility IDs and their admin_area_3
+  # Step 1: Extract facility list with the specified geographic level
   facility_list <- facility_metadata %>%
-    select(facility_id, admin_area_3) %>%
-    distinct()  # Ensure each facility appears only once
+    select(facility_id, all_of(geo_level)) %>%
+    distinct()
   
-  # Step 2: Expand geo consistency results to all facilities by joining on `admin_area_3`
+  # Step 2: Expand geo consistency results by duplicating values across all facilities in the same area
   facility_consistency_results <- facility_list %>%
-    left_join(geo_consistency_results, by = "admin_area_3", relationship = "many-to-many")  # Allow expected many-to-many join
+    left_join(geo_consistency_results, by = geo_level, relationship = "many-to-many")
   
+  print("Successfully expanded geo-level consistency results to all facilities")
   return(facility_consistency_results)
 }
 
@@ -517,8 +518,9 @@ if (length(consistency_params$consistency_pairs) > 0) {
 
 # Expend consistency - join to facility
 facility_consistency_results <- expand_geo_consistency_to_facilities(
-  facility_metadata = data,  # Contains `facility_id` and `admin_area_3`
-  geo_consistency_results = geo_consistency_results  # Geo-level consistency results
+  facility_metadata = data,  
+  geo_consistency_results = geo_consistency_results,  
+  geo_level = GEOLEVEL  
 )
 
 # Ensure consistency data has one row per facility-month by pivoting ratio pairs
