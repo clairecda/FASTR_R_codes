@@ -1,7 +1,7 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100      # Minimum count threshold for consideration
 GEOLEVEL <- "admin_area_3" 
-DQA_INDICATORS <- c("penta1", "opd", "anc1") # Specify which indicators are subjected to DQA (default: opd, penta1, anc1)
+DQA_INDICATORS <- c("penta1") # Specify which indicators are subjected to DQA (default: opd, penta1, anc1)
 
 #------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
@@ -264,7 +264,7 @@ completeness_analysis <- function(data, geo_cols, facility_metadata) {
   
   all_facilities_indicators <- data %>% distinct(facility_id, indicator_common_id)
   
-  # Step 2: Generate full facility-month-indicator coverage **without geo columns**
+  # Step 2: Generate full facility-month-indicator coverage
   complete_month_grid <- all_facilities_indicators %>%
     crossing(all_year_months)
   
@@ -286,9 +286,9 @@ completeness_analysis <- function(data, geo_cols, facility_metadata) {
       completeness_flag = ifelse(!is.na(count) & count > 0, 1, 0)  # Keep 0s where missing
     )
   
-  # Step 5: Smoothing reporting timeframe WITHOUT DROPPING ANY ROWS
+  # Step 5: Smoothing reporting timeframe
   smoothed_data <- expanded_data %>%
-    group_by(facility_id, indicator_common_id) %>%  # **Fix: Group by facility_id + indicator**
+    group_by(facility_id, indicator_common_id) %>%  
     arrange(date) %>%
     mutate(
       first_valid_report = cumsum(completeness_flag) > 0,
@@ -315,11 +315,11 @@ completeness_analysis <- function(data, geo_cols, facility_metadata) {
     ) %>%
     summarise(
       reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Count of reported months
-      completeness_rate = mean(completeness_flag, na.rm = TRUE),  # Proportion completeness per facility-month
+      completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness per facility-month
       .groups = "drop"
     ) %>%
     mutate(
-      completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Final completeness assessment
+      completeness_flag = ifelse(reported_facility_months > 0, 1, 0)    # Final completeness assessment
     )
   
   # Step 7: Fix the many-to-many join issue
@@ -327,7 +327,7 @@ completeness_analysis <- function(data, geo_cols, facility_metadata) {
     select(facility_id, all_of(geo_cols)) %>%
     distinct(facility_id, .keep_all = TRUE)
   
-  # Step 8: Rejoin geo_cols **after ensuring unique facility_id**
+  # Step 8: Rejoin geo_cols
   facility_month_data <- facility_month_data %>%
     left_join(facility_metadata_unique, by = "facility_id")
   
@@ -357,36 +357,47 @@ dqa_with_consistency <- function(
   outlier_data <- outlier_data %>%
     filter(indicator_common_id %in% DQA_INDICATORS)
   
-  # Step 2: Merge Completeness & Outlier Data (Fix: Fill `NA` outlier_flag with `0`)
-  dqa_data <- completeness_data %>%
+  # Step 2: Merge Completeness & Outlier Data at Facility-Month-Indicator Level
+  merged_data <- completeness_data %>%
     left_join(
       outlier_data,
       by = c("facility_id", "year", "month", "indicator_common_id", geo_cols)
     ) %>%
     mutate(
-      outlier_flag = replace_na(outlier_flag, 0),  # Ensure NA is treated as "Not an Outlier"
+      outlier_flag = replace_na(outlier_flag, 0),  # Treat NA as "Not an Outlier"
       completeness_pass = ifelse(completeness_flag == dqa_rules$completeness, 1, 0),
       outlier_pass = ifelse(outlier_flag == dqa_rules$outlier_flag, 1, 0)
     )
   
-  # Step 3: Merge Expanded Consistency Data (Fix: Prevent Many-to-Many Join)
-  dqa_data <- dqa_data %>%
+  # Step 3: Aggregate at Facility-Month Level (Total Points for Completeness & Outlier)
+  dqa_facility_month <- merged_data %>%
+    group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
+    summarise(
+      total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),  # Max 2 points per indicator
+      max_points = 2 * length(DQA_INDICATORS),  # Maximum possible points
+      dqa_outlier_completeness = ifelse(total_indicator_points == max_points, 1, 0),  # Pass if all indicators pass
+      .groups = "drop"
+    )
+  
+  # Step 4: Merge with Consistency Data (Now at Facility-Month Level)
+  dqa_data <- dqa_facility_month %>%
     left_join(consistency_expanded, by = c("facility_id", "year", "month", geo_cols)) %>%
     mutate(across(starts_with("pair_"), ~replace_na(.x, 0)))  # Fill missing consistency scores with 0
   
-  # Step 4: Compute DQA Score Based on All Conditions
+  # Step 5: Compute Final DQA Score Based on All Conditions
   consistency_cols <- setdiff(names(consistency_expanded), c("facility_id", "year", "month", geo_cols))
   
   dqa_data <- dqa_data %>%
     mutate(
       all_pairs_pass = ifelse(rowSums(select(., all_of(consistency_cols)) == 1) == length(consistency_cols), 1, 0),
       dqa_score = ifelse(
-        completeness_pass == 1 & outlier_pass == 1 & all_pairs_pass == 1, 1, 0
+        dqa_outlier_completeness == 1 & all_pairs_pass == 1, 1, 0
       ),
       period_id = as.integer(paste0(year, sprintf("%02d", month)))  # Ensure YYYYMM format
     ) %>%
-    select(all_of(geo_cols), facility_id, year, month, period_id, dqa_score )  %>%
-    distinct()  # Keep only needed columns
+   
+    select(all_of(geo_cols), facility_id, year, month, period_id, dqa_score) %>%
+    #distinct()  # Ensure only one row per facility-month
   
   return(dqa_data)
 }
@@ -514,21 +525,20 @@ if (!is.null(facility_consistency_results)) {
 
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
+print("Saving results from outlier analysis...")
+write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
 
-# print("Saving results from outlier analysis...")
-# write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
-# 
-# if (length(consistency_params$consistency_pairs) > 0) {
-#   print("Saving all data outputs from consistency analysis...")
-#   write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
-#   write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
-# }
-# 
-# 
-# print("Saving results from completeness analysis...")
-# write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
-# 
-# print("Saving results from DQA analysis...")
-# write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
-# 
-# print("DQA Analysis completed. All outputs saved.")
+if (length(consistency_params$consistency_pairs) > 0) {
+  print("Saving all data outputs from consistency analysis...")
+  write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
+  write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
+}
+
+
+print("Saving results from completeness analysis...")
+write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
+
+print("Saving results from DQA analysis...")
+write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
+
+print("DQA Analysis completed. All outputs saved.")
