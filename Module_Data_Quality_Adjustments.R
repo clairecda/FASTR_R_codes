@@ -6,9 +6,8 @@
 #   1. Outliers: Replaces flagged outliers with 12-month rolling averages (excluding outliers).
 #   2. Completeness: Replaces missing count with 12-month rolling averages (excluding outliers).
 
-outlier_data <- read.csv("M1_output_outliers.csv")
-completeness_data <- read.csv("M1_completeness_long_format.csv")
 
+# DATA: guinea_imported_dataset_v2.csv
 
 # -------------------------- KEY OUTPUT ----------------------------------------------------------------------
 # FILE: M2_adjusted_data.csv    # Dataset including facility-level adjusted volumes for all adjustment scenarios.
@@ -20,6 +19,9 @@ library(tidyverse)
 library(data.table)
 library(zoo)  # For rolling averages
 
+data <- read.csv("guinea_imported_dataset_v2.csv")
+outlier_data <- read.csv("M1_output_outliers.csv")
+completeness_data <- read.csv("M1_completeness_long_format.csv")
 
 # Define Functions ------------------------------------------------------------------------------------------
 
@@ -101,6 +103,9 @@ apply_adjustments <- function(data, outlier_data, completeness_data, geo_cols,
 apply_adjustments_scenarios <- function(data, outlier_data, completeness_data) {
   join_cols <- c("facility_id", "indicator_common_id", "year", "month")
   
+  # Detect geo columns dynamically from `completeness_data`
+  geo_cols <- grep("^admin_area_[0-9]+$", colnames(completeness_data), value = TRUE)
+  
   scenarios <- list(
     none = list(adjust_outliers = FALSE, adjust_completeness = FALSE),
     outliers = list(adjust_outliers = TRUE, adjust_completeness = FALSE),
@@ -132,8 +137,19 @@ apply_adjustments_scenarios <- function(data, outlier_data, completeness_data) {
   
   # Ensure completeness rows are kept, even when merging
   df_final <- merge(data, df_adjusted, by = join_cols, all.x = TRUE, all.y = TRUE)
-  df_final <- df_final %>%
-    select(-any_of(c("indicator_label", "mapped_raw_indicator_ids", "count")))
+  
+  # Convert to data.table (Fixing `:=` error)
+  setDT(df_final)
+  
+  # Add geo columns from completeness_data (without duplicates)
+  geo_data <- unique(completeness_data[, c("facility_id", geo_cols), with = FALSE])
+  df_final <- merge(df_final, geo_data, by = "facility_id", all.x = TRUE)
+  
+  # Ensure period_id and quarter_id are correctly computed
+  df_final[, period_id := as.integer(paste0(year, sprintf("%02d", month)))]
+  df_final[, quarter_id := as.integer(paste0(year, ceiling(month / 3)))]
+
+  df_final <- df_final[, !c("count", "indicator_label", "mapped_raw_indicator_ids"), with = FALSE]
   
   return(df_final)
 }
@@ -141,6 +157,12 @@ apply_adjustments_scenarios <- function(data, outlier_data, completeness_data) {
 
 # ------------------- Main Execution ------------------------------------------------------------------------
 print("Running adjustments analysis...")
+data <- read.csv("guinea_imported_dataset_v2.csv")
+geo_cols <- colnames(data) %>% str_subset("^admin_area_[0-9]+$")
+
+# Drop geo columns + period_id + quarter_id from `data`
+data <- data %>% select(-all_of(geo_cols), -period_id, -quarter_id)
+
 
 # Run Adjustment Scenarios
 adjusted_data_final <- apply_adjustments_scenarios(
