@@ -177,6 +177,14 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
       values_fill = list(count = 0)
     )
   
+  
+  print("Checking consistency parameters...")
+  print(paste("Defined consistency pairs:", names(consistency_params$consistency_pairs)))
+  print(paste("Defined consistency ranges:", names(consistency_params$consistency_ranges)))
+  
+  print("Checking available indicators in dataset...")
+  print(unique(data$indicator_common_id))
+  
   # Process each pair in isolation
   pair_results <- list()
   
@@ -372,15 +380,18 @@ dqa_with_consistency <- function(
     group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
       total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),  # Max 2 points per indicator
-      max_points = 2 * length(DQA_INDICATORS),  # Maximum possible points
+      max_points = 2 * length(dqa_indicators_to_use),  # Maximum possible points
       dqa_outlier_completeness = ifelse(total_indicator_points == max_points, 1, 0),  # Pass if all indicators pass
       .groups = "drop"
     )
   
+  
   # Step 4: Merge with Consistency Data (Now at Facility-Month Level)
   dqa_data <- dqa_facility_month %>%
-    left_join(consistency_expanded, by = c("facility_id", "year", "month", geo_cols)) %>%
+    left_join(consistency_expanded %>% select(facility_id, year, month, starts_with("pair_")), 
+              by = c("facility_id", "year", "month")) %>%
     mutate(across(starts_with("pair_"), ~replace_na(.x, 0)))  # Fill missing consistency scores with 0
+  
   
   # Step 5: Compute Final DQA Score Based on All Conditions
   consistency_cols <- setdiff(names(consistency_expanded), c("facility_id", "year", "month", geo_cols))
@@ -395,8 +406,7 @@ dqa_with_consistency <- function(
     ) %>%
    
     select(all_of(geo_cols), facility_id, year, month, period_id, dqa_score) %>%
-    #distinct()  # Ensure only one row per facility-month
-  
+
   return(dqa_data)
 }
 
@@ -433,7 +443,7 @@ dqa_without_consistency <- function(
     group_by(facility_id, year, month, !!!syms(geo_cols)) %>%
     summarise(
       total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),
-      max_points = 2 * length(DQA_INDICATORS),  # Max points per indicator
+      max_points = 2 * length(dqa_indicators_to_use),  # Max points per indicator
       dqa_score = ifelse(total_indicator_points == max_points, 1, 0),
       .groups = "drop"
     )
@@ -502,6 +512,7 @@ consistency_expanded <- facility_consistency_results %>%
     values_from = sconsistency, 
     values_fill = list(sconsistency = 0)
   ) %>%
+  mutate(across(where(is.numeric), ~ replace_na(.x, 0))) %>%  # Ensure no remaining NAs
   distinct(facility_id, year, month, .keep_all = TRUE)
 
 # Restore geo_cols AFTER pivoting to avoid duplication issues
@@ -541,7 +552,6 @@ if (length(consistency_params$consistency_pairs) > 0) {
   write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
   write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
 }
-
 
 print("Saving results from completeness analysis...")
 write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
