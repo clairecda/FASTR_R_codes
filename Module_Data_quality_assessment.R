@@ -449,7 +449,7 @@ geo_cols <- inputs$geo_cols
 
 # Validate Consistency Pairs
 consistency_params <- validate_consistency_pairs(consistency_params, data)
-# Validate the DQA indicators 
+
 # Load and preprocess data
 inputs <- load_and_preprocess_data("guinea_imported_dataset_v2.csv")
 data <- inputs$data
