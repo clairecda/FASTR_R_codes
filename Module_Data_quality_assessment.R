@@ -20,7 +20,7 @@ DQA_INDICATORS <- c("penta1", "anc1", "opd")
 # Outlier Analysis Parameters
 outlier_params <- list(
   outlier_pc_threshold = OUTLIER_PROPORTION_THRESHOLD,  # Threshold for proportional contribution to flag outliers
-  count_threshold = MINIMUM_COUNT_THRESHOLD        # Minimum count to consider for outlier adjustment
+  count_threshold = MINIMUM_COUNT_THRESHOLD             # Minimum count to consider for outlier adjustment
 )
 
 geo_level <- GEOLEVEL
@@ -30,12 +30,12 @@ geo_level <- GEOLEVEL
 # Consistency Analysis Parameters 
 consistency_params <- list(
   consistency_pairs = list(
-    pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
+    #pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
     pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
     pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
   ),
   consistency_ranges = list(
-    pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
+    #pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
     pair_penta = c(lower = 1, upper = Inf),       # Penta1 / Penta3 > 1
     pair_anc = c(lower = 1, upper = Inf)          # ANC1 / ANC4 > 1
   )
@@ -106,14 +106,14 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   # Step 1: Calculate Median Volume
   print("Calculating median volume per facility and indicator...")
   data <- data %>%
-    group_by(facility_id, indicator_common_id, period_id, quarter_id) %>%
+    group_by(facility_id, indicator_common_id) %>%
     mutate(median_volume = median(count, na.rm = TRUE)) %>%
     ungroup()
   
   # Step 2: Calculate MAD and Identify Outliers
   print("Calculating MAD and identifying outliers...")
   data <- data %>%
-    group_by(facility_id, indicator_common_id, period_id, quarter_id) %>%
+    group_by(facility_id, indicator_common_id) %>%
     mutate(
       mad_volume = ifelse(!is.na(count), mad(count[count >= median_volume], na.rm = TRUE), NA),
       mad_residual = ifelse(!is.na(mad_volume) & mad_volume > 0, abs(count - median_volume) / mad_volume, NA),
@@ -124,7 +124,7 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   # Step 3: Calculate Proportional Contribution and Identify Outliers
   print("Calculating proportional contribution and flagging outliers...")
   data <- data %>%
-    group_by(facility_id, indicator_common_id, year, period_id, quarter_id) %>%
+    group_by(facility_id, indicator_common_id, year) %>%
     mutate(
       pc = count / sum(count, na.rm = TRUE),  # Calculate proportional contribution
       outlier_pc = ifelse(!is.na(pc) & pc > outlier_params$outlier_pc_threshold, 1, 0)  # Flag based on threshold
@@ -140,12 +140,17 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
       )  # Combine MAD and proportional contribution
     )
   
-  # Step 5: Output Only Outlier Data
-  print("Returning dataset with outliers flagged...")
+  # Step 5: Select relevant columns for output
+  print("Selecting relevant columns for output...")
   outlier_data <- data %>%
-    mutate(period_id = as.integer(paste0(year, sprintf("%02d", month)))) %>%
-    select(facility_id, all_of(geo_cols), indicator_common_id, year, month, period_id, quarter_id, count, 
-           median_volume, mad_volume, mad_residual, pc, outlier_flag)
+    select(facility_id, all_of(geo_cols), indicator_common_id, year, month, count, 
+           median_volume, mad_volume, mad_residual, outlier_mad, pc, outlier_flag)
+  
+  # Step 6: Bring back period_id and quarter_id from original data
+  print("Merging period_id and quarter_id back into outlier data...")
+  outlier_data <- outlier_data %>%
+    left_join(data %>% select(facility_id, indicator_common_id, year, month, period_id, quarter_id),
+              by = c("facility_id", "indicator_common_id", "year", "month"))
   
   return(outlier_data)
 }
@@ -177,11 +182,6 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
       values_fill = list(count = 0)
     )
   
-  
-  print("Checking consistency parameters...")
-  print(paste("Defined consistency pairs:", names(consistency_params$consistency_pairs)))
-  print(paste("Defined consistency ranges:", names(consistency_params$consistency_ranges)))
-  
   print("Checking available indicators in dataset...")
   print(unique(data$indicator_common_id))
   
@@ -193,25 +193,52 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
     col1 <- pair[1]
     col2 <- pair[2]
     
+    # Ensure both indicators exist in `wide_data`
     if (all(c(col1, col2) %in% colnames(wide_data))) {
-      # Retrieve consistency range for the current pair
-      range <- consistency_ranges[[pair_name]]
-      lower_bound <- range["lower"]
-      upper_bound <- range["upper"]
+      print(paste("Processing pair:", pair_name, "-", col1, "/", col2))
       
+      # Retrieve consistency range for the current pair
+      if (pair_name %in% names(consistency_ranges)) {
+        range <- consistency_ranges[[pair_name]]
+        
+        # Extract lower and upper bounds correctly
+        if (is.list(range)) {
+          lower_bound <- range$lower
+          upper_bound <- range$upper
+        } else if (is.vector(range) && !is.null(names(range))) {
+          lower_bound <- as.numeric(range["lower"])
+          upper_bound <- as.numeric(range["upper"])
+        } else {
+          warning(paste("Unexpected range structure for:", pair_name))
+          lower_bound <- NA_real_
+          upper_bound <- NA_real_
+        }
+      } else {
+        warning(paste("No range found for pair:", pair_name))
+        lower_bound <- NA_real_
+        upper_bound <- NA_real_
+      }
+      
+      # Compute consistency ratios and flag consistency
       pair_data <- wide_data %>%
         mutate(
           ratio_type = pair_name,
-          consistency_ratio = if_else(!!sym(col2) > 0, !!sym(col1) / !!sym(col2), NA_real_),
+          consistency_ratio = if_else(
+            !!sym(col2) > 0, 
+            !!sym(col1) / !!sym(col2), 
+            NA_real_
+          ),
           sconsistency = case_when(
             !is.na(consistency_ratio) & consistency_ratio >= lower_bound & consistency_ratio <= upper_bound ~ 1,
             !is.na(consistency_ratio) ~ 0,
-            TRUE ~ NA_real_
+            TRUE ~ NA_integer_
           )
         ) %>%
         select(all_of(c(geo_cols, "year", "month", "period_id", "quarter_id", "ratio_type", "consistency_ratio", "sconsistency")))
       
       pair_results[[pair_name]] <- pair_data
+    } else {
+      print(paste("Skipping pair - missing columns:", col1, col2))
     }
   }
   
@@ -221,16 +248,6 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   # Ensure `sconsistency` is converted to integer
   combined_data <- combined_data %>%
     mutate(sconsistency = as.integer(sconsistency))
-  
-  # Add `range` field showing the start and end month for each year
-  combined_data <- combined_data %>%
-    group_by(across(all_of(c(geo_cols, "year", "ratio_type")))) %>%
-    mutate(
-      start_month = min(month, na.rm = TRUE),
-      end_month = max(month, na.rm = TRUE),
-      range = paste0(year, sprintf("%02d", start_month), " - ", year, sprintf("%02d", end_month))
-    ) %>%
-    ungroup()
   
   return(combined_data)
 }
@@ -544,19 +561,19 @@ if (!is.null(facility_consistency_results)) {
 }
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
-print("Saving results from outlier analysis...")
-write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
-
-if (length(consistency_params$consistency_pairs) > 0) {
-  print("Saving all data outputs from consistency analysis...")
-  write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
-  write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
-}
-
-print("Saving results from completeness analysis...")
-write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
-
-print("Saving results from DQA analysis...")
-write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
-
-print("DQA Analysis completed. All outputs saved.")
+# print("Saving results from outlier analysis...")
+# write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
+# 
+# if (length(consistency_params$consistency_pairs) > 0) {
+#   print("Saving all data outputs from consistency analysis...")
+#   write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
+#   write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
+# }
+# 
+# print("Saving results from completeness analysis...")
+# write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
+# 
+# print("Saving results from DQA analysis...")
+# write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
+# 
+# print("DQA Analysis completed. All outputs saved.")
