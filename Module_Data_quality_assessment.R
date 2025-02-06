@@ -13,10 +13,9 @@ DQA_INDICATORS <- c("penta1") # Specify which indicators are subjected to DQA (d
 # to performing the DQA without including consistency checks.
 
 
-# DATA: guinea_imported_dataset.csv
+# DATA: guinea_imported_dataset_v2.csv
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
-
 # ------------------------------------------------------------------------------------------------------------
 # Outlier Analysis Parameters
 outlier_params <- list(
@@ -102,14 +101,14 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   # Step 1: Calculate Median Volume
   print("Calculating median volume per facility and indicator...")
   data <- data %>%
-    group_by(facility_id, indicator_common_id) %>%
+    group_by(facility_id, indicator_common_id, period_id, quarter_id) %>%
     mutate(median_volume = median(count, na.rm = TRUE)) %>%
     ungroup()
   
   # Step 2: Calculate MAD and Identify Outliers
   print("Calculating MAD and identifying outliers...")
   data <- data %>%
-    group_by(facility_id, indicator_common_id) %>%
+    group_by(facility_id, indicator_common_id, period_id, quarter_id) %>%
     mutate(
       mad_volume = ifelse(!is.na(count), mad(count[count >= median_volume], na.rm = TRUE), NA),
       mad_residual = ifelse(!is.na(mad_volume) & mad_volume > 0, abs(count - median_volume) / mad_volume, NA),
@@ -120,7 +119,7 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   # Step 3: Calculate Proportional Contribution and Identify Outliers
   print("Calculating proportional contribution and flagging outliers...")
   data <- data %>%
-    group_by(facility_id, indicator_common_id, year) %>%
+    group_by(facility_id, indicator_common_id, year, period_id, quarter_id) %>%
     mutate(
       pc = count / sum(count, na.rm = TRUE),  # Calculate proportional contribution
       outlier_pc = ifelse(!is.na(pc) & pc > outlier_params$outlier_pc_threshold, 1, 0)  # Flag based on threshold
@@ -139,12 +138,13 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   # Step 5: Output Only Outlier Data
   print("Returning dataset with outliers flagged...")
   outlier_data <- data %>%
-    mutate(period_id = as.integer(paste0(year, sprintf("%02d", month))),) %>%
-    select(facility_id, geo_cols, indicator_common_id, year, month, period_id, count, median_volume, 
-           mad_volume, mad_residual, pc, outlier_flag)
+    mutate(period_id = as.integer(paste0(year, sprintf("%02d", month)))) %>%
+    select(facility_id, all_of(geo_cols), indicator_common_id, year, month, period_id, quarter_id, count, 
+           median_volume, mad_volume, mad_residual, pc, outlier_flag)
   
   return(outlier_data)
 }
+
 
 # PART 2-A Consistency Analysis - Geo Level -----------------------------------------------------------------
 geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
@@ -160,13 +160,13 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   
   # Aggregate data at geographic level
   aggregated_data <- data %>%
-    group_by(across(all_of(c(geo_cols, "indicator_common_id", "year", "month")))) %>%
+    group_by(across(all_of(c(geo_cols, "indicator_common_id", "year", "month", "period_id", "quarter_id")))) %>%
     summarise(count = sum(count, na.rm = TRUE), .groups = "drop")
   
   # Pivot to wide format
   wide_data <- aggregated_data %>%
     pivot_wider(
-      id_cols = c(geo_cols, "year", "month"),
+      id_cols = c(geo_cols, "year", "month", "period_id", "quarter_id"),
       names_from = "indicator_common_id",
       values_from = "count",
       values_fill = list(count = 0)
@@ -174,7 +174,6 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   
   # Process each pair in isolation
   pair_results <- list()
-  
   
   for (pair_name in names(required_pairs)) {
     pair <- required_pairs[[pair_name]]
@@ -196,8 +195,8 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
             !is.na(consistency_ratio) ~ 0,
             TRUE ~ NA_real_
           )
-        )  %>%
-        select(all_of(c(geo_cols, "year", "month", "ratio_type", "consistency_ratio", "sconsistency")))
+        ) %>%
+        select(all_of(c(geo_cols, "year", "month", "period_id", "quarter_id", "ratio_type", "consistency_ratio", "sconsistency")))
       
       pair_results[[pair_name]] <- pair_data
     }
@@ -438,7 +437,7 @@ dqa_without_consistency <- function(
 }
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset.csv")
+inputs <- load_and_preprocess_data("guinea_imported_dataset_v2.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
