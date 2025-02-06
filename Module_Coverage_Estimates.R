@@ -245,7 +245,7 @@ calculate_denominators <- function(data) {
       danc1_livebirth = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                                     (countanc1 / (anc1carry / 100)) * 
                                                       (1 - PREGNANCY_LOSS_RATE) * 
-                                                      (1 + TWIN_RATE) * 
+                                                      (1 - (TWIN_RATE / 2)) *
                                                       (1 - STILLBIRTH_RATE),
                                                     NA_real_)),
       
@@ -260,7 +260,7 @@ calculate_denominators <- function(data) {
       danc1_mcv = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                               (countanc1 / (anc1carry / 100)) * 
                                                 (1 - PREGNANCY_LOSS_RATE) *
-                                                (1 + TWIN_RATE) * 
+                                                (1 - (TWIN_RATE / 2)) *
                                                 (1 - STILLBIRTH_RATE) *
                                                 (1 - INFANT_MORTALITY_RATE),
                                               NA_real_)),
@@ -659,7 +659,17 @@ prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_ta
       values_from = coverage,
       names_prefix = "coverage_",
       values_fill = NA
-    )
+    ) %>%
+    mutate(
+      coverage_official_estimate = coverage_official_estimate / 100,
+      coverage_avgsurveyprojection = coverage_avgsurveyprojection / 100,
+      coverage_cov = coverage_cov / 100
+    ) %>%
+    
+    #PLACEHOLDER FILTER TO DROP ROWS WITH NAs in.... and drop col coverage count...
+    
+    filter(!(is.na(coverage_official_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) %>%
+    select(-coverage_count)  # Remove coverage_count column
   
   return(combined_data_wide)
 }
@@ -672,10 +682,10 @@ hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevan
 # 2. Aggregate HMIS Data to Annual Level
 print("aggregate HMIS adjusted volume to annual level...")
 annual_hmis <- adjusted_volume %>%
-  select(admin_area_1, year, indicator_common_id, count, month) %>%  
+  select(admin_area_1, year, indicator_common_id, count_final_both, month) %>%  
   group_by(admin_area_1, year, indicator_common_id) %>%
   summarise(
-    count = sum(count, na.rm = TRUE),  # Sum counts across all months
+    count = sum(count_final_both, na.rm = TRUE),  # Sum counts across all months
     .groups = "drop"
   )
 
@@ -702,7 +712,6 @@ annual_hmis <- annual_hmis %>%
   arrange(admin_area_1, year)
 
 # 3. Adjust Names for Consistency
-
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
 
 # 4. Apply Filtering to Ensure Only Relevant Countries are Included
@@ -770,3 +779,4 @@ combined_data <- prepare_combined_coverage_data(data_survey, annual_hmis, covera
 print("Save the results..")
 write.csv(combined_data, "M4_Coverage_Estimation.csv", row.names = FALSE)
 
+# remove now the empty coverage rows like opd
