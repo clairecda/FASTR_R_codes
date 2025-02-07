@@ -186,7 +186,7 @@ apply_adjustments_scenarios <- function(completeness_data, outlier_data) {
   
   # Ensure period_id and quarter_id are correctly computed
   df_adjusted[, period_id := as.integer(paste0(year, sprintf("%02d", month)))]
-  df_adjusted[, quarter_id := as.integer(paste0(year, sprintf("%02d", (month - 1) %/% 3 + 1)))]  # yyyyQQ format
+  df_adjusted[, quarter_id := as.integer(paste0(year, sprintf("%02d", (month - 1) %/% 3 + 1)))]
   
   # FIX: Ensure geo_cols are reattached correctly
   df_adjusted <- df_adjusted %>%
@@ -197,9 +197,6 @@ apply_adjustments_scenarios <- function(completeness_data, outlier_data) {
 
 # ------------------- Main Execution ------------------------------------------------------------------------
 print("Running adjustments analysis...")
-geo_cols <- colnames(data) %>% str_subset("^admin_area_[0-9]+$")
-
-
 
 # Run Adjustment Scenarios
 adjusted_data_final <- apply_adjustments_scenarios(
@@ -207,10 +204,19 @@ adjusted_data_final <- apply_adjustments_scenarios(
   completeness_data = completeness_data
 )
 
+geo_cols <- colnames(adjusted_data_final) %>% str_subset("^admin_area_[0-9]+$")
+lowest_geo_level <- if (length(geo_cols) > 0) {
+  geo_cols[which.max(as.numeric(str_extract(geo_cols, "[0-9]+")))]  # Extract and find the highest admin level
+} else {
+  stop("No geographic levels detected in the dataset!")
+}
+
+GEOLEVEL <- lowest_geo_level
+print(paste("Detected lowest geographic level:", GEOLEVEL))
 
 # Aggregate data at the lowest available admin area level
 adjusted_data_admin_area_final <- adjusted_data_final %>%
-  group_by(across(all_of(geo_cols)),year, month, period_id, quarter_id) %>%
+  group_by(across(all_of(GEOLEVEL)),indicator_common_id, year, month, period_id, quarter_id) %>%
   summarise(
     count_final_none = sum(count_final_none, na.rm = TRUE),
     count_final_outliers = sum(count_final_outliers, na.rm = TRUE),
@@ -221,7 +227,7 @@ adjusted_data_admin_area_final <- adjusted_data_final %>%
 
 # Aggregate data at annual level
 adjusted_data_national_final <- adjusted_data_final %>%  
-  group_by(across(all_of(geo_cols)), year, month, period_id, quarter_id) %>%
+  group_by(admin_area_1, indicator_common_id, year, month, period_id, quarter_id) %>%
   summarise(
     count_final_none = sum(count_final_none, na.rm = TRUE),
     count_final_outliers = sum(count_final_outliers, na.rm = TRUE),
