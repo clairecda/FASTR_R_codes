@@ -157,7 +157,6 @@ apply_adjustments_scenarios <- function(data, outlier_data, completeness_data) {
 
 # ------------------- Main Execution ------------------------------------------------------------------------
 print("Running adjustments analysis...")
-data <- read.csv("guinea_imported_dataset_v2.csv")
 geo_cols <- colnames(data) %>% str_subset("^admin_area_[0-9]+$")
 
 # Drop geo columns + period_id + quarter_id from `data`
