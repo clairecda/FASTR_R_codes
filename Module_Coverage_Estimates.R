@@ -1,6 +1,4 @@
 SELECTED_COUNT_VARIABLE <- "count_final_both"  # Options: "count_final_none", "count_final_outlier", "count_final_completeness", "count_final_both"
-VALID_COUNT_VARIABLES <- c("count_final_none", "count_final_outlier", "count_final_completeness", "count_final_both")
-
 
 CURRENT_YEAR <- as.numeric(format(Sys.Date(), "%Y"))  # Dynamically get current year
 MIN_YEAR <- 2000  # Set a fixed minimum year for filtering
