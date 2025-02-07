@@ -406,10 +406,10 @@ dqa_with_consistency <- function(
     summarise(
       total_indicator_points = sum(completeness_pass + outlier_pass, na.rm = TRUE),  # Max 2 points per indicator
       max_points = 2 * length(dqa_indicators_to_use),  # Maximum possible points
-      dqa_outlier_completeness = ifelse(total_indicator_points == max_points, 1, 0),  # Pass if all indicators pass
+      completeness_outlier_score = total_indicator_points / max_points,  # NEW: Normalized completeness/outlier score
+      dqa_outlier_completeness = ifelse(total_indicator_points == max_points, 1, 0),  # Binary pass/fail
       .groups = "drop"
     )
-  
   
   # Step 4: Merge with Consistency Data (Now at Facility-Month Level)
   dqa_data <- dqa_facility_month %>%
@@ -425,20 +425,26 @@ dqa_with_consistency <- function(
   # Step 5: Compute Final DQA Score Based on All Conditions
   consistency_cols <- setdiff(names(consistency_expanded), c("facility_id", "year", "month", geo_cols, "pair_delivery"))
   
-
   dqa_data <- dqa_data %>%
     mutate(
-      all_pairs_pass = ifelse(rowSums(select(., all_of(consistency_cols)) == 1) == length(consistency_cols), 1, 0),
-      dqa_score = ifelse(
-        dqa_outlier_completeness == 1 & all_pairs_pass == 1, 1, 0
-      ),
+      total_consistency_pass = rowSums(select(., all_of(consistency_cols)) == 1, na.rm = TRUE),  # Count consistency passes
+      max_consistency_checks = length(consistency_cols),  # Total consistency checks available
+      consistency_score = ifelse(max_consistency_checks > 0, total_consistency_pass / max_consistency_checks, NA),  # Normalized
+      
+      all_pairs_pass = ifelse(total_consistency_pass == max_consistency_checks, 1, 0),  # Binary pass/fail for consistency
+      
+      dqa_mean = (completeness_outlier_score + consistency_score) / 2,
+      dqa_score = ifelse(dqa_outlier_completeness == 1 & all_pairs_pass == 1, 1, 0),  # Binary DQA score (1=pass, 0=fail)
+      
       period_id = as.integer(paste0(year, sprintf("%02d", month)))  # Ensure YYYYMM format
     ) %>%
-   
-    select(all_of(geo_cols), facility_id, year, month, period_id, dqa_score) %>%
-
+    
+    select(all_of(geo_cols), facility_id, year, month, period_id, 
+           completeness_outlier_score, consistency_score, dqa_mean, dqa_score)  # Include all new scores
+  
   return(dqa_data)
 }
+
 
 # DQA Function Excluding Consistency Checks
 dqa_without_consistency <- function(
@@ -490,10 +496,6 @@ geo_cols <- inputs$geo_cols
 # Validate Consistency Pairs
 consistency_params <- validate_consistency_pairs(consistency_params, data)
 
-# Load and preprocess data
-inputs <- load_and_preprocess_data("guinea_imported_dataset_v2.csv")
-data <- inputs$data
-geo_cols <- inputs$geo_cols
 
 # Dynamically set DQA_INDICATORS based on available indicators
 dqa_indicators_to_use <- intersect(DQA_INDICATORS, unique(data$indicator_common_id))
