@@ -1,6 +1,6 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
-GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
+GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 #------------------------------------------------------------------------------
@@ -28,12 +28,12 @@ geo_level <- GEOLEVEL
 # Consistency Analysis Parameters 
 consistency_params <- list(
   consistency_pairs = list(
-    #pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
+    pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
     pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
     pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
   ),
   consistency_ranges = list(
-    #pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
+    pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
     pair_penta = c(lower = 1, upper = Inf),       # Penta1 / Penta3 > 1
     pair_anc = c(lower = 1, upper = Inf)          # ANC1 / ANC4 > 1
   )
@@ -250,9 +250,20 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   return(combined_data)
 }
 
+
+
 expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consistency_results, geo_level) {
   print(paste("Expanding geo-level consistency results using:", geo_level, "..."))
+  # Detect all available geographic levels in `facility_metadata`
+  available_geo_levels <- grep("^admin_area_[0-9]+$", colnames(facility_metadata), value = TRUE)
   
+  # Ensure the chosen geo_level exists, fallback to the lowest available level if missing
+  if (!(geo_level %in% available_geo_levels)) {
+    geo_level <- tail(sort(available_geo_levels), 1)  # Pick the lowest available (highest number)
+    print(paste("Chosen geo_level not found! Falling back to:", geo_level))
+  } else {
+    print(paste("Using user-specified geo_level:", geo_level))
+  }
   # Step 1: Extract facility list with the specified geographic level
   facility_list <- facility_metadata %>%
     select(facility_id, all_of(geo_level)) %>%
@@ -406,12 +417,17 @@ dqa_with_consistency <- function(
   dqa_data <- dqa_facility_month %>%
     left_join(consistency_expanded %>% select(facility_id, year, month, starts_with("pair_")), 
               by = c("facility_id", "year", "month")) %>%
-    mutate(across(starts_with("pair_"), ~replace_na(.x, 0)))  # Fill missing consistency scores with 0
+    mutate(across(starts_with("pair_"), ~replace_na(.x, 0)))   # Fill missing consistency scores with 0
   
+  # Step 4B: Drop "pair_delivery" if it exists
+  if ("pair_delivery" %in% colnames(dqa_data)) {
+    dqa_data <- dqa_data %>% select(-pair_delivery)
+  }
   
   # Step 5: Compute Final DQA Score Based on All Conditions
-  consistency_cols <- setdiff(names(consistency_expanded), c("facility_id", "year", "month", geo_cols))
+  consistency_cols <- setdiff(names(consistency_expanded), c("facility_id", "year", "month", geo_cols, "pair_delivery"))
   
+
   dqa_data <- dqa_data %>%
     mutate(
       all_pairs_pass = ifelse(rowSums(select(., all_of(consistency_cols)) == 1) == length(consistency_cols), 1, 0),
