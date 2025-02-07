@@ -250,8 +250,6 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   return(combined_data)
 }
 
-
-
 expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consistency_results, geo_level) {
   print(paste("Expanding geo-level consistency results using:", geo_level, "..."))
   # Detect all available geographic levels in `facility_metadata`
