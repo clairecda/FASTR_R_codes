@@ -229,9 +229,10 @@ calculate_denominators <- function(data) {
   data <- data %>%
     mutate(
       # ANC1 Denominators
-      danc1_pregnancy = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
-                                                    countanc1 / (anc1carry / 100),
-                                                    NA_real_)),
+      
+      # danc1_pregnancy = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
+      #                                               countanc1 / (anc1carry / 100),
+      #                                               NA_real_)),
       
       danc1_livebirth = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                                     (countanc1 / (anc1carry / 100)) * 
@@ -262,11 +263,11 @@ calculate_denominators <- function(data) {
                                                               (1 - PREGNANCY_LOSS_RATE),
                                                             NA_real_)),
       
-      ddelivery_livebirth = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-                                                            (countdelivery / (deliverycarry / 100)) * 
-                                                              (1 + TWIN_RATE) * 
-                                                              (1 - STILLBIRTH_RATE),
-                                                            NA_real_)),
+      # ddelivery_livebirth = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+      #                                                       (countdelivery / (deliverycarry / 100)) * 
+      #                                                         (1 + TWIN_RATE) * 
+      #                                                         (1 - STILLBIRTH_RATE),
+      #                                                       NA_real_)),
       
       ddelivery_dpt = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
                                                       (countdelivery / (deliverycarry / 100)) * 
@@ -290,9 +291,9 @@ calculate_denominators <- function(data) {
                                                     (1 - STILLBIRTH_RATE),
                                                   NA_real_)),
       
-      dbcg_livebirth = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
-                                                  countbcg / (bcgcarry / 100),
-                                                  NA_real_)),
+      # dbcg_livebirth = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
+      #                                             countbcg / (bcgcarry / 100),
+      #                                             NA_real_)),
       
       dbcg_dpt = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
                                             (countbcg / (bcgcarry / 100)) * (1 - NEONATAL_MORTALITY_RATE),
@@ -319,9 +320,9 @@ calculate_denominators <- function(data) {
                                                           (1 - NEONATAL_MORTALITY_RATE),
                                                         NA_real_)),
       
-      dpenta1_dpt = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
-                                                  countpenta1 / (penta1carry / 100),
-                                                  NA_real_)),
+      # dpenta1_dpt = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
+      #                                             countpenta1 / (penta1carry / 100),
+      #                                             NA_real_)),
       
       dpenta1_mcv = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
                                                   (countpenta1 / (penta1carry / 100)) * (1 - POSTNEONATAL_MORTALITY_RATE),
@@ -337,14 +338,16 @@ calculate_denominators <- function(data) {
         coverage_adjustment = if_else(year == most_recent_year & nummonth < 12, 12 / nummonth, 1),
         
         # Adjust denominators for the most recent year
-        danc1_pregnancy = if_else(year == most_recent_year, danc1_pregnancy * coverage_adjustment, danc1_pregnancy),
+        #danc1_pregnancy = if_else(year == most_recent_year, danc1_pregnancy * coverage_adjustment, danc1_pregnancy),
         danc1_livebirth = if_else(year == most_recent_year, danc1_livebirth * coverage_adjustment, danc1_livebirth),
         ddelivery_pregnancy = if_else(year == most_recent_year, ddelivery_pregnancy * coverage_adjustment, ddelivery_pregnancy),
-        ddelivery_livebirth = if_else(year == most_recent_year, ddelivery_livebirth * coverage_adjustment, ddelivery_livebirth),
+        #ddelivery_livebirth = if_else(year == most_recent_year, ddelivery_livebirth * coverage_adjustment, ddelivery_livebirth),
         dbcg_pregnancy = if_else(year == most_recent_year, dbcg_pregnancy * coverage_adjustment, dbcg_pregnancy),
-        dbcg_livebirth = if_else(year == most_recent_year, dbcg_livebirth * coverage_adjustment, dbcg_livebirth),
+        #dbcg_livebirth = if_else(year == most_recent_year, dbcg_livebirth * coverage_adjustment, dbcg_livebirth),
         dpenta1_pregnancy = if_else(year == most_recent_year, dpenta1_pregnancy * coverage_adjustment, dpenta1_pregnancy),
-        dpenta1_livebirth = if_else(year == most_recent_year, dpenta1_livebirth * coverage_adjustment, dpenta1_livebirth)
+        dpenta1_livebirth = if_else(year == most_recent_year, dpenta1_livebirth * coverage_adjustment, dpenta1_livebirth),
+        #dpenta1_dpt = if_else(year == most_recent_year, dpenta1_dpt * coverage_adjustment, dpenta1_dpt),
+        dpenta1_mcv = if_else(year == most_recent_year, dpenta1_mcv * coverage_adjustment, dpenta1_mcv)
       ) %>%
       ungroup() %>%
       select(-most_recent_year, -coverage_adjustment)
