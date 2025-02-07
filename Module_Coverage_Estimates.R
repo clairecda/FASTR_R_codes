@@ -1,19 +1,16 @@
 SELECTED_COUNT_VARIABLE <- "count_final_both"  # Options: "count_final_none", "count_final_outlier", "count_final_completeness", "count_final_both"
 VALID_COUNT_VARIABLES <- c("count_final_none", "count_final_outlier", "count_final_completeness", "count_final_both")
 
+
 CURRENT_YEAR <- as.numeric(format(Sys.Date(), "%Y"))  # Dynamically get current year
 MIN_YEAR <- 2000  # Set a fixed minimum year for filtering
 
-PREGNANCY_LOSS_RATE <- 0.03      
-TWIN_RATE <- 0.015               
-STILLBIRTH_RATE <- 0.02          
-NEONATAL_MORTALITY_RATE <- 0.03  
-POSTNEONATAL_MORTALITY_RATE <- 0.02  
+PREGNANCY_LOSS_RATE <- 0.03
+TWIN_RATE <- 0.015       
+STILLBIRTH_RATE <- 0.02
+NEONATAL_MORTALITY_RATE <- 0.03
+POSTNEONATAL_MORTALITY_RATE <- 0.02
 INFANT_MORTALITY_RATE <- 0.05   
-
-
-
-library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL DATA LOADING once the xtra datasets load in platform
 
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Jan 31
@@ -31,13 +28,15 @@ library(haven)      # For reading Stata .dta files -- !!!!! REMOVE THIS AND ALL 
 
 
 # ------------------------------ Load Required Libraries -------------------------
-library(tidyverse)  # For data manipulation and visualization
-library(zoo)        # For carryforward functionality
-library(data.table) # For coverage calculations
+library(dplyr)       # For `mutate()`, `group_by()`, `summarise()`, `filter()`, `arrange()`
+library(tidyr)       # For `pivot_longer()`, `pivot_wider()`, `complete()`
+library(zoo)         # For `na.locf()` in `carry_forward_survey_data()`
+library(stringr)     # For `str_subset()` to detect `geo_cols`
+library(haven)       # For reading `.dta` Stata files
 
 # ------------------------------ Define File Paths -------------------------------
 # Input Datasets
-adjusted_volume_data <- read.csv("M2_adjusted_data.csv")
+adjusted_volume_data <- read.csv("M2_adjusted_data_national.csv")
 wpp_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/UNWPP/WPP.dta"
 mics_data_path       <- "~/Desktop/FASTR/Coverage_Analysis/MICS/MICS.dta"
 dhs_data_path        <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS.dta"
@@ -66,35 +65,21 @@ adjust_names_for_merging <- function(data, column, replacements) {
 map_adjusted_volumes <- function(data) {
   expected_indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")
   
-  # Add missing indicators with NA values if they do not exist
+  # Ensure all expected indicators exist
   missing_indicators <- setdiff(expected_indicators, unique(data$indicator_common_id))
   if (length(missing_indicators) > 0) {
-    warning("The following indicators are missing from the dataset: ", 
-            paste(missing_indicators, collapse = ", "))
-    for (indicator in missing_indicators) {
-      data <- data %>%
-        mutate(!!paste0("count", indicator) := NA_real_)
-    }
+    warning("The following indicators are missing from the dataset: ", paste(missing_indicators, collapse = ", "))
   }
   
-  # Map the existing indicators dynamically using SELECTED_COUNT_VARIABLE
+  # Keep `indicator_common_id` and dynamically rename `SELECTED_COUNT_VARIABLE` to `count`
   data <- data %>%
-    mutate(
-      countanc1 = if_else(indicator_common_id == "anc1", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countanc4 = if_else(indicator_common_id == "anc4", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countdelivery = if_else(indicator_common_id == "delivery", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countbcg = if_else(indicator_common_id == "bcg", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countpenta1 = if_else(indicator_common_id == "penta1", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countpenta3 = if_else(indicator_common_id == "penta3", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countnmr = if_else(indicator_common_id == "nmr", !!sym(SELECTED_COUNT_VARIABLE), NA_real_),
-      countimr = if_else(indicator_common_id == "imr", !!sym(SELECTED_COUNT_VARIABLE), NA_real_)
-    )
-  
-  data <- data %>%
-    arrange(admin_area_1, year, indicator_common_id)
+    mutate(count = !!sym(SELECTED_COUNT_VARIABLE)) %>%  # Assign selected count variable to "count"
+    select(admin_area_1, year, month, indicator_common_id, count) %>%  # Keep only necessary columns
+    arrange(admin_area_1, year, month, indicator_common_id)
   
   return(data)
 }
+
 
 
 # PART 3 - Extend Survey Data for Missing Years -----------------------------------
@@ -182,6 +167,14 @@ carry_forward_survey_data <- function(data) {
     return(data)
   }
   
+  for (var in existing_vars) {
+    original_var <- paste0(var, "_original")
+    
+    if (!(original_var %in% colnames(data))) {  # Only create if not already existing
+      data[[original_var]] <- data[[var]]
+    }
+  }
+  
   data <- data %>%
     arrange(admin_area_1, year) %>%  # Ensure data is sorted correctly
     group_by(admin_area_1) %>%       # Group by admin area for correct carryforward
@@ -196,6 +189,10 @@ carry_forward_survey_data <- function(data) {
   
   return(data)
 }
+
+# idea.. duplicate cols to preserve the OG avgsurvey_anc1 - which give us the time points where we had data...
+# then on that column after we have calculated coverage on hmis (after PART 7) we need to carry that back to fill year after 
+# last survey in the OG avgsurvey_anc1
 
 # PART 5.2 - Assign Carried Survey Data -------------------------------------------
 assign_carried_survey_data <- function(data) {
@@ -582,6 +579,7 @@ detect_coverage_delta <- function(best_coverage) {
   return(coverage_table)
 }
 
+
 # Function to calculate avg survey projections based on coverage deltas and reference values
 calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
   
@@ -613,45 +611,56 @@ prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_ta
                  names_to = "indicator_common_id", 
                  values_to = "coverage") %>%
     mutate(source = "official_estimate",
-           # Clean indicator names by removing "avgsurvey_" prefix
            indicator_common_id = gsub("avgsurvey_", "", indicator_common_id)) %>%
-    filter(!indicator_common_id %in% c("nmr", "imr")) %>%
+    filter(!grepl("_original", indicator_common_id)) %>%
     select(admin_area_1, year, indicator_common_id, coverage, source)
   
-  # 2. Transform annual HMIS data
+  # 2. Process `_original` values
+  original_estimate_long <- data_survey %>%
+    select(admin_area_1, year, ends_with("_original")) %>%
+    pivot_longer(cols = ends_with("_original"), 
+                 names_to = "indicator_common_id", 
+                 values_to = "coverage") %>%
+    mutate(source = "original_estimate",
+           indicator_common_id = gsub("avgsurvey_", "", indicator_common_id),
+           indicator_common_id = gsub("_original", "", indicator_common_id)) %>%
+    select(admin_area_1, year, indicator_common_id, coverage, source)
+  
+  # 3. Transform annual HMIS data
   annual_hmis_long <- annual_hmis %>%
     pivot_longer(cols = starts_with("count"), 
                  names_to = "indicator_common_id", 
                  values_to = "count") %>%
-    mutate(indicator_common_id = gsub("count", "", indicator_common_id))  # Clean indicator names
+    mutate(indicator_common_id = gsub("count", "", indicator_common_id))  
   
-  # 3. Transform coverage_table_with_projection
+  # 4. Transform coverage_table_with_projection
   coverage_projection_long <- coverage_table_with_projection %>%
     select(admin_area_1, year, indicator_common_id, avgsurveyprojection, reference_value) %>%
     pivot_longer(cols = c("avgsurveyprojection", "reference_value"), 
                  names_to = "source", 
                  values_to = "coverage")
   
-  # 4. Transform best_coverage
+  # 5. Transform best_coverage
   best_coverage_long <- best_coverage %>%
     select(admin_area_1, year, indicator_common_id, coverage) %>%
     mutate(source = "cov")
   
-  # 5. Transform annual_hmis_long and rename for merging
+  # 6. Transform annual_hmis_long and rename for merging
   annual_hmis_long <- annual_hmis_long %>%
     select(admin_area_1, year, indicator_common_id, count) %>%
     mutate(source = "count", coverage = count) %>%
     select(-count)
   
-  # 6. Merge all datasets together
+  # 7. Merge all datasets together
   combined_data <- bind_rows(coverage_projection_long, 
                              best_coverage_long, 
                              annual_hmis_long, 
-                             official_estimate_long) %>%
+                             official_estimate_long,
+                             original_estimate_long) %>%
     arrange(admin_area_1, year, indicator_common_id, source) %>%
-    filter(source != "reference_value")  # Remove reference_value rows
+    filter(source != "reference_value")  
   
-  # 7. Pivot to wide format to store results in a wide table
+  # 8. Pivot to wide format
   combined_data_wide <- combined_data %>%
     pivot_wider(
       id_cols = c(admin_area_1, year, indicator_common_id),
@@ -661,55 +670,46 @@ prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_ta
       values_fill = NA
     ) %>%
     mutate(
+      coverage_original_estimate = coverage_original_estimate / 100,
       coverage_official_estimate = coverage_official_estimate / 100,
       coverage_avgsurveyprojection = coverage_avgsurveyprojection / 100,
       coverage_cov = coverage_cov / 100
     ) %>%
-    
-    #PLACEHOLDER FILTER TO DROP ROWS WITH NAs in.... and drop col coverage count...
-    
     filter(!(is.na(coverage_official_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) %>%
     select(-coverage_count)  # Remove coverage_count column
   
   return(combined_data_wide)
 }
+
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
 print("load HMIS adjusted volume...")
 adjusted_volume <- map_adjusted_volumes(adjusted_volume_data)
 hmis_countries <- unique(adjusted_volume$admin_area_1)        # Identify Relevant Countries from HMIS Data
+print(hmis_countries)
 
-# 2. Aggregate HMIS Data to Annual Level
-print("aggregate HMIS adjusted volume to annual level...")
-annual_hmis <- adjusted_volume %>%
-  select(admin_area_1, year, indicator_common_id, count_final_both, month) %>%  
-  group_by(admin_area_1, year, indicator_common_id) %>%
-  summarise(
-    count = sum(count_final_both, na.rm = TRUE),  # Sum counts across all months
-    .groups = "drop"
-  )
-
-# Step 2: Count number of unique months per `admin_area_1` and `year`
+# 2. Count number of unique months per `admin_area_1` and `year`
 nummonth_data <- adjusted_volume %>%
   select(admin_area_1, year, month) %>%
   distinct() %>%  # Keep only unique month entries per area-year
   group_by(admin_area_1, year) %>%
   summarise(nummonth = n_distinct(month[!is.na(month)]), .groups = "drop")  # Count unique months
 
-annual_hmis <- annual_hmis %>%
+
+# 2. Aggregate HMIS Data to Annual Level
+print("aggregate HMIS adjusted volume to annual level...")
+annual_hmis <- adjusted_volume %>%
+  group_by(admin_area_1, year, indicator_common_id) %>%
+  summarise(count = sum(count, na.rm = TRUE), .groups = "drop") %>%
   pivot_wider(
     names_from = indicator_common_id,  
     values_from = count,  
-    names_prefix = "count",  # Prefix column names with "count"
-    values_fill = list(count = 0)  # Fill missing values with 0
-  )
-
-annual_hmis <- annual_hmis %>%
-  left_join(nummonth_data, by = c("admin_area_1", "year"))
-
-
-annual_hmis <- annual_hmis %>%
+    names_prefix = "count",  # 
+    values_fill = list(count = 0)
+  ) %>%  
+  left_join(nummonth_data, by = c("admin_area_1", "year")) %>%
   arrange(admin_area_1, year)
+
 
 # 3. Adjust Names for Consistency
 name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
@@ -753,6 +753,7 @@ data_survey <- carry_forward_survey_data(data)
 # 8. Assign Carried Survey Data 
 data <- assign_carried_survey_data(data_survey)
 
+
 # 9. Calculate Denominators
 print("Calculate denominators...")
 data <- calculate_all_denominators(data)
@@ -775,8 +776,18 @@ coverage_table_with_projection <- calculate_avgsurveyprojection(coverage_table, 
 # 13. Call function to generate the combined dataset
 combined_data <- prepare_combined_coverage_data(data_survey, annual_hmis, coverage_table_with_projection, best_coverage)
 
+# Carry back survey projection to original survey points 
+combined_data <- combined_data %>%
+  mutate(
+    coverage_original_estimate = case_when(
+      !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  # If both exist, replace with `coverage_avgsurveyprojection`
+      is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  # If `coverage_original_estimate` is NA, use `coverage_avgsurveyprojection`
+      TRUE ~ coverage_original_estimate  # Otherwise, keep original value
+    )
+  )
+
+
+
 # 14. Export the cleaned dataset
 print("Save the results..")
-write.csv(combined_data, "M4_Coverage_Estimation.csv", row.names = FALSE)
-
-# remove now the empty coverage rows like opd
+write.csv(combined_data, "M4_coverage_estimation.csv", row.names = FALSE)
