@@ -3,9 +3,9 @@ MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
 GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
-#------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Feb 6
+# Last edit: 2025 Feb 7
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to handle datasets where the available indicators are limited 
@@ -56,8 +56,10 @@ dqa_rules <- list(
 # FILE: M1_facility_dqa.csv                # Facility-level results from DQA analysis.
 
 # Load Required Libraries ------------------------------------------------------------------------------------
-library(tidyverse)
-library(scales)
+library(zoo)
+library(stringr)
+library(dplyr)       
+library(tidyr)
 
 
 # Define Functions ------------------------------------------------------------------------------------------
@@ -308,7 +310,8 @@ completeness_analysis <- function(data, geo_cols, facility_metadata) {
     mutate(
       date = as.Date(paste(year, month, "1", sep = "-")),
       period_id = as.integer(paste0(year, sprintf("%02d", month))),
-      negdate = as.integer(date) * -1  # Negative date for sorting
+      quarter_id = as.integer(paste0(year, sprintf("%02d", (month - 1) %/% 3 + 1))),
+      negdate = as.integer(date) * -1
     )
   
   # Step 4: Identify completeness - Keep all months, even if not reported
@@ -342,9 +345,11 @@ completeness_analysis <- function(data, geo_cols, facility_metadata) {
       indicator_common_id, 
       year, 
       month, 
-      period_id
+      period_id,
+      quarter_id
     ) %>%
     summarise(
+      count = ifelse(all(is.na(count)), NA_real_, sum(count, na.rm = TRUE)),
       reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Count of reported months
       completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness per facility-month
       .groups = "drop"
@@ -436,10 +441,11 @@ dqa_with_consistency <- function(
       dqa_mean = (completeness_outlier_score + consistency_score) / 2,
       dqa_score = ifelse(dqa_outlier_completeness == 1 & all_pairs_pass == 1, 1, 0),  # Binary DQA score (1=pass, 0=fail)
       
-      period_id = as.integer(paste0(year, sprintf("%02d", month)))  # Ensure YYYYMM format
+      period_id = as.integer(paste0(year, sprintf("%02d", month))),
+      quarter_id = as.integer(paste0(year, sprintf("%02d", (month - 1) %/% 3 + 1)))
     ) %>%
     
-    select(all_of(geo_cols), facility_id, year, month, period_id, 
+    select(all_of(geo_cols), facility_id, year, month, period_id, quarter_id,
            completeness_outlier_score, consistency_score, dqa_mean, dqa_score)  # Include all new scores
   
   return(dqa_data)
