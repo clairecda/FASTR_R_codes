@@ -1,6 +1,6 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
-GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
+GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 #------------------------------------------------------------------------------
