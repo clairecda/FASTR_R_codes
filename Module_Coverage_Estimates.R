@@ -190,10 +190,6 @@ carry_forward_survey_data <- function(data) {
   return(data)
 }
 
-# idea.. duplicate cols to preserve the OG avgsurvey_anc1 - which give us the time points where we had data...
-# then on that column after we have calculated coverage on hmis (after PART 7) we need to carry that back to fill year after 
-# last survey in the OG avgsurvey_anc1
-
 # PART 5.2 - Assign Carried Survey Data -------------------------------------------
 assign_carried_survey_data <- function(data) {
   # Define the mapping of avgsurvey_* to _carry variables
