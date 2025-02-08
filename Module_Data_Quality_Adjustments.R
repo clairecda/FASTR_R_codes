@@ -216,7 +216,7 @@ print(paste("Detected lowest geographic level:", GEOLEVEL))
 
 # Aggregate data at the lowest available admin area level
 adjusted_data_admin_area_final <- adjusted_data_final %>%
-  group_by(across(all_of(GEOLEVEL)),indicator_common_id, year, month, period_id, quarter_id) %>%
+  group_by(across(all_of(geo_cols)),indicator_common_id, year, month, period_id, quarter_id) %>%
   summarise(
     count_final_none = sum(count_final_none, na.rm = TRUE),
     count_final_outliers = sum(count_final_outliers, na.rm = TRUE),
