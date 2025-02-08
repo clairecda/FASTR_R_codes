@@ -1,5 +1,6 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
+MADS <- 10                           # Number of MADs
 GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
@@ -16,7 +17,6 @@ DQA_INDICATORS <- c("penta1", "anc1", "opd")
 # DATA: guinea_imported_dataset_v2.csv
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
-# ------------------------------------------------------------------------------------------------------------
 # Outlier Analysis Parameters
 outlier_params <- list(
   outlier_pc_threshold = OUTLIER_PROPORTION_THRESHOLD,  # Threshold for proportional contribution to flag outliers
@@ -117,7 +117,7 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
     mutate(
       mad_volume = ifelse(!is.na(count), mad(count[count >= median_volume], na.rm = TRUE), NA),
       mad_residual = ifelse(!is.na(mad_volume) & mad_volume > 0, abs(count - median_volume) / mad_volume, NA),
-      outlier_mad = ifelse(!is.na(mad_residual) & mad_residual > 10, 1, 0)  # Flag outliers based on MAD
+      outlier_mad = ifelse(!is.na(mad_residual) & mad_residual > MADS, 1, 0)  # Flag outliers based on MAD
     ) %>%
     ungroup()
   
