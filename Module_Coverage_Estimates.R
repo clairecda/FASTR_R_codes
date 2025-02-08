@@ -11,7 +11,7 @@ POSTNEONATAL_MORTALITY_RATE <- 0.02
 INFANT_MORTALITY_RATE <- 0.05   
 
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Jan 31
+# Last edit: 2025 Feb 8
 # Module: Coverage Estimates
 
 # Description:
