@@ -599,20 +599,9 @@ calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
 }
 
 # PART 10 - Prepare Results (combine estimates) --------------------------------------
-prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_table_with_projection, best_coverage) {
+prepare_combined_coverage_data <- function(data_survey, coverage_table_with_projection) {
   
-  # 1. Transform official estimates from data_survey
-  official_estimate_long <- data_survey %>%
-    select(admin_area_1, year, starts_with("avgsurvey_"), starts_with("datasource_")) %>%
-    pivot_longer(cols = starts_with("avgsurvey_"), 
-                 names_to = "indicator_common_id", 
-                 values_to = "coverage") %>%
-    mutate(source = "official_estimate",
-           indicator_common_id = gsub("avgsurvey_", "", indicator_common_id)) %>%
-    filter(!grepl("_original", indicator_common_id)) %>%
-    select(admin_area_1, year, indicator_common_id, coverage, source)
-  
-  # 2. Process `_original` values
+  # 1. Process official estimates from data_survey
   original_estimate_long <- data_survey %>%
     select(admin_area_1, year, ends_with("_original")) %>%
     pivot_longer(cols = ends_with("_original"), 
@@ -623,41 +612,27 @@ prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_ta
            indicator_common_id = gsub("_original", "", indicator_common_id)) %>%
     select(admin_area_1, year, indicator_common_id, coverage, source)
   
-  # 3. Transform annual HMIS data
-  annual_hmis_long <- annual_hmis %>%
-    pivot_longer(cols = starts_with("count"), 
-                 names_to = "indicator_common_id", 
-                 values_to = "count") %>%
-    mutate(indicator_common_id = gsub("count", "", indicator_common_id))  
-  
-  # 4. Transform coverage_table_with_projection
+  # 2. Transform coverage_table_with_projection
   coverage_projection_long <- coverage_table_with_projection %>%
-    select(admin_area_1, year, indicator_common_id, avgsurveyprojection, reference_value) %>%
-    pivot_longer(cols = c("avgsurveyprojection", "reference_value"), 
+    select(admin_area_1, year, indicator_common_id, avgsurveyprojection) %>%
+    pivot_longer(cols = c("avgsurveyprojection"), 
                  names_to = "source", 
                  values_to = "coverage")
   
-  # 5. Transform best_coverage
+  # 3. Transform best_coverage
   best_coverage_long <- best_coverage %>%
     select(admin_area_1, year, indicator_common_id, coverage) %>%
     mutate(source = "cov")
   
-  # 6. Transform annual_hmis_long and rename for merging
-  annual_hmis_long <- annual_hmis_long %>%
-    select(admin_area_1, year, indicator_common_id, count) %>%
-    mutate(source = "count", coverage = count) %>%
-    select(-count)
+  # 4. Merge all datasets together
+  combined_data <- bind_rows(
+    coverage_projection_long, 
+    best_coverage_long, 
+    original_estimate_long
+  ) %>%
+    arrange(admin_area_1, year, indicator_common_id, source)
   
-  # 7. Merge all datasets together
-  combined_data <- bind_rows(coverage_projection_long, 
-                             best_coverage_long, 
-                             annual_hmis_long, 
-                             official_estimate_long,
-                             original_estimate_long) %>%
-    arrange(admin_area_1, year, indicator_common_id, source) %>%
-    filter(source != "reference_value")  
-  
-  # 8. Pivot to wide format
+  # 5. Pivot to wide format
   combined_data_wide <- combined_data %>%
     pivot_wider(
       id_cols = c(admin_area_1, year, indicator_common_id),
@@ -668,12 +643,10 @@ prepare_combined_coverage_data <- function(data_survey, annual_hmis, coverage_ta
     ) %>%
     mutate(
       coverage_original_estimate = coverage_original_estimate / 100,
-      coverage_official_estimate = coverage_official_estimate / 100,
       coverage_avgsurveyprojection = coverage_avgsurveyprojection / 100,
       coverage_cov = coverage_cov / 100
     ) %>%
-    filter(!(is.na(coverage_official_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) %>%
-    select(-coverage_count)  # Remove coverage_count column
+    filter(!(is.na(coverage_original_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) 
   
   return(combined_data_wide)
 }
@@ -771,20 +744,22 @@ coverage_table <- detect_coverage_delta(best_coverage)
 coverage_table_with_projection <- calculate_avgsurveyprojection(coverage_table, carry_values)
 
 # 13. Call function to generate the combined dataset
-combined_data <- prepare_combined_coverage_data(data_survey, annual_hmis, coverage_table_with_projection, best_coverage)
+combined_data <- prepare_combined_coverage_data(data_survey, coverage_table_with_projection)
 
-# Carry back survey projection to original survey points 
+
+# 14. Carry back survey projection to official survey points 
 combined_data <- combined_data %>%
   mutate(
-    coverage_original_estimate = case_when(
-      !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  # If both exist, replace with `coverage_avgsurveyprojection`
-      is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  # If `coverage_original_estimate` is NA, use `coverage_avgsurveyprojection`
-      TRUE ~ coverage_original_estimate  # Otherwise, keep original value
+    coverage_official_estimate = case_when(
+      !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  
+      is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  
+      TRUE ~ coverage_original_estimate  
     )
-  )
+  ) %>%
+  select(-coverage_original_estimate)  # Drop the old column after renaming
 
 
 
-# 14. Export the cleaned dataset
+# 15. Export the cleaned dataset
 print("Save the results..")
 write.csv(combined_data, "M4_coverage_estimation.csv", row.names = FALSE)
