@@ -205,14 +205,6 @@ adjusted_data_final <- apply_adjustments_scenarios(
 )
 
 geo_cols <- colnames(adjusted_data_final) %>% str_subset("^admin_area_[0-9]+$")
-lowest_geo_level <- if (length(geo_cols) > 0) {
-  geo_cols[which.max(as.numeric(str_extract(geo_cols, "[0-9]+")))]  # Extract and find the highest admin level
-} else {
-  stop("No geographic levels detected in the dataset!")
-}
-
-GEOLEVEL <- lowest_geo_level
-print(paste("Detected lowest geographic level:", GEOLEVEL))
 
 # Aggregate data at the lowest available admin area level
 adjusted_data_admin_area_final <- adjusted_data_final %>%
