@@ -748,7 +748,17 @@ combined_data <- prepare_combined_coverage_data(data_survey, coverage_table_with
 
 
 # 14. Carry back survey projection to official survey points 
+# Identify indicators where ALL values of coverage_cov are missing
+indicators_to_remove <- combined_data %>%
+  group_by(indicator_common_id) %>%
+  summarize(all_missing = all(is.na(coverage_cov))) %>%
+  filter(all_missing) %>%
+  pull(indicator_common_id)
+
+# Remove these indicators from the dataset
 combined_data <- combined_data %>%
+  filter(!indicator_common_id %in% indicators_to_remove) %>%
+  ungroup() %>%
   mutate(
     coverage_official_estimate = case_when(
       !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  
@@ -757,7 +767,6 @@ combined_data <- combined_data %>%
     )
   ) %>%
   select(-coverage_original_estimate)  # Drop the old column after renaming
-
 
 
 # 15. Export the cleaned dataset
