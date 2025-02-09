@@ -14,6 +14,8 @@ INFANT_MORTALITY_RATE <- 0.05
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Feb 8
 # Module: Coverage Estimates Province
+# Notes: this is WIP - will be added to M4..
+
 
 # ------------------------------ Load Required Libraries -------------------------
 library(dplyr)       # For `mutate()`, `group_by()`, `summarise()`, `filter()`, `arrange()`
@@ -274,8 +276,8 @@ coverage_results_province <- coverage_results %>%
 
 
 # Create histograms for each indicator and print them
-for (indicator in unique(avg_coverage$indicator_common_id)) {
-  df <- avg_coverage %>%
+for (indicator in unique(coverage_results_province$indicator_common_id)) {
+  df <- coverage_results_province %>%
     filter(indicator_common_id == indicator) %>%
     arrange(desc(avg_coverage))  # Sort by coverage (high to low)
   
