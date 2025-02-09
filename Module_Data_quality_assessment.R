@@ -494,7 +494,7 @@ dqa_without_consistency <- function(
 }
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_imported_dataset_v2.csv")
+inputs <- load_and_preprocess_data("nigeria_sampled_data.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
