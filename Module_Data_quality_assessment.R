@@ -14,7 +14,7 @@ DQA_INDICATORS <- c("penta1", "anc1", "opd")
 # to performing the DQA without including consistency checks.
 
 
-# DATA: guinea_imported_dataset_v2.csv
+# DATA: nigeria_sampled_data.csv
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
 # Outlier Analysis Parameters
@@ -23,7 +23,6 @@ outlier_params <- list(
   count_threshold = MINIMUM_COUNT_THRESHOLD             # Minimum count to consider for outlier adjustment
 )
 
-geo_level <- GEOLEVEL
 
 # Consistency Analysis Parameters 
 consistency_params <- list(
@@ -157,26 +156,33 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
 
 
 # PART 2-A Consistency Analysis - Geo Level -----------------------------------------------------------------
-geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
-  print("Performing geo-level consistency analysis...")
-  
+geo_consistency_analysis <- function(data, geo_cols, geo_level, consistency_params) {
   # Extract required pairs and ranges from parameters
   required_pairs <- consistency_params$consistency_pairs
   consistency_ranges <- consistency_params$consistency_ranges
+  
+  # Define all possible geographic levels
+  geo_levels <- c("admin_area_1", "admin_area_2", "admin_area_3", "admin_area_4", "admin_area_5", "admin_area_6", "admin_area_7", "admin_area_8")
+  
+  # Identify the geographic columns up to the selected geo_level
+  relevant_geo_cols <- geo_levels[seq_len(match(geo_level, geo_levels, nomatch = length(geo_levels)))]
+  
+  # Ensure only existing columns in data are selected
+  relevant_geo_cols <- intersect(relevant_geo_cols, geo_cols)
   
   # Exclude Outliers
   data <- data %>%
     mutate(count = ifelse(outlier_flag == 1, NA, count))
   
-  # Aggregate data at geographic level
+  # Aggregate data at the selected geographic level
   aggregated_data <- data %>%
-    group_by(across(all_of(c(geo_cols, "indicator_common_id", "year", "month", "period_id", "quarter_id")))) %>%
+    group_by(across(all_of(c(relevant_geo_cols, "indicator_common_id", "year", "month", "period_id", "quarter_id")))) %>%
     summarise(count = sum(count, na.rm = TRUE), .groups = "drop")
   
   # Pivot to wide format
   wide_data <- aggregated_data %>%
     pivot_wider(
-      id_cols = c(geo_cols, "year", "month", "period_id", "quarter_id"),
+      id_cols = c(relevant_geo_cols, "year", "month", "period_id", "quarter_id"),
       names_from = "indicator_common_id",
       values_from = "count",
       values_fill = list(count = 0)
@@ -234,7 +240,7 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
             TRUE ~ NA_integer_
           )
         ) %>%
-        select(all_of(c(geo_cols, "year", "month", "period_id", "quarter_id", "ratio_type", "consistency_ratio", "sconsistency")))
+        select(all_of(c(relevant_geo_cols, "year", "month", "period_id", "quarter_id", "ratio_type", "consistency_ratio", "sconsistency")))
       
       pair_results[[pair_name]] <- pair_data
     } else {
@@ -251,7 +257,6 @@ geo_consistency_analysis <- function(data, geo_cols, consistency_params) {
   
   return(combined_data)
 }
-
 expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consistency_results, geo_level) {
   print(paste("Expanding geo-level consistency results using:", geo_level, "..."))
   # Detect all available geographic levels in `facility_metadata`
@@ -268,6 +273,7 @@ expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consiste
   facility_list <- facility_metadata %>%
     select(facility_id, all_of(geo_level)) %>%
     distinct()
+
   
   # Step 2: Expand geo consistency results by duplicating values across all facilities in the same area
   facility_consistency_results <- facility_list %>%
@@ -528,6 +534,7 @@ if (length(consistency_params$consistency_pairs) > 0) {
   geo_consistency_results <- geo_consistency_analysis(
     data = outlier_data_main, 
     geo_cols = geo_cols, 
+    geo_level = GEOLEVEL,
     consistency_params = consistency_params
   )
 
@@ -558,7 +565,8 @@ consistency_expanded <- facility_consistency_results %>%
 # Restore geo_cols AFTER pivoting to avoid duplication issues
 consistency_expanded <- consistency_expanded %>%
   left_join(
-    facility_consistency_results %>% select(facility_id, year, month, all_of(geo_cols)) %>% distinct(),
+    facility_consistency_results %>%
+      select(facility_id, year, month, any_of(geo_cols)) %>% distinct(),  # Use any_of() instead of all_of()
     by = c("facility_id", "year", "month")
   )
 
