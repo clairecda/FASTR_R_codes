@@ -682,7 +682,7 @@ annual_hmis <- adjusted_volume %>%
 
 
 # 3. Adjust Names for Consistency
-name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone")
+name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone", "Nigeria" = "ng Federal Government")
 
 # 4. Apply Filtering to Ensure Only Relevant Countries are Included
 mics_data_filtered <- read_dta(mics_data_path) %>%
