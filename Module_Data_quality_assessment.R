@@ -1,12 +1,12 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
 MADS <- 10                           # Number of MADs
-GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
+GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Feb 7
+# Last edit: 2025 Feb 9
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to handle datasets where the available indicators are limited 
