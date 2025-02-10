@@ -17,6 +17,7 @@
 library(data.table)  # For fast data processing & merging
 library(zoo)         # For rolling averages
 library(stringr)     # For `str_subset()`
+library(dplyr)
 
 outlier_data <- read.csv("M1_output_outliers.csv")
 completeness_data <- read.csv("M1_completeness_long_format.csv")
