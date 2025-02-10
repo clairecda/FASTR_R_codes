@@ -688,17 +688,20 @@ name_replacements <- c("Guinea" = "Guinée", "Sierra Leone" = "SierraLeone", "Ni
 mics_data_filtered <- read_dta(mics_data_path) %>%
   rename(admin_area_1 = country) %>%
   adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+  filter(admin_area_1 %in% hmis_countries) %>%  # Keep only HMIS countries
+  filter(year != 2024)  # Remove year 2024
 
 dhs_data_filtered <- read_dta(dhs_data_path) %>%
   rename(admin_area_1 = country) %>%
   adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+  filter(admin_area_1 %in% hmis_countries) %>%  # Keep only HMIS countries
+  filter(year != 2024)  # Remove year 2024
 
 wpp_data_filtered <- read_dta(wpp_data_path) %>%
   rename(admin_area_1 = country) %>%
   adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  filter(admin_area_1 %in% hmis_countries)  # Keep only HMIS countries
+  filter(admin_area_1 %in% hmis_countries) %>%  # Keep only HMIS countries
+  filter(year != 2024)  # Remove year 2024
 
 # 5. Extend Survey Data
 print("Extend survey data...")
@@ -758,15 +761,35 @@ indicators_to_remove <- combined_data %>%
 # Remove these indicators from the dataset
 combined_data <- combined_data %>%
   filter(!indicator_common_id %in% indicators_to_remove) %>%
-  ungroup() %>%
+  ungroup() 
+
+# Identify the first year where coverage_avgsurveyprojection is available
+first_year_projection <- combined_data %>%
+  filter(!is.na(coverage_avgsurveyprojection)) %>%
+  summarise(first_year = min(year, na.rm = TRUE)) %>%
+  pull(first_year)
+
+# Identify the last year where coverage_original_estimate exists
+last_year_original <- combined_data %>%
+  filter(!is.na(coverage_original_estimate)) %>%
+  summarise(last_year = max(year, na.rm = TRUE)) %>%
+  pull(last_year)
+
+# Apply conditional replacement based on these years
+combined_data <- combined_data %>%
   mutate(
-    coverage_official_estimate = case_when(
-      !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  
-      is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,  
-      TRUE ~ coverage_original_estimate  
+    coverage_original_estimate = case_when(
+      # First year condition: replace if coverage_original_estimate is NA
+      year == first_year_projection & is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,
+      
+      # Last year condition: replace only if both values exist
+      year == last_year_original & !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,
+      
+      # Otherwise, keep the original value
+      TRUE ~ coverage_original_estimate
     )
   ) %>%
-  select(-coverage_original_estimate)  # Drop the old column after renaming
+  rename(coverage_official_estimate = coverage_original_estimate)  # Rename after adjustments
 
 
 # 15. Export the cleaned dataset
