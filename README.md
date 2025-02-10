@@ -1,4 +1,4 @@
-# FASTR_Modules
+# FASTR Modules
 
 R scripts and test data for FASTR data quality assessment
 
