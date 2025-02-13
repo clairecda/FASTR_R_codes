@@ -62,7 +62,7 @@ library(zoo)
 library(stringr)
 library(dplyr)       
 library(tidyr)
-
+library(data.table)
 
 # Define Functions ------------------------------------------------------------------------------------------
 load_and_preprocess_data <- function(file_path) {
@@ -287,128 +287,119 @@ expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consiste
 }
 
 # PART 3 COMPLETENESS ----------------------------------------------------------------------------------------
-completeness_analysis <- function(data, geo_cols) {
-  print("Performing completeness analysis for each indicator separately with smoothing...")
+# Function to generate full time series per indicator
+generate_full_series_per_indicator <- function(outlier_data, indicator_id, timeframe) {
+  print(paste("Processing indicator:", indicator_id))  # Track progress
   
-  # List to store completeness data for each indicator
-  completeness_list <- list()
+  # Subset data for the given indicator
+  indicator_subset <- outlier_data[indicator_common_id == indicator_id, .(facility_id, indicator_common_id, year, month, count)]
+  print(paste("Subset data size for", indicator_id, ":", nrow(indicator_subset)))
   
-  # Get unique indicators
-  indicators <- unique(data$indicator_common_id)
+  # Get first and last reporting month for this indicator
+  time_range <- timeframe[indicator_common_id == indicator_id]
+  first_month <- time_range$first_month
+  last_month <- time_range$last_month
   
-  for (indicator in indicators) {
-    print(paste("Processing:", indicator))
+  print(paste("Time range for", indicator_id, ":", first_month, "to", last_month))
+  
+  # Generate full month sequence
+  month_seq <- seq(from = first_month, to = last_month, by = "1 month")
+  
+  # Create a full facility-month grid
+  complete_grid <- CJ(
+    facility_id = unique(indicator_subset$facility_id),
+    date = month_seq
+  )[, `:=` (
+    indicator_common_id = indicator_id,
+    year = year(date),
+    month = month(date),
+    period_id = sprintf("%04d%02d", year(date), month(date)),  # YYYYMM format
+    quarter_id = sprintf("%04d%02d", year(date), ((month(date) - 1) %/% 3) + 1)
+  )]
+  
+  print(paste("Generated complete grid for", indicator_id, "with", nrow(complete_grid), "rows"))
+  
+  # Ensure `indicator_subset` has a `date` column before merging
+  indicator_subset[, date := as.Date(paste(year, month, "1", sep = "-"))]
+  
+  # Merge with original data to retain counts
+  complete_data <- merge(
+    complete_grid, indicator_subset,
+    by = c("facility_id", "indicator_common_id", "year", "month", "date"),
+    all.x = TRUE
+  )[, .(facility_id, indicator_common_id, year, month, count, date, period_id, quarter_id)]
+  
+  print(paste("Merged data size for", indicator_id, ":", nrow(complete_data)))
+  
+  return(complete_data)
+}
+
+
+# Main processing function
+process_completeness <- function(outlier_data_main) {
+  print("Starting completeness processing...")
+  setDT(outlier_data_main)  # Convert to data.table
+  
+  # Identify first and last reported month for each indicator
+  indicator_timeframe <- outlier_data_main[, .(
+    first_month = min(as.Date(paste(year, month, "1", sep = "-")), na.rm = TRUE),
+    last_month = max(as.Date(paste(year, month, "1", sep = "-")), na.rm = TRUE)
+  ), by = indicator_common_id]
+  
+  print(paste("Identified timeframes for", nrow(indicator_timeframe), "indicators"))
+
+  
+  # Deduplicate to ensure one row per facility
+  geo_lookup <- unique(outlier_data_main[, c("facility_id", geo_cols), with = FALSE])
+  
+  
+  print(paste("Geo data extracted for", nrow(geo_lookup), "facilities"))
+  
+  # Process each indicator separately to optimize memory usage
+  completeness_list <- lapply(unique(outlier_data_main$indicator_common_id), function(ind) {
+    print(paste("Starting processing for indicator:", ind))
     
-    # Filter data for the current indicator
-    indicator_data <- data %>% filter(indicator_common_id == indicator)
+    # Generate full time series for the indicator
+    complete_data <- generate_full_series_per_indicator(outlier_data_main, ind, indicator_timeframe)
     
-    # Get the count of unique facilities reporting this indicator
-    unique_facilities <- indicator_data %>% distinct(facility_id) %>% nrow()
-    print(paste("Number of facilities reporting for", indicator, ":", unique_facilities))
+    print(paste("Applying completeness tagging for", ind))
     
-    # Find first and last record dates for this indicator
-    first_record <- indicator_data %>%
-      summarise(first_date = min(as.Date(paste(year, month, "1", sep = "-")), na.rm = TRUE)) %>%
-      pull(first_date)
+    # Apply completeness tagging
+    complete_data <- complete_data[order(facility_id, date)]  # Order data
     
-    last_record <- indicator_data %>%
-      summarise(last_date = max(as.Date(paste(year, month, "1", sep = "-")), na.rm = TRUE)) %>%
-      pull(last_date)
+    complete_data[, has_reported := !is.na(count), by = facility_id]  # Identify reporting months
+    complete_data[, first_report_idx := cumsum(has_reported) > 0, by = facility_id]  # First report
+    complete_data[, last_report_idx := rev(cumsum(rev(has_reported)) > 0), by = facility_id]  # Last report
     
-    print(paste("First record for", indicator, ":", first_record))
-    print(paste("Last record for", indicator, ":", last_record))
-    
-    # Step 1: Generate a full grid of year-month combinations ONLY for this indicator's reporting period
-    all_year_months <- indicator_data %>%
-      group_by(year) %>%
-      summarise(
-        min_month = min(month, na.rm = TRUE),
-        max_month = max(month, na.rm = TRUE),
-        .groups = "drop"
-      ) %>%
-      rowwise() %>%
-      mutate(month_seq = list(seq(from = min_month, to = max_month))) %>%
-      unnest(month_seq) %>%
-      rename(month = month_seq) %>%
-      select(-min_month, -max_month)
-    
-    # Step 2: Get the facilities that reported for this indicator
-    reporting_facilities <- indicator_data %>% distinct(facility_id)
-    
-    # Step 3: Expand only for these facilities and their reporting period
-    complete_month_grid <- reporting_facilities %>%
-      crossing(all_year_months) %>%
-      mutate(indicator_common_id = indicator)
-    
-    # Drop geo_cols temporarily to avoid missing values for added rows
-    indicator_data_no_geo <- indicator_data %>% select(-all_of(geo_cols))
-    
-    # Step 4: Left join with data to retain all facility-months within reporting period
-    expanded_data <- complete_month_grid %>%
-      left_join(indicator_data_no_geo, by = c("facility_id", "indicator_common_id", "year", "month")) %>%
-      mutate(
-        date = as.Date(paste(year, month, "1", sep = "-")),
-        period_id = as.integer(paste0(year, sprintf("%02d", month))),
-        quarter_id = as.integer(paste0(year, sprintf("%02d", (month - 1) %/% 3 + 1))),
-        negdate = as.integer(date) * -1
+    complete_data[, completeness_flag := fifelse(
+      !first_report_idx, 2, fifelse(
+        has_reported, 1, fifelse(
+          first_report_idx & last_report_idx, 0, 2
+        )
       )
+    ), by = facility_id]
     
-    # Step 5: Apply smoothing per facility (prevents premature incompleteness marking)
-    smoothed_data <- expanded_data %>%
-      group_by(facility_id) %>%
-      arrange(date) %>%
-      mutate(
-        first_valid_report = cumsum(!is.na(count) & count > 0) > 0,
-        last_valid_report = rev(cumsum(rev(!is.na(count) & count > 0)) > 0),
-        
-        # Compute trailing months since last report
-        trailing_months = ifelse(!is.na(count) & count > 0, 0, NA_integer_),
-        trailing_months = zoo::na.locf(trailing_months, fromLast = TRUE, na.rm = FALSE),
-        trailing_months = ifelse(is.na(trailing_months), 12, trailing_months + 1),
-        
-        # Mark completeness only for valid reporting periods
-        completeness_flag = ifelse(first_valid_report & last_valid_report, ifelse(is.na(count), 0, 1), NA_real_)
-      ) %>%
-      ungroup()
+    print(paste("Completeness tagging done for", ind, "- Removing flagged rows..."))
     
-    # Step 6: Summarize completeness at facility-month level
-    facility_month_data <- smoothed_data %>%
-      group_by(
-        facility_id, 
-        indicator_common_id, 
-        year, 
-        month, 
-        period_id,
-        quarter_id
-      ) %>%
-      summarise(
-        count = sum(count, na.rm = TRUE),
-        reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Count of reported months
-        completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness per facility-month
-        .groups = "drop"
-      ) %>%
-      mutate(
-        completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Ensure completeness_flag is set
-      )
+    # Attach geo info: Find the admin area for each facility
+    complete_data <- merge(complete_data, geo_lookup, by = "facility_id", all.x = TRUE)
     
-    # Store results for this indicator
-    completeness_list[[indicator]] <- facility_month_data
+    # Remove rows where completeness_flag == 2
+    result <- complete_data[completeness_flag != 2, c("facility_id", "indicator_common_id", "year", "month", "count", "completeness_flag", "period_id", "quarter_id", geo_cols), with = FALSE]
+    
+    print(paste("Final dataset size for", ind, ":", nrow(result)))
+    
+    return(result)
+  })
+  
+  # Combine results efficiently
+  print("Combining all indicator datasets...")
+  completeness_long <- rbindlist(completeness_list, use.names = TRUE, fill = TRUE)
+  if ("facility_id.1" %in% colnames(completeness_long)) {
+    completeness_long <- completeness_long[, !("facility_id.1"), with = FALSE]
   }
-  
-  # Step 7: Combine all indicators into a single dataset
-  final_completeness_data <- bind_rows(completeness_list)
-  
-  # Step 8: Fix the many-to-many join issue for facility metadata
-  facility_metadata_unique <- data %>%
-    select(facility_id, all_of(geo_cols)) %>%
-    distinct(facility_id, .keep_all = TRUE)
-  
-  # Step 9: Rejoin geo_cols
-  final_completeness_data <- final_completeness_data %>%
-    left_join(facility_metadata_unique, by = "facility_id")
-  
-  # Step 10: Return the summarized completeness data
-  return(final_completeness_data)
+  print("Completeness processing finished!")
+  return(completeness_long)
 }
 
 # PART 4 DQA ----------------------------------------------------------------------------------------------------
@@ -558,11 +549,18 @@ outlier_data_main <- outlier_analysis(data, geo_cols, outlier_params)
 
 # Run Completeness Analysis
 print("Running completeness analysis...")
-completeness_results <- completeness_analysis(outlier_data_main, geo_cols)
+completeness_results <- process_completeness(outlier_data_main)
+
+
+geo_cols_filtered <- setdiff(geo_cols, "facility_id")
+
+# Extract unique facilities and their geo/admin_area columns
+facility_metadata <- completeness_results %>%
+  select(any_of(c("facility_id", geo_cols_filtered))) %>%
+  distinct()
 
 # Run Consistency Analysis (if applicable)
 if (length(consistency_params$consistency_pairs) > 0) {
-
   print("Running consistency analysis...")
   geo_consistency_results <- geo_consistency_analysis(
     data = outlier_data_main, 
@@ -570,38 +568,35 @@ if (length(consistency_params$consistency_pairs) > 0) {
     geo_level = GEOLEVEL,
     consistency_params = consistency_params
   )
-
 } else {
   print("No valid consistency pairs found. Skipping consistency analysis...")
   geo_consistency_results <- NULL
 }
 
 
-# Expend consistency - join to facility
-facility_consistency_results <- expand_geo_consistency_to_facilities(
-  facility_metadata = completeness_results,  
-  geo_consistency_results = geo_consistency_results,  
-  geo_level = GEOLEVEL  
-)
+if (!is.null(geo_consistency_results) && !"facility_id" %in% colnames(geo_consistency_results)) {
+  print("Expanding geo-level consistency results to facilities...")
+  facility_consistency_results <- expand_geo_consistency_to_facilities(
+    facility_metadata = facility_metadata,  
+    geo_consistency_results = geo_consistency_results,  
+    geo_level = GEOLEVEL  
+  )
+} else {
+  print("Geo consistency results already at facility level. Skipping expansion...")
+  facility_consistency_results <- geo_consistency_results
+}
 
-# Ensure consistency data has one row per facility-month by pivoting ratio pairs
+
 consistency_expanded <- facility_consistency_results %>%
-  select(facility_id, year, month, ratio_type, sconsistency) %>%  # Keep only necessary columns
   pivot_wider(
+    id_cols = c(facility_id, year, month, any_of(geo_cols)),
     names_from = ratio_type,   
     values_from = sconsistency, 
     values_fill = list(sconsistency = 0)
   ) %>%
   mutate(across(where(is.numeric), ~ replace_na(.x, 0))) %>%  # Ensure no remaining NAs
-  distinct(facility_id, year, month, .keep_all = TRUE)
+  distinct(facility_id, year, month, .keep_all = TRUE)  # Ensure unique rows
 
-# Restore geo_cols AFTER pivoting to avoid duplication issues
-consistency_expanded <- consistency_expanded %>%
-  left_join(
-    facility_consistency_results %>%
-      select(facility_id, year, month, any_of(geo_cols)) %>% distinct(),  # Use any_of() instead of all_of()
-    by = c("facility_id", "year", "month")
-  )
 
 
 # RUN Data Quality Assessment (DQA)
