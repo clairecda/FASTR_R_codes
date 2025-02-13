@@ -288,7 +288,7 @@ expand_geo_consistency_to_facilities <- function(facility_metadata, geo_consiste
 
 # PART 3 COMPLETENESS ----------------------------------------------------------------------------------------
 completeness_analysis <- function(data, geo_cols) {
-  print("Performing completeness analysis for each indicator separately...")
+  print("Performing completeness analysis for each indicator separately with smoothing...")
   
   # List to store completeness data for each indicator
   completeness_list <- list()
@@ -301,11 +301,12 @@ completeness_analysis <- function(data, geo_cols) {
     
     # Filter data for the current indicator
     indicator_data <- data %>% filter(indicator_common_id == indicator)
+    
     # Get the count of unique facilities reporting this indicator
     unique_facilities <- indicator_data %>% distinct(facility_id) %>% nrow()
     print(paste("Number of facilities reporting for", indicator, ":", unique_facilities))
     
-    # Get the first and last recorded month for this indicator
+    # Find first and last record dates for this indicator
     first_record <- indicator_data %>%
       summarise(first_date = min(as.Date(paste(year, month, "1", sep = "-")), na.rm = TRUE)) %>%
       pull(first_date)
@@ -317,23 +318,32 @@ completeness_analysis <- function(data, geo_cols) {
     print(paste("First record for", indicator, ":", first_record))
     print(paste("Last record for", indicator, ":", last_record))
     
-    # Generate full grid of months ONLY within the valid reporting range
-    all_year_months <- tibble(date = seq(from = first_record, to = last_record, by = "month")) %>%
-      mutate(year = year(date), month = month(date)) %>%
-      select(-date)
+    # Step 1: Generate a full grid of year-month combinations ONLY for this indicator's reporting period
+    all_year_months <- indicator_data %>%
+      group_by(year) %>%
+      summarise(
+        min_month = min(month, na.rm = TRUE),
+        max_month = max(month, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      rowwise() %>%
+      mutate(month_seq = list(seq(from = min_month, to = max_month))) %>%
+      unnest(month_seq) %>%
+      rename(month = month_seq) %>%
+      select(-min_month, -max_month)
     
-    # Get facilities that reported for this indicator
+    # Step 2: Get the facilities that reported for this indicator
     reporting_facilities <- indicator_data %>% distinct(facility_id)
     
-    # Expand grid for facilities within valid reporting range
+    # Step 3: Expand only for these facilities and their reporting period
     complete_month_grid <- reporting_facilities %>%
       crossing(all_year_months) %>%
       mutate(indicator_common_id = indicator)
     
-    # Drop geo_cols temporarily
+    # Drop geo_cols temporarily to avoid missing values for added rows
     indicator_data_no_geo <- indicator_data %>% select(-all_of(geo_cols))
     
-    # Left join to retain full reporting period ONLY within relevant window
+    # Step 4: Left join with data to retain all facility-months within reporting period
     expanded_data <- complete_month_grid %>%
       left_join(indicator_data_no_geo, by = c("facility_id", "indicator_common_id", "year", "month")) %>%
       mutate(
@@ -343,43 +353,61 @@ completeness_analysis <- function(data, geo_cols) {
         negdate = as.integer(date) * -1
       )
     
-    # Ensure completeness is assessed only within relevant reporting window
-    expanded_data <- expanded_data %>%
+    # Step 5: Apply smoothing per facility (prevents premature incompleteness marking)
+    smoothed_data <- expanded_data %>%
+      group_by(facility_id) %>%
+      arrange(date) %>%
       mutate(
-        completeness_flag = ifelse(is.na(count), 0, 1),  # Missing counts tagged as 0
-        count = ifelse(is.na(count), 0, count)  # Fill missing counts with 0
-      )
+        first_valid_report = cumsum(!is.na(count) & count > 0) > 0,
+        last_valid_report = rev(cumsum(rev(!is.na(count) & count > 0)) > 0),
+        
+        # Compute trailing months since last report
+        trailing_months = ifelse(!is.na(count) & count > 0, 0, NA_integer_),
+        trailing_months = zoo::na.locf(trailing_months, fromLast = TRUE, na.rm = FALSE),
+        trailing_months = ifelse(is.na(trailing_months), 12, trailing_months + 1),
+        
+        # Mark completeness only for valid reporting periods
+        completeness_flag = ifelse(first_valid_report & last_valid_report, ifelse(is.na(count), 0, 1), NA_real_)
+      ) %>%
+      ungroup()
     
-    # Summarize completeness at facility-month level
-    facility_month_data <- expanded_data %>%
-      group_by(facility_id, indicator_common_id, year, month, period_id, quarter_id) %>%
+    # Step 6: Summarize completeness at facility-month level
+    facility_month_data <- smoothed_data %>%
+      group_by(
+        facility_id, 
+        indicator_common_id, 
+        year, 
+        month, 
+        period_id,
+        quarter_id
+      ) %>%
       summarise(
         count = sum(count, na.rm = TRUE),
         reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Count of reported months
-        completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness
+        completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness per facility-month
         .groups = "drop"
       ) %>%
       mutate(
-        completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Ensure completeness flag is set
+        completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Ensure completeness_flag is set
       )
     
     # Store results for this indicator
     completeness_list[[indicator]] <- facility_month_data
   }
   
-  # Combine all indicators
+  # Step 7: Combine all indicators into a single dataset
   final_completeness_data <- bind_rows(completeness_list)
   
-  # Fix many-to-many join issue for facility metadata
+  # Step 8: Fix the many-to-many join issue for facility metadata
   facility_metadata_unique <- data %>%
     select(facility_id, all_of(geo_cols)) %>%
     distinct(facility_id, .keep_all = TRUE)
   
-  # Rejoin geo_cols
+  # Step 9: Rejoin geo_cols
   final_completeness_data <- final_completeness_data %>%
     left_join(facility_metadata_unique, by = "facility_id")
   
-  # Return summarized completeness data
+  # Step 10: Return the summarized completeness data
   return(final_completeness_data)
 }
 
@@ -528,11 +556,9 @@ print(paste("DQA indicators selected:", ifelse(length(dqa_indicators_to_use) > 0
 print("Running outlier analysis...")
 outlier_data_main <- outlier_analysis(data, geo_cols, outlier_params)
 
-
 # Run Completeness Analysis
 print("Running completeness analysis...")
 completeness_results <- completeness_analysis(outlier_data_main, geo_cols)
-
 
 # Run Consistency Analysis (if applicable)
 if (length(consistency_params$consistency_pairs) > 0) {
