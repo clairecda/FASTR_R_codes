@@ -17,7 +17,7 @@ DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 
 
-# DATA: nigeria_sampled_data.csv
+# DATA: nigeria_imported_data.csv
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
 # Outlier Analysis Parameters
@@ -301,12 +301,11 @@ completeness_analysis <- function(data, geo_cols) {
     
     # Filter data for the current indicator
     indicator_data <- data %>% filter(indicator_common_id == indicator)
-    
     # Get the count of unique facilities reporting this indicator
     unique_facilities <- indicator_data %>% distinct(facility_id) %>% nrow()
     print(paste("Number of facilities reporting for", indicator, ":", unique_facilities))
     
-    # Find first and last record dates for this indicator
+    # Get the first and last recorded month for this indicator
     first_record <- indicator_data %>%
       summarise(first_date = min(as.Date(paste(year, month, "1", sep = "-")), na.rm = TRUE)) %>%
       pull(first_date)
@@ -318,32 +317,23 @@ completeness_analysis <- function(data, geo_cols) {
     print(paste("First record for", indicator, ":", first_record))
     print(paste("Last record for", indicator, ":", last_record))
     
-    # Step 1: Generate a full grid of year-month combinations ONLY for this indicator's reporting period
-    all_year_months <- indicator_data %>%
-      group_by(year) %>%
-      summarise(
-        min_month = min(month, na.rm = TRUE),
-        max_month = max(month, na.rm = TRUE),
-        .groups = "drop"
-      ) %>%
-      rowwise() %>%
-      mutate(month_seq = list(seq(from = min_month, to = max_month))) %>%
-      unnest(month_seq) %>%
-      rename(month = month_seq) %>%
-      select(-min_month, -max_month)
+    # Generate full grid of months ONLY within the valid reporting range
+    all_year_months <- tibble(date = seq(from = first_record, to = last_record, by = "month")) %>%
+      mutate(year = year(date), month = month(date)) %>%
+      select(-date)
     
-    # Step 2: Get the facilities that reported for this indicator
+    # Get facilities that reported for this indicator
     reporting_facilities <- indicator_data %>% distinct(facility_id)
     
-    # Step 3: Expand only for these facilities and their reporting period
+    # Expand grid for facilities within valid reporting range
     complete_month_grid <- reporting_facilities %>%
       crossing(all_year_months) %>%
       mutate(indicator_common_id = indicator)
     
-    # Drop geo_cols temporarily to avoid missing values for added rows
+    # Drop geo_cols temporarily
     indicator_data_no_geo <- indicator_data %>% select(-all_of(geo_cols))
     
-    # Step 4: Left join with data to retain all facility-months within reporting period
+    # Left join to retain full reporting period ONLY within relevant window
     expanded_data <- complete_month_grid %>%
       left_join(indicator_data_no_geo, by = c("facility_id", "indicator_common_id", "year", "month")) %>%
       mutate(
@@ -353,50 +343,43 @@ completeness_analysis <- function(data, geo_cols) {
         negdate = as.integer(date) * -1
       )
     
-    # Step 5: Identify completeness - Keep all months within reporting range, even if not reported
+    # Ensure completeness is assessed only within relevant reporting window
     expanded_data <- expanded_data %>%
       mutate(
-        completeness_flag = ifelse(is.na(count), 0, 1),  # Missing counts are tagged as 0
+        completeness_flag = ifelse(is.na(count), 0, 1),  # Missing counts tagged as 0
         count = ifelse(is.na(count), 0, count)  # Fill missing counts with 0
       )
     
-    # Step 6: Summarize completeness at facility-month level
+    # Summarize completeness at facility-month level
     facility_month_data <- expanded_data %>%
-      group_by(
-        facility_id, 
-        indicator_common_id, 
-        year, 
-        month, 
-        period_id,
-        quarter_id
-      ) %>%
+      group_by(facility_id, indicator_common_id, year, month, period_id, quarter_id) %>%
       summarise(
         count = sum(count, na.rm = TRUE),
         reported_facility_months = sum(completeness_flag, na.rm = TRUE),  # Count of reported months
-        completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness per facility-month
+        completeness_rate = mean(completeness_flag, na.rm = TRUE),        # Proportion completeness
         .groups = "drop"
       ) %>%
       mutate(
-        completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Ensure completeness_flag is set
+        completeness_flag = ifelse(reported_facility_months > 0, 1, 0)  # Ensure completeness flag is set
       )
     
     # Store results for this indicator
     completeness_list[[indicator]] <- facility_month_data
   }
   
-  # Step 7: Combine all indicators into a single dataset
+  # Combine all indicators
   final_completeness_data <- bind_rows(completeness_list)
   
-  # Step 8: Fix the many-to-many join issue for facility metadata
+  # Fix many-to-many join issue for facility metadata
   facility_metadata_unique <- data %>%
     select(facility_id, all_of(geo_cols)) %>%
     distinct(facility_id, .keep_all = TRUE)
   
-  # Step 9: Rejoin geo_cols
+  # Rejoin geo_cols
   final_completeness_data <- final_completeness_data %>%
     left_join(facility_metadata_unique, by = "facility_id")
   
-  # Step 10: Return the summarized completeness data
+  # Return summarized completeness data
   return(final_completeness_data)
 }
 
@@ -522,7 +505,7 @@ dqa_without_consistency <- function(
 }
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("nigeria_sampled_data.csv")
+inputs <- load_and_preprocess_data("nigeria_imported_data.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -545,9 +528,11 @@ print(paste("DQA indicators selected:", ifelse(length(dqa_indicators_to_use) > 0
 print("Running outlier analysis...")
 outlier_data_main <- outlier_analysis(data, geo_cols, outlier_params)
 
+
 # Run Completeness Analysis
 print("Running completeness analysis...")
 completeness_results <- completeness_analysis(outlier_data_main, geo_cols)
+
 
 # Run Consistency Analysis (if applicable)
 if (length(consistency_params$consistency_pairs) > 0) {
