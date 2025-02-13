@@ -6,9 +6,10 @@ SELECTEDCOUNT <- "count_final_both"  # Change as needed
 # Module: SERVICE UTILIZATION
 
 # This script analyzes disruptions in essential health services using adjusted HMIS data (M2_adjusted_data.csv).
-# It runs regressions at both the indicator and indicator × district levels.
+# It runs regressions at (1) the indicator level, (2) indicator × province level, and (3) the indicator × district level.
 
-
+# Ce code analyse les perturbations des services de santé essentiels à partir des données HMIS ajustées.
+# Il exécute des régressions pour chaque indicateur aux niveaux national, régional et au niveau des districts sanitaires.
 # ------------------------------------- KEY OUTPUTS ----------------------------------------------------------
 # FILE: M3_service_utilization.csv             # Adjusted volumes aggregated at the lowest geo level
 # FILE: M3_disruptions_analysis.csv            # Outputs from the disruption analysis
@@ -91,20 +92,20 @@ for (indicator in indicators) {
                  cluster = as.formula(paste0("~", lowest_geo_level)))
   
   indicator_data <- indicator_data %>%
-    mutate(expect_national = predict(model, newdata = indicator_data))
+    mutate(expect_admin_area_1 = predict(model, newdata = indicator_data))
   
   for (pmonth in unique(indicator_data$date[indicator_data$tagged == 1])) {
     coeff <- coef(model)["tagged"]
     indicator_data <- indicator_data %>%
-      mutate(expect_national = ifelse(date == pmonth, expect_national - coeff, expect_national))
+      mutate(expect_admin_area_1 = ifelse(date == pmonth, expect_admin_area_1 - coeff, expect_admin_area_1))
   }
   
   indicator_data <- indicator_data %>%
     mutate(
-      b_national = ifelse(tagged == 1, -1 * (mean(expect_national - !!sym(SELECTEDCOUNT), na.rm = TRUE) / mean(expect_national, na.rm = TRUE)), NA_real_),
-      b_trend_national = coef(model)["date"]
+      b_admin_area_1 = ifelse(tagged == 1, -1 * (mean(expect_admin_area_1 - !!sym(SELECTEDCOUNT), na.rm = TRUE) / mean(expect_admin_area_1, na.rm = TRUE)), NA_real_),
+      b_trend_admin_area_1 = coef(model)["date"]
     ) %>%
-    select(facility_id, date, indicator_common_id, expect_national, b_national, b_trend_national)
+    select(facility_id, date, indicator_common_id, expect_admin_area_1, b_admin_area_1, b_trend_admin_area_1)
   
   results_list[[indicator]] <- indicator_data
 }
@@ -113,12 +114,12 @@ results_long <- bind_rows(results_list)
 
 # Merge national-level results into main dataset
 data_disruption <- data_disruption %>%
-  left_join(results_long, by = c("facility_id", "date", "indicator_common_id"))
+  left_join(results_long,
+            by = c("facility_id", "date", "indicator_common_id"))
+
 
 
 # # Step 4b: Run Regression for Each Indicator × District ------------------------
-#
-# ERROR - NEED TO REVIEW - Too many NAs??? 
 # print("Running regressions at the district level...")
 # 
 # for (indicator in indicators) {
@@ -129,45 +130,51 @@ data_disruption <- data_disruption %>%
 #       filter(indicator_common_id == indicator, admin_area_3 == district) %>%
 #       drop_na(!!sym(SELECTEDCOUNT))
 #     
-#     if (nrow(district_data) < 20) {
-#       print(paste("Skipping", indicator, "in", district, "- insufficient data"))
+#     # Ensure enough data before running regression
+#     if (nrow(district_data) < 30 || length(unique(district_data[[SELECTEDCOUNT]])) < 2) {
+#       print(paste("Skipping:", indicator, "in", district, "- insufficient variation in data"))
 #       next
 #     }
 #     
-#     model <- feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")), 
-#                    data = district_data, 
-#                    cluster = as.formula(paste0("~", lowest_geo_level)))
+#     # Run district-level regression dynamically with error handling
+#     model_district <- tryCatch(
+#       feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")), 
+#             data = district_data, 
+#             cluster = as.formula(paste0("~", lowest_geo_level))),
+#       error = function(e) NULL
+#     )
 #     
-#     district_data <- district_data %>%
-#       mutate(expect_district = predict(model, newdata = district_data))
-#     
-#     for (pmonth in unique(district_data$date[district_data$tagged == 1])) {
-#       coeff <- coef(model)["tagged"]
-#       district_data <- district_data %>%
-#         mutate(expect_district = ifelse(date == pmonth, expect_district - coeff, expect_district))
+#     # Check if model is valid before proceeding
+#     if (is.null(model_district) || anyNA(coef(model_district)) || anyNA(vcov(model_district))) {
+#       print(paste("Skipping district-level regression for:", indicator, "in", district, "- model issue"))
+#       next
 #     }
 #     
+#     # Compute expected values with NA handling
 #     district_data <- district_data %>%
+#       mutate(expect_district = ifelse(is.na(predict(model_district, newdata = district_data)), NA_real_, predict(model_district, newdata = district_data))) %>%
 #       mutate(
 #         b_district = ifelse(tagged == 1, -1 * (mean(expect_district - !!sym(SELECTEDCOUNT), na.rm = TRUE) / mean(expect_district, na.rm = TRUE)), NA_real_),
-#         b_trend_district = coef(model)["date"]
+#         b_trend_district = coef(model_district)["date"]
 #       ) %>%
-#       select(facility_id, date, indicator_common_id, admin_area_3, expect_district, b_district, b_trend_district)
+#       select(facility_id, date, indicator_common_id, admin_area_3, expect_district, b_district, b_trend_district)  
 #     
 #     district_results_list[[paste(indicator, district, sep = "_")]] <- district_data
 #   }
 # }
 # 
-
+# 
+# # Combine district results
 # district_results_long <- bind_rows(district_results_list)
-
+# 
 # # Merge district-level results into main dataset using admin_area_3
 # data_disruption <- data_disruption %>%
 #   left_join(district_results_long, 
 #             by = c("facility_id", "date", "indicator_common_id", "admin_area_3"), 
-#             suffix = c("", "_district"))  # Prevents column name conflicts
+#             suffix = c("", "_admin_area_3"))  # Prevents column name conflicts
 # 
 # print("District-level regression analysis complete!")
+
 
 # Step 4c: Run Regression for Each Indicator × Province ------------------------
 print("Running regressions at the province level...")
@@ -194,12 +201,12 @@ for (indicator in indicators) {
     
     if (!is.null(model_province) && !anyNA(coef(model_province))) {
       province_data <- province_data %>%
-        mutate(expect_province = predict(model_province, newdata = province_data)) %>%
+        mutate(expect_admin_area_2 = predict(model_province, newdata = province_data)) %>%
         mutate(
-          b_province = ifelse(tagged == 1, -1 * (mean(expect_province - !!sym(SELECTEDCOUNT), na.rm = TRUE) / mean(expect_province, na.rm = TRUE)), NA_real_),
-          b_trend_province = coef(model_province)["date"]
+          b_admin_area_2 = ifelse(tagged == 1, -1 * (mean(expect_admin_area_2 - !!sym(SELECTEDCOUNT), na.rm = TRUE) / mean(expect_admin_area_2, na.rm = TRUE)), NA_real_),
+          b_trend_admin_area_2 = coef(model_province)["date"]
         ) %>%
-        select(facility_id, date, indicator_common_id, admin_area_2, expect_province, b_province, b_trend_province)  # ✅ Fix: use admin_area_2
+        select(facility_id, date, indicator_common_id, admin_area_2, expect_admin_area_2, b_admin_area_2, b_trend_admin_area_2)
       
       province_results_list[[paste(indicator, province, sep = "_")]] <- province_data
     }
@@ -213,7 +220,7 @@ province_results_long <- bind_rows(province_results_list)
 data_disruption <- data_disruption %>%
   left_join(province_results_long, 
             by = c("facility_id", "date", "indicator_common_id", "admin_area_2"), 
-            suffix = c("", "_province"))  # Prevents column name conflicts
+            suffix = c("", "_admin_area_2"))  # Prevents column name conflicts
 
 
 print("Province-level regression analysis complete!")
