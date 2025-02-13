@@ -400,7 +400,6 @@ completeness_analysis <- function(data, geo_cols) {
   return(final_completeness_data)
 }
 
-
 # PART 4 DQA ----------------------------------------------------------------------------------------------------
 # 1. dqa_with_consistency: Includes consistency checks
 # 2. dqa_without_consistency: Excludes consistency checks
@@ -569,7 +568,7 @@ if (length(consistency_params$consistency_pairs) > 0) {
 
 # Expend consistency - join to facility
 facility_consistency_results <- expand_geo_consistency_to_facilities(
-  facility_metadata = data,  
+  facility_metadata = completeness_results,  
   geo_consistency_results = geo_consistency_results,  
   geo_level = GEOLEVEL  
 )
