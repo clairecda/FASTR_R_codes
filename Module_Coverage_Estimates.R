@@ -15,10 +15,15 @@ INFANT_MORTALITY_RATE <- 0.05
 # Module: Coverage Estimates
 
 # Description:
-# This script replicates the Stata Coverage Estimates module (National). It processes the
-# annual volume data (after outlier adjustment), applies population projections, integrates survey data
-# (MICS/DHS), calculates coverage estimates, selects optimal denominators based
-# on minimal error compared to surveys, and exports the results for each country.
+# This script processes the annual volume data (adjusted for completeness and outliers),  
+# applies population projections, integrates survey data (MICS/DHS),  
+# calculates coverage estimates, selects optimal denominators based on minimal error compared to surveys,  
+# and exports the results for the country.  
+
+# Ce code traite les données de volume annuel (ajustées pour la complétude et les valeurs aberrantes),  
+# applique des projections démographiques, intègre les données d'enquêtes (MICS/DHS),  
+# calcule les estimations de couverture, sélectionne les dénominateurs optimaux en fonction de l'erreur minimale  
+# par rapport aux enquêtes, et exporte les résultats pour le pays.  
 
 
 # ------------------------------------- KEY OUTPUTS --------------------------------------------------------------------------------------------
