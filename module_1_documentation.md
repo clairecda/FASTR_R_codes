@@ -68,7 +68,9 @@ The FASTR analysis generates one main output related to internal consistency: **
 
 For a given indicator-pair in a given time period (i.e. year),
 
-$$\\text{\\% of districts that are consistent} = \\frac{\\text{Number of districts meeting consistency benchmark}}{\\text{Total number of districts}} \\times 100$$
+$$
+\text{\% of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100
+$$
 
 The % of districts meeting consistency benchmarks can be presented at national level as well as subnational level.  This is generally presented for each indicator of interest and not aggregated across indicators. 
 
@@ -87,7 +89,8 @@ A facility is deemed to be “reporting” if there is a non-missing, non-zero v
 
 Notes on completeness:
 • A high level of completeness does not necessarily indicate that the HMIS is representative of all service delivery in the country as some services many not be delivered in facilities, or some facilities may not report.
-• For countries where the DHIS2 system does not store 0's, indicator completeness may be underestimated if there are many low-volume facilities for a given indicator.
+
+• For countries where the DHIS2 system does not store zeroes, indicator completeness may be underestimated if there are many low-volume facilities for a given indicator.
 
 Completeness is estimated for the following indicators in the core FASTR analysis:
 - Outpatient visits
