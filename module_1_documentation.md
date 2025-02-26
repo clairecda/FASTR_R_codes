@@ -69,8 +69,10 @@ The FASTR analysis generates one main output related to internal consistency: **
 For a given indicator-pair in a given time period (i.e. year),
 
 $$
-\text{\% of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100
+\text{Percentage of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100
 $$
+
+
 
 The % of districts meeting consistency benchmarks can be presented at national level as well as subnational level.  This is generally presented for each indicator of interest and not aggregated across indicators. 
 
