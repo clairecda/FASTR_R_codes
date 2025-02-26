@@ -334,7 +334,6 @@ generate_full_series_per_indicator <- function(outlier_data, indicator_id, timef
   return(complete_data)
 }
 
-
 # Main processing function
 process_completeness <- function(outlier_data_main) {
   print("Starting completeness processing...")
@@ -347,15 +346,13 @@ process_completeness <- function(outlier_data_main) {
   ), by = indicator_common_id]
   
   print(paste("Identified timeframes for", nrow(indicator_timeframe), "indicators"))
-
   
   # Deduplicate to ensure one row per facility
   geo_lookup <- unique(outlier_data_main[, c("facility_id", geo_cols), with = FALSE])
   
-  
   print(paste("Geo data extracted for", nrow(geo_lookup), "facilities"))
   
-  # Process each indicator separately to optimize memory usage
+  # Process each indicator separately
   completeness_list <- lapply(unique(outlier_data_main$indicator_common_id), function(ind) {
     print(paste("Starting processing for indicator:", ind))
     
@@ -368,14 +365,23 @@ process_completeness <- function(outlier_data_main) {
     complete_data <- complete_data[order(facility_id, date)]  # Order data
     
     complete_data[, has_reported := !is.na(count), by = facility_id]  # Identify reporting months
-    complete_data[, first_report_idx := cumsum(has_reported) > 0, by = facility_id]  # First report
-    complete_data[, last_report_idx := rev(cumsum(rev(has_reported)) > 0), by = facility_id]  # Last report
+    complete_data[, first_report_idx := cumsum(has_reported) > 0, by = facility_id]  # Identify first report
+    complete_data[, last_report_idx := rev(cumsum(rev(has_reported)) > 0), by = facility_id]  # Identify last report
     
+    # Identify consecutive missing periods
+    complete_data[, missing_group := rleid(has_reported), by = facility_id]
+    complete_data[, missing_count := .N, by = .(facility_id, missing_group)]
+    
+    # Flag for facilities inactive for 6+ months before first or after last report
+    complete_data[, offline_flag := fifelse(
+      (missing_group == 1 & missing_count >= 6 & !first_report_idx) | 
+        (missing_group == max(missing_group) & missing_count >= 6 & !last_report_idx),
+      2, 0), by = facility_id]
+    
+    # Assign completeness flags
     complete_data[, completeness_flag := fifelse(
-      !first_report_idx, 2, fifelse(
-        has_reported, 1, fifelse(
-          first_report_idx & last_report_idx, 0, 2
-        )
+      offline_flag == 2, 2, fifelse(
+        has_reported, 1, 0
       )
     ), by = facility_id]
     
