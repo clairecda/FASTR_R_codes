@@ -19,9 +19,22 @@ For the FASTR analysis, we identify outliers which are suspiciously high values 
  For which:
 - The volume is greater than or equal to the median **AND**
 - The volume is not missing **AND**
-- The volume is greater than 100. 
+- The volume is greater than 100.
+
 #### Detailed analysis steps
-This analysis is designed to detect and correct outliers in service volume data reported by health facilities. The code applies multiple methods to identify outliers, including the calculation of the Median Absolute Deviation (MAD) and the proportion of total service volume reported in a given time period. Outliers are identified  and flagged via binary variable… (outlier-flag ==1)
+This analysis is designed to detect and correct outliers in service volume data reported by health facilities. The code applies multiple methods to identify outliers, including the calculation of the Median Absolute Deviation (MAD) and the proportion of total service volume reported in a given time period. There are X main steps in this process:
+
+(insert here steps -cb)
+
+### Statistical notes
+#### How is a median absolute deviation (MAD) calculated ?
+- Compute the median: Find the median of the dataset.
+- Calculate absolute deviations: Subtract the median from each data point to get the absolute deviations (i.e., take the absolute value of the difference between each data point and the median).
+- Find the median of absolute deviations: Calculate the median of these absolute deviations.
+- To determine the degree of outlier, calculate the median average absolute deviation residuals:
+$$\frac{\text{(abs(volume - median volume))}}{\text{MAD}}$$
+
+- If this value is greater than 10, the value is an outlier.
 
 ### Consistency between related indicators
 Program indicators with a predictable relationship are examined to determine whether the expected relationship exists between them. In other words, this process examines whether the observed relationship between the indicators, as shown in the reported data, is that which is expected.
@@ -38,7 +51,15 @@ FASTR assesses the following pairs of indicators to measure internal consistency
 These pairs of indicators have expected relationships. For example, we expect the number of pregnant women receiving a first ANC visit will always be higher than the number of pregnant women receiving a fourth ANC visit. BCG is a birth dose vaccine so we expect that these indicators will be equal. However, we recognize there may be more variability in this predicted relationship thus we set a range of within 30%. 
 
 #### Detailed analysis steps
-To calculate each comparison, 
+This analysis is designed to identify inconsistencies in service volume data reported by health facilities. Pairs of indicators with an expected relationship are compared as the district and national levels. Consistency benchmarks are applied to identify potential challenges with internal consistency of related indicators. There are xx main steps in this process:
+
+(Draft below)
+1. Remove outliers
+2. Aggregate data
+3. Calculate consistency ratios
+4. Assess benchmarks
+5. Save data (output object name here)
+
 - Drop outlier values as identified in the previous step.
 - For each indicator, calculate the service volume (i.e. unadjusted volume ) per admin area and year.
 - Calculate the ratio of service volumes as per the above indicator pairs. 
@@ -64,8 +85,9 @@ $$\text{BCG/Delivery Consistency} =
 \end{cases}$$
 
 #### Analysis outputs, data visualization and interpretation
-The FASTR analysis generates one main output related to internal consistency: **insert here png output**, percent of districts meeting consistency benchmarks
-
+The FASTR analysis generates one main output related to internal consistency:
+(Insert here image/illustration heat-map)
+Percent of districts meeting consistency benchmarks
 For a given indicator-pair in a given time period (i.e. year),
 
 $$
@@ -150,4 +172,4 @@ This analysis is designed to generate a summary data quality score. There are **
 
 
 ---- 
-Last edit 2025 Feb 26
+Last edit 2025 March 5
