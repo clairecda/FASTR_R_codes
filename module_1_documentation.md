@@ -4,13 +4,10 @@ Routinely reported health facility data are an important source for health indic
 The FASTR approach conducts an analysis of monthly data by facility and by indicator to assess data quality. Results are presented as annual estimates but may comprise a partial year of data given the availability of data at the time the analysis is conducted (e.g., an analysis conducted in June 2024 may contain data from January – May 2024, and this will be presented as the analysis for 2024).
 
 ## Overview
-
 The Data Quality Assessment (DQA) module is designed to evaluate the reliability of HMIS (Health Management Information System) data by examining three key components:
-
 - **Detecting Outliers** – Identifies extreme observations that may indicate reporting errors or anomalies.
 - **Assessing Completeness** – Evaluates whether health facilities are consistently reporting data over time.
 - **Measuring Consistency** – Checks whether related indicators align with expected patterns.
-
 Finally, these assessments are integrated to generate a DQA score, which reflects the overall data quality. The following sections will provide a detailed explanation of each component, outlining the methodology and parameters applied in the analysis.
 
 ### Outlier Detection
@@ -20,17 +17,27 @@ For the FASTR analysis, we identify outliers which are suspiciously high values 
 - The volume is greater than or equal to the median **AND**
 - The volume is not missing **AND**
 - The volume is greater than 100.
-
 #### Detailed analysis steps
-This analysis is designed to detect and correct outliers in service volume data reported by health facilities. The code applies multiple methods to identify outliers, including the calculation of the Median Absolute Deviation (MAD) and the proportion of total service volume reported in a given time period. There are X main steps in this process:
-
-(insert here steps -cb)
+This analysis is designed to detect and correct outliers in service volume data reported by health facilities. The code applies multiple methods to identify outliers, including the calculation of the Median Absolute Deviation (MAD) and the proportion of total service volume reported in a given time period. The process consists of four key steps:
+**Step 1: Calculation of Median volume**
+- For each health facility and service indicator, the median service volume is computed using all available data points.
+**Step 2: Computation of median absolute deviation (MAD) and outlier identification**
+- The MAD is calculated for each facility-indicator combination, considering only values equal to or above the median.
+- The residual between the observed count and the median is divided by the MAD to generate a standardized residual.
+- An observation is flagged as an outlier if its MAD residual exceeds a predefined threshold (`MADS`). The MADS parameter, which determines the number of MADs required for an observation to be classified as an outlier, can be adjusted through the user interface (UI).
+**Step 3: Calculation of proportional contribution and outlier flagging**
+- The proportional contribution of each facility’s reported count to the total count for a given indicator and year is computed.
+- Any observation exceeding a predefined proportion threshold (`OUTLIER_PROPORTION_THRESHOLD`, default: 0.8) is flagged as a potential outlier. This threshold can be modified through the UI to fine-tune outlier detection sensitivity.
+**Step 4: Combining outlier flags and preparing data output**
+- The final outlier flag is determined by combining MAD-based and proportional contribution-based outlier flags.
+- An observation is classified as an outlier if it is flagged by either method and its count exceeds a specified threshold (`MINIMUM_COUNT_THRESHOLD`, default: 100). The `MINIMUM_COUNT_THRESHOLD` ensures that only facilities with a sufficiently large volume are considered for outlier detection, avoiding excessive flagging of small counts. This parameter is also adjustable in the UI.
+- The final dataset is prepared with relevant columns, including facility identifiers, geographic details, indicator IDs, time variables, and outlier-related metrics.
 
 ### Statistical notes
 #### How is a median absolute deviation (MAD) calculated ?
-- Compute the median: Find the median of the dataset.
-- Calculate absolute deviations: Subtract the median from each data point to get the absolute deviations (i.e., take the absolute value of the difference between each data point and the median).
-- Find the median of absolute deviations: Calculate the median of these absolute deviations.
+- Compute the median: find the median of the dataset.
+- Calculate absolute deviations: subtract the median from each data point to get the absolute deviations (i.e., take the absolute value of the difference between each data point and the median).
+- Find the median of absolute deviations: calculate the median of these absolute deviations.
 - To determine the degree of outlier, calculate the median average absolute deviation residuals:
 $$\frac{\text{(abs(volume - median volume))}}{\text{MAD}}$$
 
@@ -38,7 +45,6 @@ $$\frac{\text{(abs(volume - median volume))}}{\text{MAD}}$$
 
 ### Consistency between related indicators
 Program indicators with a predictable relationship are examined to determine whether the expected relationship exists between them. In other words, this process examines whether the observed relationship between the indicators, as shown in the reported data, is that which is expected.
-
 #### FASTR definition of internal consistency
 FASTR assesses the following pairs of indicators to measure internal consistency:
 
@@ -49,23 +55,22 @@ FASTR assesses the following pairs of indicators to measure internal consistency
 | BCG / Facility Deliveries | Ratio between 0.7 and 1.3 |
 
 These pairs of indicators have expected relationships. For example, we expect the number of pregnant women receiving a first ANC visit will always be higher than the number of pregnant women receiving a fourth ANC visit. BCG is a birth dose vaccine so we expect that these indicators will be equal. However, we recognize there may be more variability in this predicted relationship thus we set a range of within 30%. 
-
 #### Detailed analysis steps
-This analysis is designed to identify inconsistencies in service volume data reported by health facilities. Pairs of indicators with an expected relationship are compared as the district and national levels. Consistency benchmarks are applied to identify potential challenges with internal consistency of related indicators. There are xx main steps in this process:
-
-(Draft below)
-1. Remove outliers
-2. Aggregate data
-3. Calculate consistency ratios
-4. Assess benchmarks
-5. Save data (output object name here)
-
-- Drop outlier values as identified in the previous step.
-- For each indicator, calculate the service volume (i.e. unadjusted volume ) per admin area and year.
-- Calculate the ratio of service volumes as per the above indicator pairs. 
-
-If the following criteria are met, the ratio is considered consistent:
-
+This analysis identifies inconsistencies in service volume data by comparing related indicators at the lowest possible geographic aggregation level (e.g., district, ward). Since individuals may seek different services at multiple facilities within their local area, assessing consistency at this level provides a more accurate picture of service utilization patterns across a community. Instead of attributing all services to a single facility, this approach accounts for movement between facilities within a district or ward. Consistency benchmarks are then applied to detect potential discrepancies in the reporting of related indicators. The process consists of the following main steps:
+**Step 1: Determine the geographic level**
+- The lowest available geographic level is selected dynamically based on data availability, ensuring the most disaggregated level is used.
+**Step 2: Exclude outliers**
+Data points flagged as outliers (`outlier_flag = 1`) are removed to prevent extreme values from skewing the consistency assessment.
+**Step 3: Aggregate data at the selected geographic level and reshape to wide**
+Service volume data is aggregated at the lowest geographic level for each indicator (summing values across facilities for each combination of geographic area, indicator, year, and month).
+The aggregated data is then reshaped into a wide format, where each indicator is represented as a separate column.
+**Step 4: compute consistency ratios**
+- Predefined pairs of related indicators are extracted from the consistency parameters.
+- For each indicator pair, the ratio of the first indicator (col1) to the second indicator (col2) is calculated:
+$$\frac{\text{col1}}{\text{col2}}$$
+- If the denominator (col2) is zero, the consistency ratio is set to NA.
+**Step 5: Apply consistency benchmarks**
+Each indicator pair has predefined lower and upper bounds for acceptable consistency ratios.
 $$\text{ANC Consistency} =
 \begin{cases} 
 1, & \frac{\text{ANC1 Volume}}{\text{ANC4 Volume}} > 1 \\ 
@@ -83,37 +88,33 @@ $$\text{BCG/Delivery Consistency} =
 1, & 0.7 \leq \frac{\text{BCG Volume}}{\text{Delivery Volume}} \leq 1.3 \\ 
 0, & \text{otherwise}
 \end{cases}$$
-
+- If the computed ratio falls within this range, the pair is marked as consistent (`sconsistency = 1`).
+- If the ratio is outside the bounds, the pair is flagged as inconsistent (`sconsistency = 0`).
+- If the ratio cannot be computed due to missing values, it remains NA.
+**Step 6: Expand results to facility level**
+Each facility is assigned the consistency results of its corresponding district or ward.
 #### Analysis outputs, data visualization and interpretation
 The FASTR analysis generates one main output related to internal consistency:
 (Insert here image/illustration heat-map)
 Percent of districts meeting consistency benchmarks
 For a given indicator-pair in a given time period (i.e. year),
 
-$$
-\text{Percentage of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100
-$$
+$$\text{Percentage of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100$$
 
+The percentage of districts meeting consistency benchmarks can be presented at national level as well as subnational level.  This is generally presented for each indicator of interest and not aggregated across indicators. 
 
-
-The % of districts meeting consistency benchmarks can be presented at national level as well as subnational level.  This is generally presented for each indicator of interest and not aggregated across indicators. 
-
-The following colors have been used to create a heat map within the visualization: **insert here the color scale(s)**
-
+_The following colors have been used to create a heat map within the visualization: **insert here the color scale(s)**_
 
 ### Indicator completeness
 Indicator completeness measures the extent to which facilities that are supposed to report data on the selected core indicators are in fact doing so.  Higher completeness improves reliability of the data, especially when completeness is stable over time. This is different from overall reporting completeness in that it looks at completeness of specific data elements and not only at the receipt of the monthly reporting form.
-
 #### FASTR definition of indicator completeness
 For the FASTR analysis, completeness is defined as the percentage of reporting facilities each month out of the total number of facilities expected to report. For a given indicator in a given month,
+$$\text{\% of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100$$
 
-\text{\% of districts that are consistent} = \frac{\text{Number of districts meeting consistency benchmark}}{\text{Total number of districts}} \times 100
+A facility is deemed to be “reporting” if there is a non-missing, non-zero value recorded for the indicator and month. A facility is expected to report if it has reported any volume for each indicator anytime within a year.
 
-A facility is deemed to be “reporting” if there is a non-missing, non-zero value recorded for the indicator and month. A facility is expected to report if it has reported any volume for each indicator anytime within a year  . 
-
-Notes on completeness:
+_Notes on completeness_:
 • A high level of completeness does not necessarily indicate that the HMIS is representative of all service delivery in the country as some services many not be delivered in facilities, or some facilities may not report.
-
 • For countries where the DHIS2 system does not store zeroes, indicator completeness may be underestimated if there are many low-volume facilities for a given indicator.
 
 Completeness is estimated for the following indicators in the core FASTR analysis:
@@ -126,47 +127,43 @@ Completeness is estimated for the following indicators in the core FASTR analysi
 - BCG vaccine (BCG)
 - First pentavalent vaccine (Penta 1)
 - Third pentavalent vaccine (Penta 3)
-
 Country specific adaptations may include additional indicators of interest to the country.
-
-#### Detailed analysis steps (DRAFT)
-For each indicator, identify the earliest and latest month with reported data across all facilities. 
-
-Create a complete facility-month grid ensuring each facility has records for every month within its valid reporting period. 
-
-Combine the generated grid with actual reported data, preserving service volume values where available. 
-
-Determine whether a facility has reported data for each month.
-```r
-complete_data[, has_reported := !is.na(count), by = facility_id]
-
-```
-Identify when a facility first and last reported for each indicator:
-```r
-complete_data[, first_report_idx := cumsum(has_reported) > 0, by = facility_id]
-complete_data[, last_report_idx := rev(cumsum(rev(has_reported)) > 0), by = facility_id]
-
-```
-
-(…)
-Create variable to record complete, incomplete or offline
-1 (Complete): A facility has valid service volume data for the given month.
-0 (Incomplete): The facility is within its reporting period but missing data.
-2 (Offline): A facility is inactive **for more than 6 months** before or after any reporting period.
-Filter out offline. Exclude offline months to avoid penalizing facilities that may have opened later or closed earlier.
-
-
+#### Detailed analysis steps 
+This analysis ensures that all health facilities and indicators have a complete and continuous time series for service volume data. The process includes detecting missing data, generating full time series records, and tagging completeness based on reporting patterns. The methodology follows these key steps:
+**Step 1: Generate full time series per indicator**
+- For each indicator, the reporting time range (first and last reported month) is identified.
+- A complete month-wise facility-indicator grid is generated, ensuring that every facility has a full sequence of months between its first and last reporting period.
+- Period and quarter identifiers (`period_id` and `quarter_id`) are created in `YYYYMM` format to facilitate tracking.
+**Step 2: Merge with existing data**
+- The generated full time series is merged with the actual reported data to retain observed counts.
+- Missing values in the count column indicate periods where a facility did not report service volumes.
+**Step 3: Apply completeness tagging**
+Each facility's reporting behavior is assessed using the following flags:
+- `has_reported`:Indicates whether a facility has reported for a given month.
+- `first_report_idx:` Identifies the first month a facility submitted a report.
+- `last_report_idx`: Identifies the last month a facility submitted a report.
+- `missing_group`: Assigns a unique identifier to each consecutive period of missing months for a facility. When a facility has missing data for multiple months in a row, they are grouped under the same `missing_group_id`. If reporting resumes and then stops again, a new `missing_group_id` is assigned to the next block of missing months. This helps distinguish separate reporting gaps within a facility’s data.
+- `missing_count`: Represents the number of consecutive missing months within each `missing_group`.
+A facility is flagged as **inactive** (`offline_flag = 2)` if:
+- It remained inactive (did not report any data) for six or more consecutive months before its first reported month.
+- It remained inactive for six or more consecutive months after its last reported month.
+**Step 4: Assign completeness tags**
+Each facility’s completeness status is classified as follows: 
+- Complete (`1`): Facility reported data for that period.
+- Incomplete (`0`): Facility did not report but was not considered inactive.
+- Inactive (`2`): Facility was flagged as inactive based on reporting gaps.
+**Step 5: Final data preparation**
+Rows where a facility is flagged as inactive (`completeness_flag = 2`) are removed to maintain focus on active facilities.
+The final dataset includes completeness flags alongside facility, indicator, time, and geographic details.
 
 ### Data Quality Assessment (DQA)
 A composite measure of data quality provides an overall view of how well a dataset meets quality standards. By integrating multiple dimensions of data quality into a single score, it simplifies the interpretation of detailed information from several measures. This allows health systems to quickly assess the reliability of data, making it easier to identify trends and issues at a glance.
-
-FASTR definition of overall data quality score
+#### FASTR definition of overall data quality score
 For the FASTR analysis, we defined adequate data quality as:
 1. No missing indicator data for OPD, Penta1, ANC1, and family planning indicators, where available AND
 2. No outliers for OPD, Penta1, ANC1, and family planning indicators, where available AND
 3. Consistent reporting between Penta1/Penta3 and ANC1/ANC4.
-
-#### Detailed analysis steps 
+#### Detailed analysis steps
 
 This analysis is designed to generate a summary data quality score. There are **insert how many** main steps in this process:
 
