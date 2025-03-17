@@ -175,6 +175,16 @@ control_chart_analysis <- function(cleaned_data, geo_cols, selected_count) {
   }
   
   final_results <- bind_rows(results_list)
+  
+  print("Applying taggedmean logic for systemic disruptions...")
+  final_results <- final_results %>%
+    mutate(tagged = as.numeric(tagged)) %>%  # Ensure tagged is numeric
+    group_by(date) %>%
+    mutate(taggedmean = mean(tagged, na.rm = TRUE)) %>%
+    ungroup() %>%
+    mutate(tagged = ifelse(taggedmean > 0.3, 1, tagged)) %>%
+    #select(-taggedmean)  # Remove temporary column
+  
   print("Control chart analysis complete.")
   return(final_results)
 }
