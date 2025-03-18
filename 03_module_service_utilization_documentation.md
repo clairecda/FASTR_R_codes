@@ -11,7 +11,7 @@ The regression pipeline follows a structured, multi-level approach, starting fro
 ### Model Specification
 For each `indicator_common_id`, we estimate:
 
-$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_2 \cdot \text{tagged} + \epsilon_{it}$$
+$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month} + \beta_2 \cdot \text{tagged} + \epsilon_{it}$$
 
 Where:
 - $Y_{it}$ = volume (e.g., number of deliveries)
@@ -24,7 +24,7 @@ Where:
 
 Model specification:
 
-$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_2 \cdot \text{tagged} + \alpha_{\text{province}} + \epsilon_{it}$$
+$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month} + \beta_2 \cdot \text{tagged} + \alpha_{\text{province}} + \epsilon_{it}$$
 
 Where:
 - $Y_{it}$ = volume (e.g., number of deliveries)
@@ -46,7 +46,7 @@ Where:
 - $\text{date}$ = time trend
 - $\text{month}_m$ = controls for seasonality (factor variable)
 - $\text{tagged}$ = dummy for disruption period
-- $\alpha_{\text{district}}$ = District fixed effects
+- $\alpha_{\text{district}}$ = district fixed effects
 - $\epsilon_{it}$ = error term
 
 Each regression model (Country-wide, Province-level, and District-level) produces the following key outputs:
