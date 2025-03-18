@@ -6,7 +6,19 @@ output:
 
 # Module 3: Service Utilisation. Disruption analysis
 
-This module analyzes disruptions in service utilization… Part 1 - Control Chart Part 2 - Disruption Analysis Before running regressions, the data is prepared: - Merging `M3_chartout_selected` to get `tagged` variable. - Identifying the **lowest geographic level** (`lowest_geo_level`) for clustering. The regression pipeline follows a structured, multi-level approach, starting from the broadest level (country-wide) and moving to more granular levels (province, then district).
+This module analyzes disruptions in service utilization…
+
+##PART 1. Control Chart Analysis
+
+
+##PART 2. Disruption Analysis
+
+.... before running regressions, the data is prepared
+
+Merging `M3_chartout_selected` to get `tagged` variable
+Identifying the **lowest geographic level** (`lowest_geo_level`) for clustering
+
+then the regression pipeline follows a structured, multi-level approach, starting from the broadest level (country-wide) and moving to more granular levels (province, then district).
 
 ### Country-Wide Regression (Indicator Level)
 
