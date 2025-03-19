@@ -13,11 +13,34 @@ This module is used to
 -   Compare current service use volumes to historical trends and
     seasonality, adjusting for data quality.
 
-## PART 1. Control Chart Analysis
+## Background
+
+Service utilization refers to the volume of health services delivered
+and reported through routine health information systems. It reflects how
+populations access and use essential healthcare services over time.
+
+(...)
 
 The Control Chart analysis helps determine whether deviations in service
 volumes are part of normal fluctuations or indicate significant
 disruptions.
+
+The Disruption analysis helps quantify the impact of these disruptions
+by measuring how service volumes changed during flagged periods.
+
+(...)
+
+## Overview
+
+The Service Utilization module is designed to evaluate trends in health
+service usage by identifying disruptions and surpluses in service
+delivery over time. The module consists of two key components:
+
+1.  **Control chart analysis**
+
+2.  **Disruption analysis**
+
+### Control chart analysis
 
 The control chart analysis aggregates service volume data at the
 province level to monitor trends, filling in missing months to create a
@@ -39,43 +62,32 @@ Forward and backward tagging ensures systemic disruptions are captured,
 rather than isolated events, by propagating flagged anomalies in both
 directions.
 
-The results are saved in `M3_chartout.csv`, which is later merged with
-external disruption databases for tagging known disruptions.
+Once anomalies are flagged, they are merged with a disruption database
+that contains information on known events such as pandemics (e.g.,
+COVID-19), conflicts, coups, and policy changes. If a flagged anomaly
+falls within a known disruption period, the `tagged` variable is updated
+to ensure these disruptions are explicitly marked in the dataset.
 
-A note on *lead-lag smoothing*.
+The results of the control chart analysis are saved in
+**`M3_chartout.csv`**, which serves as an input for the disruption
+analysis.
 
-Lead-lag smoothing is a technique used to remove noise from a dataset by
-averaging observed values across past and future periods. The process
-works as follows:
+### Disruption analysis
 
-1.  For each data point, the algorithm considers a window of past
-    (lagged) and future (leading) values within a specified number of
-    months.
+Once anomalies are identified in `M3_chartout.csv`, the disruption
+analysis quantifies their impact using regression models. These models
+estimate how much service utilization changed during the flagged
+disruption periods by adjusting for long-term trends and seasonal
+variations.
 
-2.  Averages these values, creating a smoothed estimate that reduces
-    short-term fluctuations and better represents the underlying trend.
-
-3.  Interpolates missing values using linear interpolation, which
-    estimates the missing values by assuming a straight-line
-    relationship between the known data points before and after the gap.
-
-4.  Replaces each observed value with the computed smoothed value.
-
-Mathematically, lead-lag smoothing is represented as:
-
-$`\text{count\_smooth}_{it} = \frac{1}{2k+1} \sum_{j=-k}^{k} Y_{i,t+j}`$
+For each indicator, we estimate:
 
 where:
 
--   $Y_{i,t}$ is the observed service volume at time ${t}$ for province
-    ${i}$,
-
--   ${k}$ is the number of months considered for smoothing (e.g., 6
-    months),
-
--   ${t+j}$ represents the lead (+) and lag (-) months,
-
--   The sum takes the average across the window of ${2k+1}$ months.
+The coefficient on `tagged` (β2\beta_2β2​) measures the relative change
+in service utilization during flagged disruptions. Separate regressions
+are run at the province and district levels to assess the impact across
+different geographic scales.
 
 #### Detailed analysis steps
 
@@ -114,7 +126,6 @@ adjust the data and aggregate to province)**
 
     $`Y_{it} = \beta_0 + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_1 \cdot \text{date} + \epsilon_{it}`$
 
-
 Where:
 
 $Y_{it}$ is the observed service volume,
@@ -130,7 +141,42 @@ $\epsilon_{it}$ is the error term.
 
 **Step 4: Smoothing and residual calculation**
 
--   Applies lead-lag smoothing as described above.
+-   Applies lead-lag smoothing as described below.
+
+*Lead-lag smoothing* is a technique used to remove noise from a dataset
+by averaging observed values across past and future periods. The process
+works as follows:
+
+1.  For each data point, the algorithm considers a window of past
+    (lagged) and future (leading) values within a specified number of
+    months.
+
+2.  Averages these values, creating a smoothed estimate that reduces
+    short-term fluctuations and better represents the underlying trend.
+
+3.  Interpolates missing values using linear interpolation, which
+    estimates the missing values by assuming a straight-line
+    relationship between the known data points before and after the gap.
+
+4.  Replaces each observed value with the computed smoothed value.
+
+Mathematically, lead-lag smoothing is represented as:
+
+$`{count\_smooth}_{it} = \frac{1}{2k+1} \sum_{j=-k}^{k} Y_{i,t+j}`$
+
+where:
+
+-   $Y_{i,t}$ is the observed service volume at time ${t}$ for province
+    ${i}$,
+
+-   ${k}$ is the number of months considered for smoothing (e.g., 6
+    months),
+
+-   ${t+j}$ represents the lead (+) and lag (-) months,
+
+-   The sum takes the average across the window of ${2k+1}$ months.
+
+<!-- -->
 
 -   Computes residuals: the difference between actual values and
     smoothed predictions `count_smooth`.
@@ -153,14 +199,14 @@ $`\text{control}_{it} = \frac{\text{residual}_{it}}{sd\_residual}`$
 
 If:
 
--   $\text{control}_{it}> 2$, the observed service volume is
-    significantly higher than expected.
+$\text{control}_{it}> 2$, the observed service volume is significantly
+higher than expected.
 
--   $\text{control}_{it}< 2$, the observed service volume is
-    significantly lower than expected.
+$\text{control}_{it}< 2$, the observed service volume is significantly
+lower than expected.
 
--   Values between -2 and 2 are considered within the normal range of
-    variability.
+Values between -2 and 2 are considered within the normal range of
+variability.
 
 **Step 5: Tagging disruptions**
 
@@ -178,14 +224,13 @@ tagged:
 If the absolute difference between `Y_{it}` and `count_smooth` is less
 than 5% of `count_smooth`, it is also assigned `tag = 0`.
 
-$`\text{tag}_{it} = 
-\begin{cases} 
+$`\text{tag}_{it} =
+\begin{cases}
 1, & \text{if } |\text{control}_{it}| \geq 2 \\
 0, & \text{if } |Y_{it} - \text{count\_smooth}_{it} | \text{count\_smooth}_{it} < 0.05 \\
 0, & \text{if } |\text{control}_{it}| \leq 0.5 \\
 \text{NA}, & \text{otherwise}
 \end{cases}`$
-
 
 ## PART 2. Disruption Analysis
 
@@ -260,21 +305,29 @@ $\alpha_{\text{district}}$ = district fixed effects
 
 $\epsilon_{it}$ = error term
 
-Each regression model (Country-wide, Province-level, and District-level)
-produces the following key outputs: - Expected values
-(`expect_admin_area_*`): The predicted service volume based on the
-regression model, adjusted for seasonality and time trends. - Disruption
-effect (`b_admin_area_*`): The estimated relative change in service
-utilization during the disruption period, computed as:
+Each regression model (country-wide, province-level, and district-level)
+produces the following key outputs:
 
-$`b_{\text{admin_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$
+-   Expected values (`expect_admin_area_*`): The predicted service
+    volume based on the regression model, adjusted for seasonality and
+    time trends.
+
+-   Disruption effect (`b_admin_area_*`): The estimated relative change
+    in service utilization during the disruption period, computed as:
+
+$`b_{\text{admin\_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$
 
 This measures the impact of the disruption relative to expected values.
 
 -   Trend coefficient (`b_trend_admin_area_*`): The estimated underlying
     time trend in service volume, capturing long-term changes unrelated
     to disruptions.
+
 -   Statistical significance (p-value) (`p_admin_area_*`): The
     probability that the disruption effect (`b_admin_area_*`) is due to
     random variation rather than an actual disruption. Lower values
     indicate stronger evidence of a true effect.
+
+------------------------------------------------------------------------
+
+last edit March 19
