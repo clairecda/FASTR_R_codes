@@ -25,11 +25,24 @@ sub-national levels.
 
 ### Overview of the additional data used in the module
 
-Population projections (UNWPP)
+Population projections
 
-Survey data - MICS (UNICEF)
+Sourced from the United Nations World Population Prospects (WPP), these
+estimates provide age-specific and total population figures used to
+calculate denominators for coverage estimates. These projections account
+for demographic trends, including fertility, mortality, and migration.
 
-Survey data - DHS (USAID)
+Survey data - MICS
+
+The Multiple Indicator Cluster Surveys (MICS), conducted by UNICEF,
+provide household survey-based estimates for key health indicators,
+including coverage of maternal and child health services.
+
+Survey data - DHS
+
+The Demographic and Health Surveys (DHS), conducted by USAID, provide
+survey data on health service utilization, including immunization rates
+and maternal care coverage.
 
 #### Detailed analysis steps
 

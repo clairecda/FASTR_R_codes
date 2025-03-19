@@ -2,14 +2,24 @@ SELECTEDCOUNT <- "count"  # Change as needed
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Feb 10
-# Module: SERVICE UTILIZATION & DISRUPTION ANALYSIS
+# Last edit: 2025 Mar 19
+# Module: SERVICE UTILIZATION
 
-# This script analyzes disruptions in essential health services using adjusted HMIS data (M2_adjusted_data.csv).
-# It runs regressions at (1) the indicator level, (2) indicator × province level, and (3) the indicator × district level.
+
+# This script analyzes disruptions in essential health services using adjusted HMIS data (M2_adjusted_data.csv). 
+# It has two main components:
+#   1. Control Chart Analysis: Identifies whether deviations in service volumes are part of normal fluctuations 
+#      or indicate significant disruptions.
+#   2. Disruption Analysis: Quantifies the impact of these disruptions by measuring how service volumes changed 
+#      during flagged periods.
+
 
 # Ce code analyse les perturbations des services de santé essentiels à partir des données HMIS ajustées.
-# Il exécute des régressions pour chaque indicateur aux niveaux national, régional et au niveau des districts sanitaires.
+# Il comprend deux parties principales :
+#   1. Analyse des cartes de contrôle : Détermine si les écarts dans les volumes de services relèvent de fluctuations normales 
+#      ou signalent des perturbations importantes.
+#   2. Analyse des perturbations : Quantifie l'impact des perturbations en mesurant les variations des volumes 
+#      de services pendant les périodes signalées.
 
 # ------------------------------------- KEY OUTPUTS ----------------------------------------------------------
 # FILE: control_chart_results.csv       # Facility-level control chart analysis results with flags for anomalies.
@@ -26,6 +36,7 @@ library(zoo)
 library(readxl)
 library(fixest)  # For panel regressions (alternative to 'xtreg' in Stata)
 library(stringr)
+library(dplyr)
 
 #-------------------------------------------------------------------------------------------------------------
 # STEP 1: CONTROL CHART ANALYSIS
@@ -579,7 +590,7 @@ print("Province-level regression complete.")
 
 
 # # Step 5: Save Output ----------------------------------------------------------
-# print("Saving results...")
-# write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
-# #write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
-# write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
+print("Saving results...")
+write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
+#write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
+write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
