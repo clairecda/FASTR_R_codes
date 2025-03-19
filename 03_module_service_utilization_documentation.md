@@ -1,7 +1,8 @@
 ---
-editor_options: 
-  markdown: 
+editor_options:
+  markdown:
     wrap: 72
+output: pdf_document
 ---
 
 # Module 3: Service Utilization
@@ -16,8 +17,15 @@ This module is used to
 ## Background
 
 Service utilization refers to the volume of health services delivered
-and reported through routine health information systems. It reflects how
-populations access and use essential healthcare services over time.
+and reported through routine health information systems (i.e. DHIS2). It
+reflects how populations access and use essential healthcare services
+over time and across different regions.
+
+However, service utilization can fluctuate due to various factors,
+including seasonal trends, policy changes, pandemics, or other external
+shocks. Identifying whether these variations are part of normal patterns
+or signal significant disruptions is important for health system
+monitoring and decision-making.
 
 (...)
 
@@ -69,27 +77,36 @@ falls within a known disruption period, the `tagged` variable is updated
 to ensure these disruptions are explicitly marked in the dataset.
 
 The results of the control chart analysis are saved in
-**`M3_chartout.csv`**, which serves as an input for the disruption
-analysis.
+`M3_chartout.csv`, which serves as an input for the disruption analysis.
 
 ### Disruption analysis
 
-Once anomalies are identified in `M3_chartout.csv`, the disruption
-analysis quantifies their impact using regression models. These models
-estimate how much service utilization changed during the flagged
-disruption periods by adjusting for long-term trends and seasonal
-variations.
+Once anomalies are identified and saved in `M3_chartout.csv`, the
+disruption analysis quantifies their impact using regression models.
+These models estimate how much service utilization changed during the
+flagged disruption periods by adjusting for long-term trends and
+seasonal variations.
 
 For each indicator, we estimate:
 
-where:
+$`Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_2 \cdot \text{tagged} + \epsilon_{it}`$
 
-The coefficient on `tagged` (β2\beta_2β2​) measures the relative change
-in service utilization during flagged disruptions. Separate regressions
-are run at the province and district levels to assess the impact across
-different geographic scales.
+where:\
+- $`Y_{it}`$ is the observed service volume,\
+- $`\text{date}`$ captures time trends,\
+- $`\text{month}_m`$ controls for seasonality,\
+- $`\text{tagged}`$ is the disruption dummy (from the control chart
+analysis),\
+- $`\epsilon_{it}`$ is the error term.
+
+The coefficient on $`\text{tagged}`$ ($`\beta_2`$) measures the relative
+change in service utilization during flagged disruptions. Separate
+regressions are run at the province and district levels to assess the
+impact across different geographic scales.
 
 #### Detailed analysis steps
+
+##### **PART 1 - Control Chart Analysis**
 
 **Step 1: Prepare the data (note here for Claire to review - should we
 read form module 2? if yes: create new output = remove outliers do not
@@ -176,8 +193,6 @@ where:
 
 -   The sum takes the average across the window of ${2k+1}$ months.
 
-<!-- -->
-
 -   Computes residuals: the difference between actual values and
     smoothed predictions `count_smooth`.
 
@@ -232,18 +247,50 @@ $`\text{tag}_{it} =
 \text{NA}, & \text{otherwise}
 \end{cases}`$
 
-## PART 2. Disruption Analysis
+**Step 6: Crossing with the disruption database**
 
-intro... before running the regressions, the data is prepared
+-   The flagged anomalies from the control chart analysis are merged
+    with the disruption database, which contains known events such as
+    pandemics (e.g., COVID-19), conflicts, coups, and policy changes.
+-   If a flagged anomaly falls within a known disruption period (i.e.,
+    the date of service disruption is within the start and end dates of
+    a documented event), the `tagged` variable is updated to explicitly
+    mark it as a disruption.
+-   The results are saved in `M3_chartout.csv`, which serves as the
+    input for Part 2: Disruption Regression Analysis.
 
-Merging `M3_chartout_selected` to get `tagged` variable Identifying the
-lowest geographic level (`lowest_geo_level`) for clustering
+##### PART 2. Disruption Analysis
 
-then the regression pipeline follows a structured, multi-level approach,
-starting from the broadest level (country-wide) and moving to more
-granular levels (province, then district).
+**Step 1: Data preparation**
 
-#### Country-Wide Regression (Indicator Level)
+-   The `M3_chartout` dataset is merged with the main dataset to
+    integrate the `tagged` variable, which identifies flagged
+    disruptions.
+-   The lowest available geographic level (`lowest_geo_level`) is
+    identified for clustering, based on the highest-resolution
+    `admin_area_*` column available.
+
+... then the regression pipeline follows a structured, multi-level
+approach, starting from the broadest level (country-wide) and moving to
+more granular levels (province, then district).
+
+**Step 2: Country-wide regression**
+
+The country-wide regression estimates how service utilization changes at
+the national level when a disruption occurs. Instead of analyzing
+individual provinces or districts separately, this model considers the
+entire country's data in a single regression. Errors are clustered at
+the lowest available geographic level (`lowest_geo_level`), which can be
+districts or wards.
+
+-   A panel regression model is applied at the country-wide level,
+    estimating the expected service volume (`expect_admin_area_1`) for
+    each indicator (`indicator_common_id`).
+-   The model adjusts for historical trends and seasonal variations,
+    ensuring that deviations are measured against expected patterns.
+-   If a disruption (`tagged` = 1) is detected, the predicted service
+    volume is adjusted by subtracting the estimated effect of the
+    disruption to isolate its impact.
 
 Model Specification
 
@@ -264,7 +311,31 @@ $\text{tagged}$ = dummy for disruption period
 $\epsilon_{it}$ = error term, clustered at the district level
 (`admin_area_3`)
 
-### Province-Level Regression. Runs one regression across all provinces with province fixed effects.
+The country-wide regression is implemented using the `feols()` function
+in R:
+`model <- tryCatch( feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")), data = indicator_data, cluster = as.formula(paste0("~", lowest_geo_level))), error = function(e) { print(paste("Regression failed for:", indicator, "Error:", e$message)) return(NULL) } )`
+
+**Step 3: Province-level regression**
+
+The province-level disruption regression estimates how service
+utilization changes at the province level when a disruption occurs.
+Unlike the country-wide model, which treats the entire country as a
+single unit, this approach runs separate regressions for each province
+to capture regional variations in service utilization during
+disruptions. Errors are clustered at the lowest available geographic
+level, districts or wards, *to account for local variation within each
+province.*
+
+-   A fixed effects panel regression model is applied at the province
+    level, estimating expected service volume (`expect_admin_area_2`)
+    while controlling for province-specific factors.
+
+-   The model adjusts for historical trends and seasonal variations,
+    ensuring deviations are compared against expected patterns.
+
+-   If a disruption (`tagged` = 1) is detected, the predicted service
+    volume is adjusted by subtracting the estimated effect of the
+    disruption to isolate its impact.
 
 Model specification:
 
@@ -285,7 +356,30 @@ $\alpha_{\text{province}}$ = province fixed effects
 $\epsilon_{it}$ = error term, clustered at the district level
 (`admin_area_3`)
 
-### District-Level Regression. Runs one regression across all districts with district fixed effects.
+The province-level regression is implemented using the `feols()`
+function in R:
+`model_province <- tryCatch( feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged | admin_area_2")), data = province_data, cluster = as.formula(paste0("~", lowest_geo_level))), error = function(e) { print(paste("Regression failed for:", indicator, "in", province, "Error:", e$message)) return(NULL) } )`
+
+**Step 4: District-level regression**
+
+The district-level disruption regression estimates how service
+utilization changes at the district level when a disruption occurs. This
+approach runs separate regressions for each district to capture
+localized variations in service utilization during disruptions. Errors
+are clustered at the **l**owest available geographic level, typically
+wards or districts, to account for variations within each district.
+**REVIEW** THIS \> might need to cluster at the district always..
+
+-   A fixed effects panel regression model is applied at the district
+    level, estimating expected service volume (`expect_admin_area_3`)
+    while controlling for district-specific factors.
+
+-   The model adjusts for historical trends and seasonal variations,
+    ensuring deviations are compared against expected patterns.
+
+-   If a disruption (`tagged` = 1) is detected, the predicted service
+    volume is adjusted by subtracting the estimated effect of the
+    disruption to isolate its impact.
 
 Model specification:
 
@@ -305,6 +399,12 @@ $\alpha_{\text{district}}$ = district fixed effects
 
 $\epsilon_{it}$ = error term
 
+The district-level regression is implemented using the `feols()`
+function in R:
+`model_district <- tryCatch( feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged | admin_area_3")), data = district_data, cluster = as.formula(paste0("~", lowest_geo_level))), error = function(e) { print(paste("Regression failed for:", indicator, "in", district, "Error:", e$message)) return(NULL) } )`
+
+Step 5: Prepare outputs for visualization
+
 Each regression model (country-wide, province-level, and district-level)
 produces the following key outputs:
 
@@ -314,10 +414,9 @@ produces the following key outputs:
 
 -   Disruption effect (`b_admin_area_*`): The estimated relative change
     in service utilization during the disruption period, computed as:
-
-$`b_{\text{admin\_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$
-
-This measures the impact of the disruption relative to expected values.
+    $`b_{\text{admin\_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$.
+    This measures the impact of the disruption relative to expected
+    values.
 
 -   Trend coefficient (`b_trend_admin_area_*`): The estimated underlying
     time trend in service volume, capturing long-term changes unrelated
@@ -327,6 +426,9 @@ This measures the impact of the disruption relative to expected values.
     probability that the disruption effect (`b_admin_area_*`) is due to
     random variation rather than an actual disruption. Lower values
     indicate stronger evidence of a true effect.
+
+(ADD BELOW : HOW IS THE DATA PREPARED FOR VISUALIZATION / Line graphs
+and Maps as per Guinea Slide deck)
 
 ------------------------------------------------------------------------
 
