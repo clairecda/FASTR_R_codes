@@ -63,7 +63,7 @@ works as follows:
 
 Mathematically, lead-lag smoothing is represented as:
 
-$\text{count_smooth}_{it} = \frac{1}{2k+1} \sum_{j=-k}^{k} Y_{i,t+j}$
+$`\text{count\_smooth}_{it} = \frac{1}{2k+1} \sum_{j=-k}^{k} Y_{i,t+j}`$
 
 where:
 
@@ -112,9 +112,8 @@ adjust the data and aggregate to province)**
 -   Run a linear regression for each province group to estimate expected
     service volumes
 
-    $$
-    Y_{it} = \beta_0 + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_1 \cdot \text{date} + \epsilon_{it}
-    $$
+    $`Y_{it} = \beta_0 + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_1 \cdot \text{date} + \epsilon_{it}`$
+
 
 Where:
 
@@ -136,11 +135,11 @@ $\epsilon_{it}$ is the error term.
 -   Computes residuals: the difference between actual values and
     smoothed predictions `count_smooth`.
 
-$$
-    {residual}_{it} = Y_{it} -   {count\_smooth}_{it}
-$$where:
+$`{residual}_{it} = Y_{it} -   {count\_smooth}_{it}`$
 
-${Y_{it}}$is the observed service volume
+where:
+
+${Y_{it}}$ is the observed service volume
 
 ${count\_smooth}$ is the smoothed expected value.
 
@@ -150,9 +149,9 @@ ${count\_smooth}$ is the smoothed expected value.
 The `control` variable measures how many standard deviations the
 observed volume deviates from the expected trend.
 
-$$
-\text{control}_{it} = \frac{\text{residual}_{it}}{sd\_residual}
-$$If:
+$`\text{control}_{it} = \frac{\text{residual}_{it}}{sd\_residual}`$
+
+If:
 
 -   $\text{control}_{it}> 2$, the observed service volume is
     significantly higher than expected.
@@ -179,15 +178,16 @@ tagged:
 If the absolute difference between `Y_{it}` and `count_smooth` is less
 than 5% of `count_smooth`, it is also assigned `tag = 0`.
 
-$$
-\text{tag}_{it} = 
+$`\text{tag}_{it} = 
 \begin{cases} 
 1, & \text{if } |\text{control}_{it}| \geq 2 \\
-0, & \text{if } |Y_{it} - \text{count_smooth}_{it} | \text{count_smooth}_{it} < 0.05 \\
+0, & \text{if } |Y_{it} - \text{count\_smooth}_{it} | \text{count\_smooth}_{it} < 0.05 \\
 0, & \text{if } |\text{control}_{it}| \leq 0.5 \\
 \text{NA}, & \text{otherwise}
-\end{cases}
-$$PART 2. Disruption Analysis
+\end{cases}`$
+
+
+## PART 2. Disruption Analysis
 
 intro... before running the regressions, the data is prepared
 
@@ -204,7 +204,7 @@ Model Specification
 
 For each `indicator_common_id`, we estimate:
 
-$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month} + \beta_2 \cdot \text{tagged} + \epsilon_{it}$$
+$`Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month} + \beta_2 \cdot \text{tagged} + \epsilon_{it}`$
 
 Where:
 
@@ -223,7 +223,7 @@ $\epsilon_{it}$ = error term, clustered at the district level
 
 Model specification:
 
-$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month} + \beta_2 \cdot \text{tagged} + \alpha_{\text{province}} + \epsilon_{it}$$
+$`Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \sum_{m=1}^{12} \gamma_m \cdot \text{month} + \beta_2 \cdot \text{tagged} + \alpha_{\text{province}} + \epsilon_{it}`$
 
 Where:
 
@@ -244,7 +244,7 @@ $\epsilon_{it}$ = error term, clustered at the district level
 
 Model specification:
 
-$$Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \gamma \cdot \text{month} + \beta_2 \cdot \text{tagged} + \alpha_{\text{district}} + \epsilon_{it}$$
+$`Y_{it} = \beta_0 + \beta_1 \cdot \text{date} + \gamma \cdot \text{month} + \beta_2 \cdot \text{tagged} + \alpha_{\text{district}} + \epsilon_{it}`$
 
 Where:
 
@@ -267,7 +267,7 @@ regression model, adjusted for seasonality and time trends. - Disruption
 effect (`b_admin_area_*`): The estimated relative change in service
 utilization during the disruption period, computed as:
 
-$$b_{\text{admin_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}$$
+$`b_{\text{admin_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$
 
 This measures the impact of the disruption relative to expected values.
 
