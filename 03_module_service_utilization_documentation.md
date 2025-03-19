@@ -414,13 +414,27 @@ produces the following key outputs:
 
 -   Disruption effect (`b_admin_area_*`): The estimated relative change
     in service utilization during the disruption period, computed as:
-    $`b_{\text{admin\_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$.
+
+    $`b_{\text{admin\_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$
+
     This measures the impact of the disruption relative to expected
     values.
 
 -   Trend coefficient (`b_trend_admin_area_*`): The estimated underlying
     time trend in service volume, capturing long-term changes unrelated
-    to disruptions.
+    to disruptions. This coefficient is calculated separately at three
+    levels, since trends might look different at different geographic
+    scales. It shows whether service volumes are naturally increasing or
+    decreasing over time, independent of disruptions.
+
+    -   If the trend coefficient is positive, it means service volumes
+        were gradually increasing before, during, and after disruptions.
+
+    -   If the trend coefficient is negative, it means service volumes
+        were gradually declining over time.
+
+    -   If the coefficient is close to zero, it means there was no
+        strong long-term trend—service levels were fairly stable.
 
 -   Statistical significance (p-value) (`p_admin_area_*`): The
     probability that the disruption effect (`b_admin_area_*`) is due to
