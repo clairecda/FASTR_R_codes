@@ -163,7 +163,31 @@ $$If:
 -   Values between -2 and 2 are considered within the normal range of
     variability.
 
-## PART 2. Disruption Analysis
+**Step 5: Tagging disruptions**
+
+Once the `control` variable is computed, disruptions are identified and
+tagged:
+
+**Initial Tagging:**
+
+-   If `abs(control) >= 2`, the time point is flagged as an anomaly
+    (`tag = 1`).
+
+-   If the deviation is small (`abs(control) <= 0.5`), it is considered
+    within normal fluctuations and assigned `tag = 0`.
+
+If the absolute difference between `Y_{it}` and `count_smooth` is less
+than 5% of `count_smooth`, it is also assigned `tag = 0`.
+
+$$
+\text{tag}_{it} = 
+\begin{cases} 
+1, & \text{if } |\text{control}_{it}| \geq 2 \\
+0, & \text{if } |Y_{it} - \text{count_smooth}_{it} | \text{count_smooth}_{it} < 0.05 \\
+0, & \text{if } |\text{control}_{it}| \leq 0.5 \\
+\text{NA}, & \text{otherwise}
+\end{cases}
+$$PART 2. Disruption Analysis
 
 intro... before running the regressions, the data is prepared
 
