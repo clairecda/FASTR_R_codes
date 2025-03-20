@@ -43,7 +43,9 @@ library(tidyr)
 # STEP 1: CONTROL CHART ANALYSIS
 #-------------------------------------------------------------------------------------------------------------
 print("Loading data for control chart analysis...")
-data <- read.csv("M1_output_outliers.csv")                  ##data <- fread("M2_adjusted_data.csv", showProgress = TRUE)
+data_utilization <- read.csv("M2_adjusted_data_admin_area.csv")        # adjusted data aggregated at the lowest geo level, used for visualization
+
+data <- read.csv("M1_output_outliers.csv")                  
 
 print("Loading disruption data...")
 disruption_data <- read_excel("Disruption Database.xlsx")
@@ -592,6 +594,7 @@ print("Province-level regression complete.")
 
 # # Step 5: Save Output ----------------------------------------------------------
 print("Saving results...")
+
+write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
 write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
-#write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
 write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
