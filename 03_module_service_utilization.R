@@ -30,13 +30,14 @@ SELECTEDCOUNT <- "count"  # Change as needed
 #-------------------------------------------------------------------------------------------------------------
 # Load required libraries
 
-library(data.table)
+
 library(lubridate)
 library(zoo)
 library(readxl)
 library(fixest)  # For panel regressions (alternative to 'xtreg' in Stata)
 library(stringr)
 library(dplyr)
+library(tidyr)
 
 #-------------------------------------------------------------------------------------------------------------
 # STEP 1: CONTROL CHART ANALYSIS
@@ -305,9 +306,9 @@ merge_disruption_data <- function(control_chart_results, disruption_data) {
 control_chart_results <- control_chart_analysis(data, geo_cols, SELECTEDCOUNT)
 final_results <- merge_disruption_data(control_chart_results, disruption_data)
 
-# Save final outputs
-write_csv(final_results, "M3_chartout.csv")
-print("Output from the control chart analysis saved.")
+M3_chartout <- final_results
+
+print("Control chart analysis complete")
 
 
 
