@@ -294,8 +294,8 @@ analysis:
 -   BCG vaccine (BCG)
 
 -   First pentavalent vaccine (Penta 1)
-
-Third pentavalent vaccine (Penta 3)
+-   
+-   Third pentavalent vaccine (Penta 3)
 
 Country specific adaptations may include additional indicators of
 interest to the country.
