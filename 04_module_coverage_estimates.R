@@ -11,7 +11,7 @@ POSTNEONATAL_MORTALITY_RATE <- 0.02
 INFANT_MORTALITY_RATE <- 0.05   
 
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Feb 8
+# Last edit: 2025 March 24
 # Module: Coverage Estimates
 
 # Description:
@@ -221,10 +221,11 @@ calculate_denominators <- function(data) {
   # Identify available columns in data
   available_vars <- names(data)
   
-  # Safe mutate function to avoid crashes
+  # Safe mutate function to prevent errors when required variables are missing
   safe_mutate <- function(var_name, formula) {
     if (all(indicator_vars[[var_name]] %in% available_vars)) {
-      return(formula)
+      return(if_else(!is.na(data[[indicator_vars[[var_name]][1]]]) & 
+                       !is.na(data[[indicator_vars[[var_name]][2]]]), formula, NA_real_))
     } else {
       return(NA_real_)
     }
@@ -235,9 +236,10 @@ calculate_denominators <- function(data) {
     mutate(
       # ANC1 Denominators
       
-      # danc1_pregnancy = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
-      #                                               countanc1 / (anc1carry / 100),
-      #                                               NA_real_)),
+      danc1_pregnancy = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
+                                                    countanc1 / (anc1carry / 100),
+                                                    NA_real_)),
+      
       
       danc1_livebirth = safe_mutate("anc1", if_else(!is.na(countanc1) & !is.na(anc1carry),
                                                     (countanc1 / (anc1carry / 100)) * 
@@ -268,11 +270,11 @@ calculate_denominators <- function(data) {
                                                               (1 - PREGNANCY_LOSS_RATE),
                                                             NA_real_)),
       
-      # ddelivery_livebirth = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
-      #                                                       (countdelivery / (deliverycarry / 100)) * 
-      #                                                         (1 + TWIN_RATE) * 
-      #                                                         (1 - STILLBIRTH_RATE),
-      #                                                       NA_real_)),
+      ddelivery_livebirth = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
+                                                            (countdelivery / (deliverycarry / 100)) *
+                                                              (1 + TWIN_RATE) *
+                                                              (1 - STILLBIRTH_RATE),
+                                                            NA_real_)),
       
       ddelivery_dpt = safe_mutate("delivery", if_else(!is.na(countdelivery) & !is.na(deliverycarry),
                                                       (countdelivery / (deliverycarry / 100)) * 
@@ -296,9 +298,9 @@ calculate_denominators <- function(data) {
                                                     (1 - STILLBIRTH_RATE),
                                                   NA_real_)),
       
-      # dbcg_livebirth = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
-      #                                             countbcg / (bcgcarry / 100),
-      #                                             NA_real_)),
+      dbcg_livebirth = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
+                                                  countbcg / (bcgcarry / 100),
+                                                  NA_real_)),
       
       dbcg_dpt = safe_mutate("bcg", if_else(!is.na(countbcg) & !is.na(bcgcarry),
                                             (countbcg / (bcgcarry / 100)) * (1 - NEONATAL_MORTALITY_RATE),
@@ -325,37 +327,27 @@ calculate_denominators <- function(data) {
                                                           (1 - NEONATAL_MORTALITY_RATE),
                                                         NA_real_)),
       
-      # dpenta1_dpt = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
-      #                                             countpenta1 / (penta1carry / 100),
-      #                                             NA_real_)),
+      dpenta1_dpt = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
+                                                  countpenta1 / (penta1carry / 100),
+                                                  NA_real_)),
       
       dpenta1_mcv = safe_mutate("penta1", if_else(!is.na(countpenta1) & !is.na(penta1carry),
                                                   (countpenta1 / (penta1carry / 100)) * (1 - POSTNEONATAL_MORTALITY_RATE),
                                                   NA_real_))
-    )
-  
-  # Adjust the most recent year's coverage if `nummonth` is available and < 12
+    ) 
+  # Adjust denominators for all years where `nummonth` < 12
   if ("nummonth" %in% available_vars) {
     data <- data %>%
-      group_by(admin_area_1) %>%
+      group_by(admin_area_1, year) %>%
       mutate(
-        most_recent_year = max(year, na.rm = TRUE),
-        coverage_adjustment = if_else(year == most_recent_year & nummonth < 12, 12 / nummonth, 1),
+        # Ensure `nummonth` is valid (never 0 or NA)
+        coverage_adjustment = if_else(is.na(nummonth) | nummonth == 0, 1, 12 / nummonth),
         
-        # Adjust denominators for the most recent year
-        #danc1_pregnancy = if_else(year == most_recent_year, danc1_pregnancy * coverage_adjustment, danc1_pregnancy),
-        danc1_livebirth = if_else(year == most_recent_year, danc1_livebirth * coverage_adjustment, danc1_livebirth),
-        ddelivery_pregnancy = if_else(year == most_recent_year, ddelivery_pregnancy * coverage_adjustment, ddelivery_pregnancy),
-        #ddelivery_livebirth = if_else(year == most_recent_year, ddelivery_livebirth * coverage_adjustment, ddelivery_livebirth),
-        dbcg_pregnancy = if_else(year == most_recent_year, dbcg_pregnancy * coverage_adjustment, dbcg_pregnancy),
-        #dbcg_livebirth = if_else(year == most_recent_year, dbcg_livebirth * coverage_adjustment, dbcg_livebirth),
-        dpenta1_pregnancy = if_else(year == most_recent_year, dpenta1_pregnancy * coverage_adjustment, dpenta1_pregnancy),
-        dpenta1_livebirth = if_else(year == most_recent_year, dpenta1_livebirth * coverage_adjustment, dpenta1_livebirth),
-        #dpenta1_dpt = if_else(year == most_recent_year, dpenta1_dpt * coverage_adjustment, dpenta1_dpt),
-        dpenta1_mcv = if_else(year == most_recent_year, dpenta1_mcv * coverage_adjustment, dpenta1_mcv)
+        # Only apply adjustments to numeric denominator columns
+        across(where(is.numeric) & starts_with("d"), ~ if_else(!is.na(.x), .x * coverage_adjustment, NA_real_))
       ) %>%
       ungroup() %>%
-      select(-most_recent_year, -coverage_adjustment)
+      select(-coverage_adjustment)
   }
   
   return(data)
@@ -363,36 +355,24 @@ calculate_denominators <- function(data) {
 
 # Function to calculate denominators for WPP (World Population Prospects)
 calculate_wpp_denominators <- function(data) {
+  # Ensure `nummonth` is valid
+  data <- data %>%
+    mutate(nummonth = if_else(is.na(nummonth) | nummonth == 0, 12, nummonth)) 
+  
+  # Apply WPP-based denominator calculations while preserving NA logic
   data <- data %>%
     mutate(
-      # dwpp_pregnancy: Estimated pregnancies based on crude birth rate and total population
-      dwpp_pregnancy = if_else(
-        !is.na(wppCBR) & !is.na(wpptotpop) & !is.na(nummonth) & nummonth > 0,
-        (wppCBR / 1000) * wpptotpop / (1 + TWIN_RATE) * (12 / nummonth),   # Use hardcoded TWIN_RATE
-        NA_real_
-      ),
+      dwpp_pregnancy = if_else(!is.na(wppCBR) & !is.na(wpptotpop),
+                               (wppCBR / 1000) * wpptotpop / (1 + TWIN_RATE), NA_real_),
       
-      # dwpp_livebirth: Adjusted for number of months reported
-      dwpp_livebirth = if_else(
-        !is.na(wpplivebirth) & !is.na(nummonth) & nummonth > 0,
-        wpplivebirth * (12 / nummonth),
-        NA_real_
-      ),
+      dwpp_livebirth = if_else(!is.na(wpplivebirth), wpplivebirth, NA_real_),
       
-      # dwpp_dpt: Estimated eligible infants for DPT1, adjusted for reporting months
-      dwpp_dpt = if_else(
-        !is.na(wpptotu1pop) & !is.na(nummonth) & nummonth > 0,
-        wpptotu1pop * (12 / nummonth),
-        NA_real_
-      ),
+      dwpp_dpt = if_else(!is.na(wpptotu1pop), wpptotu1pop, NA_real_),
       
-      # dwpp_mcv: Estimated eligible infants for MCV, adjusted for reporting months
-      dwpp_mcv = if_else(
-        !is.na(wpptotu5pop) & !is.na(nummonth) & nummonth > 0,
-        wpptotu5pop * (12 / nummonth),
-        NA_real_
-      )
-    )
+      dwpp_mcv = if_else(!is.na(wpptotu5pop), wpptotu5pop, NA_real_)
+    ) %>%
+    # Adjust all non-missing denominators dynamically
+    mutate(across(starts_with("dwpp"), ~ if_else(!is.na(.x), .x * (12 / nummonth), NA_real_)))
   
   return(data)
 }
@@ -526,7 +506,8 @@ merge_survey_estimates <- function(coverage_long, carry_values) {
     coverage_long, expanded_carry_values,
     by = c("admin_area_1", "year", "indicator_to_match_on")
   ) %>%
-    arrange(admin_area_1, year, indicator_to_match_on)  # Ensure order is year-wise
+    rename(indicator_common_id = indicator_to_match_on) %>% 
+    arrange(admin_area_1, year, indicator_common_id)  # Ensure order is year-wise
   
   # Compute Squared Error (Distance from Reference Survey Value)
   merged_data <- merged_data %>%
@@ -545,14 +526,30 @@ merge_survey_estimates <- function(coverage_long, carry_values) {
 select_best_denominator <- function(merged_data) {
   best_denominator <- merged_data %>%
     filter(!is.na(squared_error)) %>%  # Remove rows where squared_error is NA
-    group_by(admin_area_1, year, indicator_to_match_on) %>%
+    group_by(admin_area_1, year, indicator_common_id) %>%
     slice_min(squared_error, with_ties = FALSE) %>%  # Select row with min squared_error
     ungroup() %>%
-    rename(indicator_common_id = indicator_to_match_on) %>%  # Rename column
+
     select(admin_area_1, year, indicator_common_id, coverage, denominator, denominator_value, denominator_type, squared_error)
   
   return(best_denominator)
 }
+compare_denominators <- function(merged_data) {
+  ranked_denominators <- merged_data %>%
+    filter(!is.na(squared_error)) %>%  # Keep only valid comparisons
+    group_by(admin_area_1, year, indicator_common_id) %>%
+    arrange(squared_error) %>%  # Sort by smallest error first
+    mutate(rank = row_number()) %>%  # Rank denominators by error
+    ungroup() %>%
+    
+    select(admin_area_1, year, indicator_common_id, coverage,
+           denominator, denominator_value, squared_error, rank) %>%
+    mutate(denominator = paste0(denominator))  # Ensure clarity
+  
+  return(ranked_denominators)
+}
+
+
 
 # PART 9 - Extrapolate  Estimates ----------------------------------------------------
 # Function to compute coverage delta
@@ -581,6 +578,22 @@ detect_coverage_delta <- function(best_coverage) {
   return(coverage_table)
 }
 
+# Add function to compute coverage delta with ALL denominators included
+detect_coverage_delta_all <- function(merged_data) {
+  merged_data %>%
+    arrange(admin_area_1, indicator_common_id, denominator, year) %>%
+    group_by(admin_area_1, indicator_common_id, denominator) %>%
+    mutate(
+      coverage_delta = if_else(
+        !is.na(coverage) & !is.na(lag(coverage)),
+        coverage - lag(coverage),
+        NA_real_
+      ),
+      coverage_delta = if_else(is.na(coverage_delta), 0, coverage_delta)
+    ) %>%
+    ungroup()
+}
+
 
 # Function to calculate avg survey projections based on coverage deltas and reference values
 calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
@@ -603,40 +616,79 @@ calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
   return(coverage_table)
 }
 
+# Function to calculate avg survey projection for each denominator separately
+calculate_avgsurveyprojection_all <- function(coverage_table, carry_values) {
+  # Remove existing reference_value to avoid name clash
+  coverage_table <- coverage_table %>%
+    select(-reference_value)
+  
+  # Rename for join
+  carry_values <- carry_values %>%
+    rename(indicator_common_id = indicator_to_match_on)
+  
+  # Merge
+  merged <- left_join(
+    coverage_table,
+    carry_values,
+    by = c("admin_area_1", "year", "indicator_common_id")
+  )
+  
+  # Check
+  if (!"reference_value" %in% names(merged)) {
+    stop("reference_value not found after merge! Join failed.")
+  }
+  
+  # Projection logic
+  merged <- merged %>%
+    arrange(admin_area_1, indicator_common_id, denominator, year) %>%
+    group_by(admin_area_1, indicator_common_id, denominator) %>%
+    mutate(
+      avgsurveyprojection = if (all(is.na(reference_value))) {
+        NA_real_
+      } else {
+        first(reference_value) + cumsum(coverage_delta)
+      },
+      projection_source = paste0("avgsurveyprojection_", denominator)
+    ) %>%
+    ungroup()
+  
+  return(merged)
+}
+
 # PART 10 - Prepare Results (combine estimates) --------------------------------------
 prepare_combined_coverage_data <- function(data_survey, coverage_table_with_projection) {
-  
+
   # 1. Process official estimates from data_survey
   original_estimate_long <- data_survey %>%
     select(admin_area_1, year, ends_with("_original")) %>%
-    pivot_longer(cols = ends_with("_original"), 
-                 names_to = "indicator_common_id", 
+    pivot_longer(cols = ends_with("_original"),
+                 names_to = "indicator_common_id",
                  values_to = "coverage") %>%
     mutate(source = "original_estimate",
            indicator_common_id = gsub("avgsurvey_", "", indicator_common_id),
            indicator_common_id = gsub("_original", "", indicator_common_id)) %>%
     select(admin_area_1, year, indicator_common_id, coverage, source)
-  
+
   # 2. Transform coverage_table_with_projection
   coverage_projection_long <- coverage_table_with_projection %>%
     select(admin_area_1, year, indicator_common_id, avgsurveyprojection) %>%
-    pivot_longer(cols = c("avgsurveyprojection"), 
-                 names_to = "source", 
+    pivot_longer(cols = c("avgsurveyprojection"),
+                 names_to = "source",
                  values_to = "coverage")
-  
+
   # 3. Transform best_coverage
   best_coverage_long <- best_coverage %>%
     select(admin_area_1, year, indicator_common_id, coverage) %>%
     mutate(source = "cov")
-  
+
   # 4. Merge all datasets together
   combined_data <- bind_rows(
-    coverage_projection_long, 
-    best_coverage_long, 
+    coverage_projection_long,
+    best_coverage_long,
     original_estimate_long
   ) %>%
     arrange(admin_area_1, year, indicator_common_id, source)
-  
+
   # 5. Pivot to wide format
   combined_data_wide <- combined_data %>%
     pivot_wider(
@@ -651,10 +703,58 @@ prepare_combined_coverage_data <- function(data_survey, coverage_table_with_proj
       coverage_avgsurveyprojection = coverage_avgsurveyprojection / 100,
       coverage_cov = coverage_cov / 100
     ) %>%
-    filter(!(is.na(coverage_original_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) 
-  
+    filter(!(is.na(coverage_original_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov)))
+
   return(combined_data_wide)
 }
+prepare_combined_coverage_data_all <- function(data_survey, coverage_data, ranked_denominators) {
+  
+  # 1. Process original survey estimates
+  original_estimates <- data_survey %>%
+    select(admin_area_1, year, ends_with("_original")) %>%
+    pivot_longer(
+      cols = ends_with("_original"),
+      names_to = "indicator_common_id",
+      values_to = "coverage_original_estimate"
+    ) %>%
+    mutate(
+      indicator_common_id = gsub("avgsurvey_", "", indicator_common_id),
+      indicator_common_id = gsub("_original", "", indicator_common_id)
+    )
+  
+  # 2. Get all unique denominators per indicator
+  unique_denoms <- coverage_data %>%
+    distinct(indicator_common_id, denominator)
+  
+  # 3. Expand each survey row across all denominators
+  expanded_originals <- original_estimates %>%
+    left_join(unique_denoms, by = "indicator_common_id", relationship = "many-to-many")
+  
+  # 4. Pull avgsurvey projection and HMIS coverage
+  projections <- coverage_data %>%
+    select(admin_area_1, year, indicator_common_id, denominator, avgsurveyprojection)
+  
+  hmis_cov <- coverage_data %>%
+    select(admin_area_1, year, indicator_common_id, denominator, coverage) %>%
+    rename(coverage_cov = coverage)
+  
+  # 5. Bring in rank
+  ranks <- ranked_denominators %>%
+    select(admin_area_1, year, indicator_common_id, denominator, rank)
+  
+  # 6. Join all together
+  final <- expanded_originals %>%
+    left_join(projections, by = c("admin_area_1", "year", "indicator_common_id", "denominator")) %>%
+    left_join(hmis_cov,    by = c("admin_area_1", "year", "indicator_common_id", "denominator")) %>%
+    left_join(ranks,       by = c("admin_area_1", "year", "indicator_common_id", "denominator")) %>%
+    rename(coverage_avgsurveyprojection = avgsurveyprojection)
+  
+  # 7. Select final columns
+  return(final %>%
+           select(admin_area_1, year, indicator_common_id, denominator,
+                  coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov, rank))
+}
+
 
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
@@ -743,60 +843,68 @@ coverage_long <- calculate_coverage(data)
 # 11. Select Best Denominator (Choose the denominator with the smallest error compared to surveys)
 print("Select best denominator...")
 carry_values <- extract_reference_values(data)
-merged_coverage <- merge_survey_estimates(coverage_long, carry_values)
-best_coverage <- select_best_denominator(merged_coverage)
+
+merged_data <- merge_survey_estimates(coverage_long, carry_values)
+best_coverage <- select_best_denominator(merged_data)
+comparative_coverage <- compare_denominators(merged_data)
+
 
 # 12. Projection
 print("Extrapolate coverage estimates...")
 coverage_table <- detect_coverage_delta(best_coverage)
+all_coverage <- detect_coverage_delta_all(merged_data)  # Compute deltas for all denominators
+
 coverage_table_with_projection <- calculate_avgsurveyprojection(coverage_table, carry_values)
+all_coverage <- calculate_avgsurveyprojection_all(all_coverage, carry_values)  # Compute projections (with ALL denominators included)
+
+
 
 # 13. Call function to generate the combined dataset
-combined_data <- prepare_combined_coverage_data(data_survey, coverage_table_with_projection)
+#combined_data <- prepare_combined_coverage_data(data_survey, coverage_table_with_projection)
+combined_coverage_data <- prepare_combined_coverage_data_all(data_survey, all_coverage, comparative_coverage)
 
 
 # 14. Carry back survey projection to official survey points 
 # Identify indicators where ALL values of coverage_cov are missing
-indicators_to_remove <- combined_data %>%
+indicators_to_remove <- combined_coverage_data %>%
   group_by(indicator_common_id) %>%
   summarize(all_missing = all(is.na(coverage_cov))) %>%
   filter(all_missing) %>%
   pull(indicator_common_id)
 
 # Remove these indicators from the dataset
-combined_data <- combined_data %>%
+combined_coverage_data <- combined_coverage_data %>%
   filter(!indicator_common_id %in% indicators_to_remove) %>%
   ungroup() 
 
-# Identify the first year where coverage_avgsurveyprojection is available
-first_year_projection <- combined_data %>%
-  filter(!is.na(coverage_avgsurveyprojection)) %>%
-  summarise(first_year = min(year, na.rm = TRUE)) %>%
-  pull(first_year)
-
-# Identify the last year where coverage_original_estimate exists
-last_year_original <- combined_data %>%
-  filter(!is.na(coverage_original_estimate)) %>%
-  summarise(last_year = max(year, na.rm = TRUE)) %>%
-  pull(last_year)
-
-# Apply conditional replacement based on these years
-combined_data <- combined_data %>%
+# Compute adjusted survey estimates (one per indicator-year)
+adjusted_survey <- combined_coverage_data %>%
+  group_by(admin_area_1, indicator_common_id, year) %>%
+  summarise(
+    coverage_original_estimate = first(coverage_original_estimate),
+    coverage_avgsurveyprojection = first(coverage_avgsurveyprojection),
+    .groups = "drop"
+  ) %>%
+  group_by(indicator_common_id) %>%
   mutate(
+    first_year_projection = min(year[!is.na(coverage_avgsurveyprojection)], na.rm = TRUE),
+    last_year_original = max(year[!is.na(coverage_original_estimate)], na.rm = TRUE),
+    
     coverage_original_estimate = case_when(
-      # First year condition: replace if coverage_original_estimate is NA
       year == first_year_projection & is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,
-      
-      # Last year condition: replace only if both values exist
-      year == last_year_original & !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,
-      
-      # Otherwise, keep the original value
+      year == last_year_original  & !is.na(coverage_original_estimate) & !is.na(coverage_avgsurveyprojection) ~ coverage_avgsurveyprojection,
       TRUE ~ coverage_original_estimate
     )
   ) %>%
-  rename(coverage_official_estimate = coverage_original_estimate)  # Rename after adjustments
+  select(admin_area_1, year, indicator_common_id, adjusted_survey = coverage_original_estimate)
+
+# Join the cleaned survey estimates back into the full dataset
+combined_coverage_data <- combined_coverage_data %>%
+  select(-coverage_original_estimate) %>%
+  left_join(adjusted_survey, by = c("admin_area_1", "year", "indicator_common_id")) %>%
+  rename(coverage_official_estimate = adjusted_survey)
 
 
 # 15. Export the cleaned dataset
 print("Save the results..")
-write.csv(combined_data, "M4_coverage_estimation.csv", row.names = FALSE)
+write.csv(combined_coverage_data, "M4_coverage_estimation.csv", row.names = FALSE)
