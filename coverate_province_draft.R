@@ -162,7 +162,7 @@ calculate_denominators_province <- function(data) {
 
 
 calculate_hmis_coverage_province <- function(data) {
-  # Step 1: Denominator table
+  # Step 1: Extract denominator columns
   denominator_cols <- names(data)[str_detect(names(data), "^d.*_(pregnancy|livebirth|dpt|mcv)$")]
   
   denominator_long <- data %>%
@@ -180,35 +180,43 @@ calculate_hmis_coverage_province <- function(data) {
         str_detect(denominator, "_dpt$") ~ "dpt",
         str_detect(denominator, "_mcv$") ~ "mcv",
         TRUE ~ NA_character_
-      ),
-      indicator_to_match_on = case_when(
-        denominator_type == "pregnancy" ~ list(c("anc1", "anc4")),
-        denominator_type == "livebirth" ~ list(c("delivery", "bcg")),
-        denominator_type == "dpt" ~ list(c("penta1", "penta3")),
-        denominator_type == "mcv" ~ list(c("anc1", "anc4", "delivery")),
-        TRUE ~ list(NA_character_)
       )
-    ) %>%
-    unnest(indicator_to_match_on)
+    )
   
-  # Step 2: Numerator table
+  # Step 2: Create explicit indicator-to-denominator map
+  indicator_map <- tibble::tribble(
+    ~denominator_type, ~indicator_to_match_on,
+    "pregnancy", "anc1",
+    "pregnancy", "anc4",
+    "livebirth", "delivery",
+    "livebirth", "bcg",
+    "dpt", "penta1",
+    "dpt", "penta3",
+    "mcv", "anc1",
+    "mcv", "anc4",
+    "mcv", "delivery"
+  )
+  
+  # Step 3: Join to expand denominator table to relevant indicators
+  denominator_long <- denominator_long %>%
+    left_join(indicator_map, by = "denominator_type")
+  
+  # Step 4: Build numerator table
   num_cols <- names(data)[str_detect(names(data), "^count(?!$|.*final)")]
   num_cols <- setdiff(num_cols, "count")
   
   numerator_long <- data %>%
     select(admin_area_1, admin_area_2, year, all_of(num_cols)) %>%
     pivot_longer(
-      cols = all_of(num_cols),
+      cols = everything(),
       names_to = "numerator_col",
       values_to = "numerator"
     ) %>%
-    mutate(
-      indicator_to_match_on = str_remove(numerator_col, "^count")
-    ) %>%
+    mutate(indicator_to_match_on = str_remove(numerator_col, "^count")) %>%
     drop_na(numerator)
   
-  # Step 3: Merge and calculate coverage
-  coverage_data <- full_join(
+  # Step 5: Merge and calculate coverage
+  coverage_data <- left_join(
     denominator_long,
     numerator_long,
     by = c("admin_area_1", "admin_area_2", "year", "indicator_to_match_on")
@@ -222,16 +230,17 @@ calculate_hmis_coverage_province <- function(data) {
       coverage_col = paste0("cov_", indicator_to_match_on, "_", str_remove(denominator, "^d"))
     )
   
-  # Step 4: Spread back out
+  # Step 6: Reshape wide and join back
   coverage_wide <- coverage_data %>%
     select(admin_area_1, admin_area_2, year, coverage_col, coverage) %>%
     pivot_wider(names_from = coverage_col, values_from = coverage)
   
-  # Step 5: Join back to original dataset
   data <- left_join(data, coverage_wide, by = c("admin_area_1", "admin_area_2", "year"))
   
   return(data)
 }
+
+
 extract_reference_values_province <- function(data) {
   carry_cols <- grep("carry$", names(data), value = TRUE)
   if (length(carry_cols) == 0) stop("No '_carry' columns found in data!")
@@ -439,11 +448,15 @@ ranked_denominators_province <- rank_denominators_by_error_province(merged_provi
 
 # ------------------------------ Part 7: Project Survey Coverage Forward ------------------------------------
 
-# Calculate year-over-year coverage deltas for each denominator
 ranked_with_deltas_province <- detect_coverage_delta_all_province(ranked_denominators_province)
-
-# Project survey estimates forward using HMIS trends
+ranked_with_deltas_province <- left_join(
+  ranked_with_deltas_province,
+  ref_vals_province %>%
+    rename(indicator_common_id = indicator_to_match_on),
+  by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id")
+)
 projected_coverage_province <- calculate_avgsurveyprojection_all_province(
   ranked_with_deltas_province,
   ref_vals_province
 )
+
