@@ -1449,5 +1449,5 @@ coverage_estimate_hmis_province <- combined_coverage_data_province %>%
 
 
 print("Save the results..")
-write.csv(combined_coverage_data_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE)
-write.csv(coverage_estimate_hmis_province, "M4_coverage_estimate_hmis_admin_area_2.csv", row.names = FALSE)
+#write.csv(combined_coverage_data_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE) # most likely not used in visualization
+write.csv(coverage_estimate_hmis_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE)
