@@ -594,7 +594,6 @@ print("Province-level regression complete.")
 
 # # Step 5: Save Output ----------------------------------------------------------
 print("Saving results...")
-
 write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
 write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
 write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)

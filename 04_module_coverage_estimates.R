@@ -921,7 +921,10 @@ combined_coverage_data <- combined_coverage_data %>%
 print("Save the results..")
 write.csv(combined_coverage_data, "M4_coverage_estimation.csv", row.names = FALSE)
 
+print("Coverage estimate analysis - country-wide - completed!")
 ## ---------------------------------------------------------------------------------------------------------------- ##
+print("Start the coverage estimate analysis at the admin_area_2 level")
+
 province_name_replacements <- c(
   "ab Abia State" = "Abia", "ad Adamawa State" = "Adamawa", "ak Akwa-Ibom State" = "Akwa Ibom",
   "an Anambra state" = "Anambra", "ba Bauchi State" = "Bauchi", "be Benue State" = "Benue",
@@ -939,7 +942,7 @@ province_name_replacements <- c(
 )
 
 # ------------------------------ Part 1: Key Functions ------------------------------------
-
+print("Load all the key functions for the analysis...")
 adjust_names_for_merging <- function(data, column, replacements) {
   data[[column]] <- recode(data[[column]], !!!replacements)
   return(data)
@@ -1322,7 +1325,7 @@ prepare_combined_coverage_data_province <- function(data_survey, coverage_data, 
 }
 
 # ------------------------------ Part 2: Load Input Data ------------------------------------
-
+print("Load data for coverage estimate (admin_area_2) level analysis ")
 # Load adjusted HMIS service volumes
 adjusted_volume_data_province <- read.csv("M2_adjusted_data_admin_area.csv")
 
@@ -1330,7 +1333,7 @@ adjusted_volume_data_province <- read.csv("M2_adjusted_data_admin_area.csv")
 dhs_data_province_path <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS Province.dta"
 
 # ------------------------------ Part 3: Prepare HMIS Aggregated Data ------------------------------------
-
+print("Prepare HMIS data for analysis...")
 # Identify countries included in the HMIS dataset
 hmis_countries <- unique(adjusted_volume_data_province$admin_area_1)
 print(hmis_countries)
@@ -1357,7 +1360,7 @@ nummonth_data <- adjusted_volume_province %>%
   summarise(nummonth = n_distinct(month, na.rm = TRUE), .groups = "drop")
 
 # Aggregate HMIS volumes to annual level
-message("Aggregating HMIS adjusted volume to annual level...")
+print("Aggregating HMIS adjusted volume to annual level...")
 
 annual_hmis_province <- adjusted_volume_province %>%
   group_by(admin_area_1, admin_area_2, year, indicator_common_id) %>%
@@ -1369,17 +1372,17 @@ annual_hmis_province <- adjusted_volume_province %>%
     values_fill = list(count = 0)
   ) %>%
   left_join(nummonth_data, by = c("admin_area_1", "admin_area_2", "year")) %>%
-  arrange(admin_area_1, admin_area_2, year) %>%
-  adjust_names_for_merging("admin_area_2", province_name_replacements)
-
+  arrange(admin_area_1, admin_area_2, year)
 # ------------------------------ Part 4: Prepare DHS Survey Data ------------------------------------
-
+print("Prepare the DHS survey data for analysis...")
 # Load and clean DHS survey estimates
 dhs_data_province <- read_dta(dhs_data_province_path) %>%
   rename(admin_area_1 = country, admin_area_2 = province) %>%
   adjust_names_for_merging("admin_area_1", name_replacements) %>%
-  adjust_names_for_merging("admin_area_2", province_name_replacements) %>%
+  # Rename short province names to match long-form province names in HMIS data
+  mutate(admin_area_2 = recode(admin_area_2, !!!setNames(names(province_name_replacements), province_name_replacements))) %>%
   filter(admin_area_1 %in% hmis_countries, year != 2024)
+
 
 # Extend and carry forward survey values
 print("Extend survey data...")
@@ -1388,7 +1391,7 @@ dhs_data_province_carried <- carry_forward_survey_data_province(dhs_data_provinc
 dhs_data_province_carried <- assign_carried_survey_data_province(dhs_data_province_carried)
 
 # ------------------------------ Part 5: Merge + Compute Denominators & Coverage ------------------------------------
-
+print("Merge survey values with HMIS, calculate denominators, calculate coverage values for each numerator-denominator combination...")
 # Merge survey with HMIS and assign reference values
 annual_hmis_province <- annual_hmis_province %>%
   left_join(dhs_data_province_carried, by = c("admin_area_1", "admin_area_2", "year")) %>%
@@ -1401,7 +1404,7 @@ annual_hmis_province <- calculate_denominators_province(annual_hmis_province)
 annual_hmis_province <- calculate_hmis_coverage_province(annual_hmis_province)
 
 # ------------------------------ Part 6: Compare Coverage vs Survey Estimates ------------------------------------
-
+print("Compare coverage VS survey estimates, rank denominators based on lowest squared error vs survey...")
 # Extract reference survey values for each indicator
 ref_vals_province <- extract_reference_values_province(annual_hmis_province)
 
@@ -1415,7 +1418,7 @@ merged_province <- merge_survey_estimates_province(long_cov_province, ref_vals_p
 ranked_denominators_province <- rank_denominators_by_error_province(merged_province)
 
 # ------------------------------ Part 7: Project Survey Coverage Forward ------------------------------------
-
+print("Project survey coverage fwd...")
 ranked_with_deltas_province <- detect_coverage_delta_all_province(ranked_denominators_province)
 ranked_with_deltas_province <- left_join(
   ranked_with_deltas_province,
@@ -1430,24 +1433,22 @@ projected_coverage_province <- calculate_avgsurveyprojection_all_province(
 
 
 # ------------------------------ Part 8: Prepare results for visualization ----------------------------------
+# Same format as national results
 combined_coverage_data_province <- prepare_combined_coverage_data_province(
   data_survey = dhs_data_province_carried,
   coverage_data = projected_coverage_province,
   ranked_data = ranked_denominators_province
 )
 
-
+# Long format - need to calculate mean(coverage_cov) and present time period min year - max year on plot
 coverage_estimate_hmis_province <- combined_coverage_data_province %>%
   filter(!is.na(coverage_cov), rank == 1) %>%  # keep best denominator only
-  group_by(admin_area_1, admin_area_2, indicator_common_id) %>%
-  summarise(
-    coverage = mean(coverage_cov, na.rm = TRUE),
-    start_year = min(year),
-    end_year = max(year),
-    .groups = "drop"
-  )
+  select(admin_area_1, admin_area_2, year, indicator_common_id, coverage_cov)
+
 
 
 print("Save the results..")
 #write.csv(combined_coverage_data_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE) # most likely not used in visualization
 write.csv(coverage_estimate_hmis_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE)
+
+print("Coverage estimate analysis - admin_area_2-level - completed!")
