@@ -1,10 +1,3 @@
----
-editor_options:
-  markdown:
-    wrap: 72
-output: pdf_document
----
-
 # Module 4: Coverage Estimates
 
 ## Background
