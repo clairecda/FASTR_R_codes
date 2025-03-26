@@ -341,14 +341,16 @@ calculate_denominators <- function(data) {
       group_by(admin_area_1, year) %>%
       mutate(
         # Ensure `nummonth` is valid (never 0 or NA)
-        coverage_adjustment = if_else(is.na(nummonth) | nummonth == 0, 1, 12 / nummonth),
+        coverage_adjustment = if_else(is.na(nummonth) | nummonth == 0, 1, nummonth / 12),
         
-        # Only apply adjustments to numeric denominator columns
-        across(where(is.numeric) & starts_with("d"), ~ if_else(!is.na(.x), .x * coverage_adjustment, NA_real_))
+        # Apply adjustment to all numeric denominators starting with "d"
+        across(where(is.numeric) & starts_with("d"), 
+               ~ if_else(!is.na(.x), .x * coverage_adjustment, NA_real_))
       ) %>%
       ungroup() %>%
       select(-coverage_adjustment)
   }
+  
   
   return(data)
 }
@@ -372,7 +374,8 @@ calculate_wpp_denominators <- function(data) {
       dwpp_mcv = if_else(!is.na(wpptotu5pop), wpptotu5pop, NA_real_)
     ) %>%
     # Adjust all non-missing denominators dynamically
-    mutate(across(starts_with("dwpp"), ~ if_else(!is.na(.x), .x * (12 / nummonth), NA_real_)))
+    mutate(across(starts_with("dwpp"), ~ if_else(!is.na(.x), .x * (nummonth / 12), NA_real_)))
+  
   
   return(data)
 }
@@ -523,17 +526,7 @@ merge_survey_estimates <- function(coverage_long, carry_values) {
 }
 
 # Step 3: Select best denominator for each year independently
-select_best_denominator <- function(merged_data) {
-  best_denominator <- merged_data %>%
-    filter(!is.na(squared_error)) %>%  # Remove rows where squared_error is NA
-    group_by(admin_area_1, year, indicator_common_id) %>%
-    slice_min(squared_error, with_ties = FALSE) %>%  # Select row with min squared_error
-    ungroup() %>%
 
-    select(admin_area_1, year, indicator_common_id, coverage, denominator, denominator_value, denominator_type, squared_error)
-  
-  return(best_denominator)
-}
 compare_denominators <- function(merged_data) {
   ranked_denominators <- merged_data %>%
     filter(!is.na(squared_error)) %>%  # Keep only valid comparisons
@@ -549,7 +542,17 @@ compare_denominators <- function(merged_data) {
   return(ranked_denominators)
 }
 
-
+select_best_denominator <- function(merged_data) {
+  best_denominator <- merged_data %>%
+    filter(!is.na(squared_error)) %>%  # Remove rows where squared_error is NA
+    group_by(admin_area_1, year, indicator_common_id) %>%
+    slice_min(squared_error, with_ties = FALSE) %>%  # Select row with min squared_error
+    ungroup() %>%
+    
+    select(admin_area_1, year, indicator_common_id, coverage, denominator, denominator_value, denominator_type, squared_error)
+  
+  return(best_denominator)
+}
 
 # PART 9 - Extrapolate  Estimates ----------------------------------------------------
 # Function to compute coverage delta
@@ -577,24 +580,6 @@ detect_coverage_delta <- function(best_coverage) {
   
   return(coverage_table)
 }
-
-# Add function to compute coverage delta with ALL denominators included
-detect_coverage_delta_all <- function(merged_data) {
-  merged_data %>%
-    arrange(admin_area_1, indicator_common_id, denominator, year) %>%
-    group_by(admin_area_1, indicator_common_id, denominator) %>%
-    mutate(
-      coverage_delta = if_else(
-        !is.na(coverage) & !is.na(lag(coverage)),
-        coverage - lag(coverage),
-        NA_real_
-      ),
-      coverage_delta = if_else(is.na(coverage_delta), 0, coverage_delta)
-    ) %>%
-    ungroup()
-}
-
-
 # Function to calculate avg survey projections based on coverage deltas and reference values
 calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
   
@@ -614,6 +599,22 @@ calculate_avgsurveyprojection <- function(coverage_table, carry_values) {
     ungroup()
   
   return(coverage_table)
+}
+
+# Add function to compute coverage delta with ALL denominators included
+detect_coverage_delta_all <- function(merged_data) {
+  merged_data %>%
+    arrange(admin_area_1, indicator_common_id, denominator, year) %>%
+    group_by(admin_area_1, indicator_common_id, denominator) %>%
+    mutate(
+      coverage_delta = if_else(
+        !is.na(coverage) & !is.na(lag(coverage)),
+        coverage - lag(coverage),
+        NA_real_
+      ),
+      coverage_delta = if_else(is.na(coverage_delta), 0, coverage_delta)
+    ) %>%
+    ungroup()
 }
 
 # Function to calculate avg survey projection for each denominator separately
@@ -707,6 +708,7 @@ prepare_combined_coverage_data <- function(data_survey, coverage_table_with_proj
 
   return(combined_data_wide)
 }
+
 prepare_combined_coverage_data_all <- function(data_survey, coverage_data, ranked_denominators) {
   
   # 1. Process original survey estimates
@@ -728,9 +730,9 @@ prepare_combined_coverage_data_all <- function(data_survey, coverage_data, ranke
   
   # 3. Expand each survey row across all denominators
   expanded_originals <- original_estimates %>%
-    left_join(unique_denoms, by = "indicator_common_id", relationship = "many-to-many")
+    left_join(unique_denoms, by = "indicator_common_id")  # removed relationship arg
   
-  # 4. Pull avgsurvey projection and HMIS coverage
+  # 4. Pull projections and HMIS coverage
   projections <- coverage_data %>%
     select(admin_area_1, year, indicator_common_id, denominator, avgsurveyprojection)
   
@@ -747,14 +749,24 @@ prepare_combined_coverage_data_all <- function(data_survey, coverage_data, ranke
     left_join(projections, by = c("admin_area_1", "year", "indicator_common_id", "denominator")) %>%
     left_join(hmis_cov,    by = c("admin_area_1", "year", "indicator_common_id", "denominator")) %>%
     left_join(ranks,       by = c("admin_area_1", "year", "indicator_common_id", "denominator")) %>%
-    rename(coverage_avgsurveyprojection = avgsurveyprojection)
+    rename(coverage_avgsurveyprojection = avgsurveyprojection) %>%
+    
+    # 7. Apply transformations
+    mutate(
+      coverage_original_estimate = coverage_original_estimate / 100,
+      coverage_avgsurveyprojection = coverage_avgsurveyprojection / 100,
+      coverage_cov = coverage_cov / 100
+    ) %>%
+    
+    # 8. Filter incomplete rows
+    filter(!(is.na(coverage_original_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) %>%
+    
+    # 9. Final columns
+    select(admin_area_1, year, indicator_common_id, denominator,
+           coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov, rank)
   
-  # 7. Select final columns
-  return(final %>%
-           select(admin_area_1, year, indicator_common_id, denominator,
-                  coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov, rank))
+  return(final)
 }
-
 
 # ------------------------------ Main Execution -----------------------------------
 # 1. Load and Map Adjusted Volumes
@@ -908,3 +920,534 @@ combined_coverage_data <- combined_coverage_data %>%
 # 15. Export the cleaned dataset
 print("Save the results..")
 write.csv(combined_coverage_data, "M4_coverage_estimation.csv", row.names = FALSE)
+
+## ---------------------------------------------------------------------------------------------------------------- ##
+province_name_replacements <- c(
+  "ab Abia State" = "Abia", "ad Adamawa State" = "Adamawa", "ak Akwa-Ibom State" = "Akwa Ibom",
+  "an Anambra state" = "Anambra", "ba Bauchi State" = "Bauchi", "be Benue State" = "Benue",
+  "bo Borno State" = "Borno", "by Bayelsa State" = "Bayelsa", "cr Cross River State" = "Cross River",
+  "de Delta State" = "Delta", "eb Ebonyi State" = "Ebonyi", "ed Edo State" = "Edo",
+  "ek Ekiti State" = "Ekiti", "en Enugu State" = "Enugu", "fc Federal Capital Territory" = "FCT Abuja",
+  "go Gombe State" = "Gombe", "im Imo State" = "Imo", "ji Jigawa State" = "Jigawa",
+  "kd Kaduna State" = "Kaduna", "ke Kebbi State" = "Kebbi", "kn Kano State" = "Kano",
+  "ko Kogi State" = "Kogi", "kt Katsina State" = "Katsina", "kw Kwara State" = "Kwara",
+  "la Lagos State" = "Lagos", "na Nasarawa State" = "Nasarawa", "ni Niger State" = "Niger",
+  "og Ogun State" = "Ogun", "on Ondo State" = "Ondo", "os Osun State" = "Osun",
+  "oy Oyo State" = "Oyo", "pl Plateau State" = "Plateau", "ri Rivers State" = "Rivers",
+  "so Sokoto State" = "Sokoto", "ta Taraba State" = "Taraba", "yo Yobe State" = "Yobe",
+  "za Zamfara State" = "Zamfara"
+)
+
+# ------------------------------ Part 1: Key Functions ------------------------------------
+
+adjust_names_for_merging <- function(data, column, replacements) {
+  data[[column]] <- recode(data[[column]], !!!replacements)
+  return(data)
+}
+extend_survey_data_province <- function(survey_data, min_year = MIN_YEAR, max_year = CURRENT_YEAR, prefix) {
+  full_year_range <- seq(min_year, max_year)
+  
+  for (var in c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")) {
+    survey_var <- paste0("dhs", var)
+    new_col <- paste0("avgsurvey_", var)
+    if (survey_var %in% colnames(survey_data)) {
+      survey_data[[new_col]] <- survey_data[[survey_var]]
+    }
+  }
+  
+  survey_data %>%
+    filter(year >= min_year & year <= max_year) %>%
+    group_by(admin_area_1, admin_area_2) %>%
+    complete(year = full_year_range) %>%
+    arrange(admin_area_1, admin_area_2, year) %>%
+    mutate(
+      across(
+        starts_with("avgsurvey_"),
+        ~ zoo::na.locf(.x, na.rm = FALSE),
+        .names = "{.col}_carry"
+      )
+    ) %>%
+    ungroup()
+}
+carry_forward_survey_data_province <- function(data) {
+  survey_vars <- c(
+    "avgsurvey_anc1", "avgsurvey_anc4", "avgsurvey_delivery",
+    "avgsurvey_bcg", "avgsurvey_penta1", "avgsurvey_penta3",
+    "avgsurvey_nmr", "avgsurvey_imr", "postnmr"
+  )
+  
+  existing_vars <- intersect(survey_vars, colnames(data))
+  if (length(existing_vars) == 0) {
+    warning("No survey variables found to carry forward.")
+    return(data)
+  }
+  
+  for (var in existing_vars) {
+    original_var <- paste0(var, "_original")
+    if (!(original_var %in% colnames(data))) {
+      data[[original_var]] <- data[[var]]
+    }
+  }
+  
+  data %>%
+    arrange(admin_area_1, admin_area_2, year) %>%
+    group_by(admin_area_1, admin_area_2) %>%
+    complete(year = full_seq(year, 1)) %>%
+    mutate(
+      across(
+        all_of(existing_vars),
+        ~ zoo::na.locf(.x, na.rm = FALSE)
+      )
+    ) %>%
+    ungroup()
+}
+assign_carried_survey_data_province <- function(data) {
+  carry_vars <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")
+  
+  for (var in carry_vars) {
+    colname <- paste0("avgsurvey_", var)
+    if (colname %in% colnames(data)) {
+      data[[paste0(var, "carry")]] <- data[[colname]]
+    }
+  }
+  return(data)
+}
+
+calculate_denominators_province <- function(data) {
+  safe_calc <- function(expr) tryCatch(expr, error = function(e) NA_real_)
+  
+  # Calculate denominators based on ANC1 (e.g. pregnancies, live births, DPT proxy, MCV proxy)
+  if (all(c("countanc1", "anc1carry") %in% names(data))) {
+    data <- data %>%
+      mutate(
+        danc1_pregnancy = safe_calc(countanc1 / (anc1carry / 100)),
+        danc1_livebirth = safe_calc(
+          danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE) * (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE)
+        ),
+        danc1_dpt = safe_calc(
+          danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE) / (1 - (TWIN_RATE / 2)) * 
+            (1 - STILLBIRTH_RATE) * (1 - NEONATAL_MORTALITY_RATE)
+        ),
+        danc1_mcv = safe_calc(
+          danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE) * (1 + TWIN_RATE) * 
+            (1 - STILLBIRTH_RATE) * (1 - INFANT_MORTALITY_RATE)
+        )
+      )
+  }
+  
+  # Calculate denominators based on delivery counts
+  if (all(c("countdelivery", "deliverycarry") %in% names(data))) {
+    data <- data %>%
+      mutate(
+        ddelivery_pregnancy = safe_calc((countdelivery / (deliverycarry / 100)) / (1 - PREGNANCY_LOSS_RATE)),
+        ddelivery_livebirth = safe_calc((countdelivery / (deliverycarry / 100)) / (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE)),
+        ddelivery_dpt = safe_calc((countdelivery / (deliverycarry / 100)) * (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE) * (1 - NEONATAL_MORTALITY_RATE)),
+        ddelivery_mcv = safe_calc((countdelivery / (deliverycarry / 100)) * (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE) * (1 - INFANT_MORTALITY_RATE))
+      )
+  }
+  
+  # If 'nummonth' exists, adjust denominators for incomplete reporting
+  if ("nummonth" %in% names(data)) {
+    data <- data %>%
+      mutate(adjustment_factor = if_else(is.na(nummonth) | nummonth == 0, 1, nummonth / 12)) %>%
+      mutate(across(starts_with("d"), ~ if_else(!is.na(.x), .x * adjustment_factor, .x))) %>%
+      select(-adjustment_factor)
+  }
+  
+  return(data)
+}
+calculate_hmis_coverage_province <- function(data) {
+  # Step 1: Identify relevant denominator columns (exclude MCV)
+  denominator_cols <- names(data)[str_detect(names(data), "^d[a-z0-9]+_(pregnancy|livebirth|dpt)$")]
+  
+  if (length(denominator_cols) == 0) {
+    warning("No denominator columns found.")
+    return(data)
+  }
+  
+  # Step 2: Define valid indicator-denominator mappings
+  denom_indicator_map <- list(
+    pregnancy = c("anc1", "anc4"),
+    livebirth = c("delivery", "bcg"),
+    dpt = c("penta1", "penta3")
+  )
+  
+  # Step 3: Reshape denominator data to long format and map indicators
+  denominator_long <- data %>%
+    select(admin_area_1, admin_area_2, year, all_of(denominator_cols)) %>%
+    pivot_longer(cols = all_of(denominator_cols),
+                 names_to = "denominator", values_to = "denominator_value") %>%
+    drop_na(denominator_value) %>%
+    mutate(
+      denominator_type = case_when(
+        str_detect(denominator, "_pregnancy$") ~ "pregnancy",
+        str_detect(denominator, "_livebirth$") ~ "livebirth",
+        str_detect(denominator, "_dpt$") ~ "dpt",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    rowwise() %>%
+    mutate(indicator_common_id = list(denom_indicator_map[[denominator_type]])) %>%
+    unnest(indicator_common_id) %>%
+    ungroup()
+  
+  # Step 4: Prepare numerator data
+  numerator_cols <- names(data)[str_detect(names(data), "^count[a-z0-9]+$")]
+  
+  if (length(numerator_cols) == 0) {
+    warning("No numerator columns found.")
+    return(data)
+  }
+  
+  numerator_long <- data %>%
+    select(admin_area_1, admin_area_2, year, all_of(numerator_cols)) %>%
+    pivot_longer(
+      cols = all_of(numerator_cols),
+      names_to = "numerator",
+      values_to = "numerator_value"
+    ) %>%
+    mutate(indicator_common_id = str_remove(numerator, "^count")) %>%
+    drop_na(numerator_value)
+  
+  # Step 5: Merge + calculate coverage
+  coverage_data <- inner_join(
+    denominator_long,
+    numerator_long,
+    by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id")
+  ) %>%
+    mutate(
+      coverage = ifelse(
+        denominator_value > 0,
+        100 * numerator_value / denominator_value,
+        NA_real_
+      ),
+      coverage_col = paste0("cov_", indicator_common_id, "_", str_remove(denominator, "^d"))
+    )
+  
+  # Step 6: Spread and merge back
+  coverage_wide <- coverage_data %>%
+    select(admin_area_1, admin_area_2, year, coverage_col, coverage) %>%
+    pivot_wider(names_from = coverage_col, values_from = coverage)
+  
+  data <- left_join(data, coverage_wide, by = c("admin_area_1", "admin_area_2", "year"))
+  
+  return(data)
+}
+
+extract_reference_values_province <- function(data) {
+  carry_cols <- grep("carry$", names(data), value = TRUE)
+  if (length(carry_cols) == 0) stop("No '_carry' columns found in data!")
+  
+  data %>%
+    select(admin_area_1, admin_area_2, year, all_of(carry_cols)) %>%
+    pivot_longer(cols = all_of(carry_cols),
+                 names_to = "indicator_to_match_on",
+                 values_to = "reference_value") %>%
+    mutate(indicator_to_match_on = gsub("carry$", "", indicator_to_match_on)) %>%
+    drop_na(reference_value) %>%
+    arrange(admin_area_1, admin_area_2, year, indicator_to_match_on)
+}
+extract_all_denominator_coverage_province <- function(data) {
+  # Define mapping from denominator type to indicators (based on Stata logic)
+  denom_indicator_map <- list(
+    pregnancy = c("anc1", "anc4"),
+    livebirth = c("delivery", "bcg"),
+    dpt = c("penta1", "penta3")
+  )
+  
+  # Get all denominator columns that match the valid suffixes
+  denom_cols <- names(data)[stringr::str_detect(names(data), "^d[a-z0-9]+_(pregnancy|livebirth|dpt)$")]
+  
+  # Pivot longer and tag with denominator type
+  denominator_long <- data %>%
+    select(admin_area_1, admin_area_2, year, all_of(denom_cols)) %>%
+    pivot_longer(cols = all_of(denom_cols),
+                 names_to = "denominator",
+                 values_to = "denominator_value") %>%
+    drop_na(denominator_value) %>%
+    mutate(
+      denominator_type = case_when(
+        str_ends(denominator, "_pregnancy") ~ "pregnancy",
+        str_ends(denominator, "_livebirth") ~ "livebirth",
+        str_ends(denominator, "_dpt") ~ "dpt"
+      )
+    ) %>%
+    rowwise() %>%
+    mutate(indicator_to_match_on = list(denom_indicator_map[[denominator_type]])) %>%
+    unnest(indicator_to_match_on) %>%
+    ungroup()
+  
+  # Attach numerators
+  numerator_long <- data %>%
+    select(admin_area_1, admin_area_2, year, starts_with("count")) %>%
+    pivot_longer(cols = starts_with("count"),
+                 names_to = "numerator",
+                 values_to = "numerator_value") %>%
+    mutate(indicator_to_match_on = str_remove(numerator, "^count")) %>%
+    filter(!is.na(numerator_value))
+  
+  # Merge and calculate coverage
+  long <- inner_join(
+    denominator_long,
+    numerator_long,
+    by = c("admin_area_1", "admin_area_2", "year", "indicator_to_match_on")
+  ) %>%
+    mutate(
+      coverage = ifelse(
+        denominator_value > 0,
+        100 * numerator_value / denominator_value,
+        NA_real_
+      )
+    ) %>%
+    select(admin_area_1, admin_area_2, year, indicator_to_match_on,
+           denominator, denominator_value, coverage)
+  
+  return(long)
+}
+merge_survey_estimates_province <- function(coverage_long, reference_values) {
+  coverage_long %>%
+    left_join(reference_values,
+              by = c("admin_area_1", "admin_area_2", "year", "indicator_to_match_on")) %>%
+    rename(indicator_common_id = indicator_to_match_on) %>%
+    mutate(
+      squared_error = ifelse(!is.na(reference_value) & !is.na(coverage),
+                             (coverage - reference_value)^2,
+                             NA_real_)
+    )
+}
+rank_denominators_by_error_province <- function(merged_data) {
+  merged_data %>%
+    filter(!is.na(squared_error)) %>%
+    group_by(admin_area_1, admin_area_2, year, indicator_common_id) %>%
+    arrange(squared_error) %>%
+    mutate(rank = row_number()) %>%
+    ungroup() %>%
+    select(admin_area_1, admin_area_2, year, indicator_common_id,
+           coverage, denominator, denominator_value, squared_error, rank)
+}
+detect_coverage_delta_all_province <- function(merged_data) {
+  merged_data %>%
+    arrange(admin_area_1, admin_area_2, indicator_common_id, denominator, year) %>%
+    group_by(admin_area_1, admin_area_2, indicator_common_id, denominator) %>%
+    mutate(
+      coverage_delta = if_else(
+        !is.na(coverage) & !is.na(lag(coverage)),
+        coverage - lag(coverage),
+        NA_real_
+      ),
+      coverage_delta = if_else(is.na(coverage_delta), 0, coverage_delta)
+    ) %>%
+    ungroup()
+}
+calculate_avgsurveyprojection_all_province <- function(coverage_table, carry_values) {
+  # Clean duplicate columns
+  coverage_table <- coverage_table %>% select(-reference_value)
+  carry_values <- carry_values %>% rename(indicator_common_id = indicator_to_match_on)
+  
+  merged <- left_join(
+    coverage_table,
+    carry_values,
+    by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id")
+  )
+  
+  if (!"reference_value" %in% names(merged)) {
+    stop("reference_value not found after merge! Join failed.")
+  }
+  
+  merged %>%
+    arrange(admin_area_1, admin_area_2, indicator_common_id, denominator, year) %>%
+    group_by(admin_area_1, admin_area_2, indicator_common_id, denominator) %>%
+    mutate(
+      # Use only the first available reference as anchor
+      anchor_value = reference_value[which(!is.na(reference_value))[1]],
+      avgsurveyprojection = ifelse(
+        is.na(anchor_value),
+        NA_real_,
+        anchor_value + cumsum(coverage_delta)
+      ),
+      projection_source = paste0("avgsurveyprojection_", denominator)
+    ) %>%
+    ungroup()
+}
+
+prepare_combined_coverage_data_province <- function(data_survey, coverage_data, ranked_data) {
+  
+  # 1. Process DHS original estimates
+  official_estimates <- data_survey %>%
+    select(admin_area_1, admin_area_2, year, ends_with("_original")) %>%
+    pivot_longer(
+      cols = ends_with("_original"),
+      names_to = "indicator_common_id",
+      values_to = "coverage_official_estimate"
+    ) %>%
+    mutate(
+      indicator_common_id = str_remove(indicator_common_id, "^avgsurvey_"),
+      indicator_common_id = str_remove(indicator_common_id, "_original$")
+    )
+  
+  # 2. Get all unique indicator-denominator pairs
+  unique_denoms <- coverage_data %>%
+    distinct(indicator_common_id, denominator)
+  
+  # 3. Expand survey rows across all denominator options
+  expanded_officials <- official_estimates %>%
+    left_join(unique_denoms, by = "indicator_common_id", relationship = "many-to-many")
+  
+  # 4. Pull HMIS coverage and projections
+  hmis_cov <- coverage_data %>%
+    select(admin_area_1, admin_area_2, year, indicator_common_id, denominator, coverage) %>%
+    rename(coverage_cov = coverage)
+  
+  projections <- coverage_data %>%
+    select(admin_area_1, admin_area_2, year, indicator_common_id, denominator, avgsurveyprojection) %>%
+    rename(coverage_avgsurveyprojection = avgsurveyprojection)
+  
+  ranks <- ranked_data %>%
+    select(admin_area_1, admin_area_2, year, indicator_common_id, denominator, rank)
+  
+  # 5. Join all together
+  final <- expanded_officials %>%
+    left_join(projections, by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id", "denominator")) %>%
+    left_join(hmis_cov,    by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id", "denominator")) %>%
+    left_join(ranks,       by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id", "denominator"))
+  
+  # 6. Normalize and clean
+  final %>%
+    mutate(across(
+      c(coverage_official_estimate, coverage_avgsurveyprojection, coverage_cov),
+      ~ .x / 100
+    )) %>%
+    filter(!(is.na(coverage_official_estimate) & is.na(coverage_avgsurveyprojection) & is.na(coverage_cov))) %>%
+    arrange(admin_area_1, admin_area_2, indicator_common_id, year, denominator)
+}
+
+# ------------------------------ Part 2: Load Input Data ------------------------------------
+
+# Load adjusted HMIS service volumes
+adjusted_volume_data_province <- read.csv("M2_adjusted_data_admin_area.csv")
+
+# Load DHS province-level survey estimates
+dhs_data_province_path <- "~/Desktop/FASTR/Coverage_Analysis/DHS/DHS Province.dta"
+
+# ------------------------------ Part 3: Prepare HMIS Aggregated Data ------------------------------------
+
+# Identify countries included in the HMIS dataset
+hmis_countries <- unique(adjusted_volume_data_province$admin_area_1)
+print(hmis_countries)
+
+# Filter and reshape adjusted volume data
+volume_data <- adjusted_volume_data_province %>%
+  filter(year >= MIN_YEAR & year <= CURRENT_YEAR)
+
+expected_indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr")
+missing_indicators <- setdiff(expected_indicators, unique(volume_data$indicator_common_id))
+if (length(missing_indicators) > 0) {
+  warning("The following indicators are missing from the dataset: ", paste(missing_indicators, collapse = ", "))
+}
+
+adjusted_volume_province <- volume_data %>%
+  mutate(count = .data[[SELECTED_COUNT_VARIABLE]]) %>%
+  select(admin_area_1, admin_area_2, year, month, indicator_common_id, count) %>%
+  arrange(admin_area_1, admin_area_2, year, month, indicator_common_id)
+
+# Count available months of data per province-year
+nummonth_data <- adjusted_volume_province %>%
+  distinct(admin_area_1, admin_area_2, year, month) %>%
+  group_by(admin_area_1, admin_area_2, year) %>%
+  summarise(nummonth = n_distinct(month, na.rm = TRUE), .groups = "drop")
+
+# Aggregate HMIS volumes to annual level
+message("Aggregating HMIS adjusted volume to annual level...")
+
+annual_hmis_province <- adjusted_volume_province %>%
+  group_by(admin_area_1, admin_area_2, year, indicator_common_id) %>%
+  summarise(count = sum(count, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(
+    names_from = indicator_common_id,
+    values_from = count,
+    names_prefix = "count",
+    values_fill = list(count = 0)
+  ) %>%
+  left_join(nummonth_data, by = c("admin_area_1", "admin_area_2", "year")) %>%
+  arrange(admin_area_1, admin_area_2, year) %>%
+  adjust_names_for_merging("admin_area_2", province_name_replacements)
+
+# ------------------------------ Part 4: Prepare DHS Survey Data ------------------------------------
+
+# Load and clean DHS survey estimates
+dhs_data_province <- read_dta(dhs_data_province_path) %>%
+  rename(admin_area_1 = country, admin_area_2 = province) %>%
+  adjust_names_for_merging("admin_area_1", name_replacements) %>%
+  adjust_names_for_merging("admin_area_2", province_name_replacements) %>%
+  filter(admin_area_1 %in% hmis_countries, year != 2024)
+
+# Extend and carry forward survey values
+print("Extend survey data...")
+dhs_data_province_extended <- extend_survey_data_province(dhs_data_province, prefix = "")
+dhs_data_province_carried <- carry_forward_survey_data_province(dhs_data_province_extended)
+dhs_data_province_carried <- assign_carried_survey_data_province(dhs_data_province_carried)
+
+# ------------------------------ Part 5: Merge + Compute Denominators & Coverage ------------------------------------
+
+# Merge survey with HMIS and assign reference values
+annual_hmis_province <- annual_hmis_province %>%
+  left_join(dhs_data_province_carried, by = c("admin_area_1", "admin_area_2", "year")) %>%
+  assign_carried_survey_data_province()
+
+# Calculate denominators
+annual_hmis_province <- calculate_denominators_province(annual_hmis_province)
+
+# Compute coverage values for each numerator-denominator combination
+annual_hmis_province <- calculate_hmis_coverage_province(annual_hmis_province)
+
+# ------------------------------ Part 6: Compare Coverage vs Survey Estimates ------------------------------------
+
+# Extract reference survey values for each indicator
+ref_vals_province <- extract_reference_values_province(annual_hmis_province)
+
+# Calculate coverage using all denominator options
+long_cov_province <- extract_all_denominator_coverage_province(annual_hmis_province)
+
+# Merge HMIS coverage with survey reference values and calculate error
+merged_province <- merge_survey_estimates_province(long_cov_province, ref_vals_province)
+
+# Rank denominators based on lowest squared error vs survey
+ranked_denominators_province <- rank_denominators_by_error_province(merged_province)
+
+# ------------------------------ Part 7: Project Survey Coverage Forward ------------------------------------
+
+ranked_with_deltas_province <- detect_coverage_delta_all_province(ranked_denominators_province)
+ranked_with_deltas_province <- left_join(
+  ranked_with_deltas_province,
+  ref_vals_province %>%
+    rename(indicator_common_id = indicator_to_match_on),
+  by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id")
+)
+projected_coverage_province <- calculate_avgsurveyprojection_all_province(
+  ranked_with_deltas_province,
+  ref_vals_province
+)
+
+
+# ------------------------------ Part 8: Prepare results for visualization ----------------------------------
+combined_coverage_data_province <- prepare_combined_coverage_data_province(
+  data_survey = dhs_data_province_carried,
+  coverage_data = projected_coverage_province,
+  ranked_data = ranked_denominators_province
+)
+
+
+coverage_estimate_hmis_province <- combined_coverage_data_province %>%
+  filter(!is.na(coverage_cov), rank == 1) %>%  # keep best denominator only
+  group_by(admin_area_1, admin_area_2, indicator_common_id) %>%
+  summarise(
+    coverage = mean(coverage_cov, na.rm = TRUE),
+    start_year = min(year),
+    end_year = max(year),
+    .groups = "drop"
+  )
+
+
+print("Save the results..")
+write.csv(combined_coverage_data_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE)
+write.csv(coverage_estimate_hmis_province, "M4_coverage_estimate_hmis_admin_area_2.csv", row.names = FALSE)
