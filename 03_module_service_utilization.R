@@ -1,5 +1,7 @@
 SELECTEDCOUNT <- "count"  # Change as needed
-DIFFPERCENT <- 10         # Threshold: actual volume differs from predicted by more than ± DIFFPERCENT (e.g. 10%)
+DIFFPERCENT <- 5        # Threshold: actual volume differs from predicted by more than ± DIFFPERCENT (e.g. 10%)
+RUN_DISTRICT_MODEL <- FALSE  # Set to FALSE to skip admin_area_3-level (e.g. district or LGA) regression
+
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Mar 28
@@ -500,81 +502,87 @@ print("Province-level regression complete.")
 
 
 
-# # Step 4b: Run Regression for Each Indicator × District ------------------------
-# print("Running regressions at the district level...")
-# 
-# district_results_list <- list()  # Store results for each indicator-district pair
-# 
-# for (indicator in indicators) {
-#   for (district in districts) {
-#     print(paste("Processing:", indicator, "in district:", district))
-#     
-#     district_data <- data_disruption %>%
-#       filter(indicator_common_id == indicator, admin_area_3 == district) %>%
-#       drop_na(!!sym(SELECTEDCOUNT), tagged, date)  # Keep only essential columns
-#     
-#     # Check if the dataset has enough data after filtering
-#     if (nrow(district_data) < 10) {  # Require at least 10 observations
-#       print(paste("Skipping", indicator, "in", district, "- insufficient data"))
-#       next
-#     }
-#     
-#     # Run district-level regression dynamically
-#     model_district <- tryCatch(
-#       feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
-#             data = district_data,
-#             cluster = as.formula(paste0("~", lowest_geo_level))),
-#       error = function(e) {
-#         print(paste("Regression failed for:", indicator, "in", district, "Error:", e$message))
-#         return(NULL)
-#       }
-#     )
-#     
-#     if (!is.null(model_district) && !anyNA(coef(model_district))) {
-#       district_data <- district_data %>%
-#         mutate(expect_admin_area_3 = predict(model_district, newdata = district_data))
-#       
-#       for (pmonth in unique(district_data$date[district_data$tagged == 1])) {
-#         coeff <- coef(model_district)["tagged"]
-#         district_data <- district_data %>%
-#           mutate(expect_admin_area_3 = ifelse(date == pmonth, expect_admin_area_3 - coeff, expect_admin_area_3))
-#       }
-#       
-#       district_data <- district_data %>%
-#         group_by(date) %>%
-#         mutate(
-#           diff = expect_admin_area_3 - !!sym(SELECTEDCOUNT),
-#           diffmean = mean(diff, na.rm = TRUE),
-#           predictmean = mean(expect_admin_area_3, na.rm = TRUE),
-#           b_admin_area_3 = ifelse(tagged == 1, -1 * (diffmean / predictmean), NA_real_)
-#         ) %>%
-#         ungroup()
-#       
-#       if ("tagged" %in% names(coef(model_district))) {
-#         p_admin_area_3 <- 2 * pt(abs(coef(model_district)["tagged"] / sqrt(diag(vcov(model_district)))["tagged"]),
-#                                  df.residual(model_district), lower.tail = FALSE)
-#         district_data <- district_data %>%
-#           mutate(p_admin_area_3 = p_admin_area_3)
-#       }
-#       
-#       # Store processed data
-#       district_results_list[[paste(indicator, district, sep = "_")]] <- district_data
-#     }
-#   }
-# }
-# 
-# # Combine district-level results
-# district_results_long <- bind_rows(district_results_list)
-# 
-# print("District-level regression analysis complete!")
-# 
-# # Merge district-level results into the main dataset
-# data_disruption <- data_disruption %>%
-#   left_join(district_results_long %>%
-#               select(facility_id, date, indicator_common_id, admin_area_3, expect_admin_area_3, b_admin_area_3, p_admin_area_3), 
-#             by = c("facility_id", "date", "indicator_common_id", "admin_area_3"))
-# 
-# print("District-level regression results merged into main dataset.")
+# Step 4b: Run Regression for Each Indicator × District ------------------------
+if (RUN_DISTRICT_MODEL) {
+  
+  print("Running regressions at the district level...")
+  
+  district_results_list <- list()  # Store results for each indicator-district pair
+  
+  for (indicator in indicators) {
+    for (district in districts) {
+      print(paste("Processing:", indicator, "in district:", district))
+      
+      district_data <- data_disruption %>%
+        filter(indicator_common_id == indicator, admin_area_3 == district) %>%
+        drop_na(!!sym(SELECTEDCOUNT), tagged, date)
+      
+      if (nrow(district_data) < 10) {
+        print(paste("Skipping", indicator, "in", district, "- insufficient data"))
+        next
+      }
+      
+      model_district <- tryCatch(
+        feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
+              data = district_data,
+              cluster = as.formula(paste0("~", lowest_geo_level))),
+        error = function(e) {
+          print(paste("Regression failed for:", indicator, "in", district, "Error:", e$message))
+          return(NULL)
+        }
+      )
+      
+      if (!is.null(model_district) && !anyNA(coef(model_district))) {
+        district_data <- district_data %>%
+          mutate(expect_admin_area_3 = predict(model_district, newdata = district_data))
+        
+        for (pmonth in unique(district_data$date[district_data$tagged == 1])) {
+          coeff <- coef(model_district)["tagged"]
+          district_data <- district_data %>%
+            mutate(expect_admin_area_3 = ifelse(date == pmonth, expect_admin_area_3 - coeff, expect_admin_area_3))
+        }
+        
+        district_data <- district_data %>%
+          group_by(date) %>%
+          mutate(
+            diff = expect_admin_area_3 - !!sym(SELECTEDCOUNT),
+            diffmean = mean(diff, na.rm = TRUE),
+            predictmean = mean(expect_admin_area_3, na.rm = TRUE),
+            b_admin_area_3 = ifelse(tagged == 1, -1 * (diffmean / predictmean), NA_real_)
+          ) %>%
+          ungroup()
+        
+        if ("tagged" %in% names(coef(model_district))) {
+          p_admin_area_3 <- 2 * pt(
+            abs(coef(model_district)["tagged"] / sqrt(diag(vcov(model_district)))["tagged"]),
+            df.residual(model_district),
+            lower.tail = FALSE
+          )
+          
+          district_data <- district_data %>%
+            mutate(p_admin_area_3 = p_admin_area_3)
+        }
+        
+        district_results_list[[paste(indicator, district, sep = "_")]] <- district_data
+      }
+    }
+  }
+  
+  district_results_long <- bind_rows(district_results_list)
+  
+  print("District-level regression analysis complete!")
+  
+  data_disruption <- data_disruption %>%
+    left_join(
+      district_results_long %>%
+        select(facility_id, date, indicator_common_id, admin_area_3,
+               expect_admin_area_3, b_admin_area_3, p_admin_area_3),
+      by = c("facility_id", "date", "indicator_common_id", "admin_area_3")
+    )
+  
+  print("District-level regression results merged into main dataset.")
+}
+
 
 
 
@@ -617,11 +625,31 @@ summary_disruption_admin2 <- data_disruption %>%
     .groups = "drop"
   )
 
+if (RUN_DISTRICT_MODEL) {
+  summary_disruption_admin3 <- data_disruption %>%
+    group_by(admin_area_3, date, indicator_common_id) %>%
+    mutate(num = n()) %>%
+    summarise(
+      mean_count = mean(count, na.rm = TRUE),
+      predict = mean(expect_admin_area_3, na.rm = TRUE),
+      b = mean(b_admin_area_3, na.rm = TRUE),
+      p = mean(p_admin_area_3, na.rm = TRUE),
+      num_obs = mean(num),
+      count_expect = sum(expect_admin_area_3, na.rm = TRUE),
+      count = sum(count, na.rm = TRUE),
+      diff_percent = 100 * (count_expect - count) / count_expect,
+      count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
+      .groups = "drop"
+    )
+}
 
-# # Step 5: Save Output ----------------------------------------------------------
+# Step 5: Save Outputs ----------------------------------------------------------
 print("Saving results...")
 write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
 write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
 #write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
 write.csv(summary_disruption_admin1, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE) 
 write.csv(summary_disruption_admin2, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE) 
+if (RUN_DISTRICT_MODEL) {
+  write.csv(summary_disruption_admin3, "M3_disruptions_analysis_admin_area_3.csv", row.names = FALSE)
+}
