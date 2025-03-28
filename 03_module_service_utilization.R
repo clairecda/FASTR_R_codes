@@ -1,5 +1,5 @@
 SELECTEDCOUNT <- "count"  # Change as needed
-DIFFPERCENT <- 5        # Threshold: actual volume differs from predicted by more than ± DIFFPERCENT (e.g. 10%)
+DIFFPERCENT <- 10       # Threshold: actual volume differs from predicted by more than ± DIFFPERCENT (e.g. 10%)
 RUN_DISTRICT_MODEL <- FALSE  # Set to FALSE to skip admin_area_3-level (e.g. district or LGA) regression
 
 #-------------------------------------------------------------------------------------------------------------
