@@ -1,8 +1,8 @@
 SELECTEDCOUNT <- "count"  # Change as needed
-
+DIFFPERCENT <- 10         # Threshold: actual volume differs from predicted by more than ± DIFFPERCENT (e.g. 10%)
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Mar 19
+# Last edit: 2025 Mar 28
 # Module: SERVICE UTILIZATION
 
 
@@ -29,8 +29,6 @@ SELECTEDCOUNT <- "count"  # Change as needed
 
 #-------------------------------------------------------------------------------------------------------------
 # Load required libraries
-
-
 library(lubridate)
 library(zoo)
 library(readxl)
@@ -309,11 +307,7 @@ control_chart_results <- control_chart_analysis(data, geo_cols, SELECTEDCOUNT)
 final_results <- merge_disruption_data(control_chart_results, disruption_data)
 
 M3_chartout <- final_results
-
 print("Control chart analysis complete")
-
-
-
 
 #-------------------------------------------------------------------------------------------------------------
 # STEP 2: DISRUPTION REGRESSION ANALYSIS (INDICATOR LEVEL + PROVINCE LEVEL + DISTRICT LEVEL)
@@ -498,7 +492,7 @@ province_results_long <- bind_rows(province_results_list)
 data_disruption <- data_disruption %>%
   left_join(province_results_long %>% 
               select(facility_id, date, indicator_common_id, 
-                     expect_admin_area_2, b_admin_area_2, p_admin_area_2, b_trend_admin_area_2),  # ✅ Added b_trend_admin_area_2
+                     expect_admin_area_2, b_admin_area_2, p_admin_area_2, b_trend_admin_area_2),
             by = c("facility_id", "date", "indicator_common_id"))
 
 print("Province-level regression complete.")
@@ -585,15 +579,49 @@ print("Province-level regression complete.")
 
 
 
+#-------------------------------------------------------------------------------------------------------------
+# STEP 3: PREPARE RESULTS FOR VISUALIZATION
+#-------------------------------------------------------------------------------------------------------------
+
+summary_disruption_admin1 <- data_disruption %>%
+  group_by(admin_area_1, date, indicator_common_id) %>%
+  mutate(num = n()) %>%
+  summarise(
+    mean_count = mean(count, na.rm = TRUE),
+    predict = mean(expect_admin_area_1, na.rm = TRUE),
+    b = mean(b_admin_area_1, na.rm = TRUE),
+    p = mean(p_admin_area_1, na.rm = TRUE),
+    num_obs = mean(num),
+    count_expect = sum(expect_admin_area_1, na.rm = TRUE),
+    count = sum(count, na.rm = TRUE),
+    diff_percent = 100 * (count_expect - count) / count_expect,
+    count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
+    .groups = "drop"
+  )
 
 
 
-
-
+summary_disruption_admin2 <- data_disruption %>%
+  group_by(admin_area_2, date, indicator_common_id) %>%
+  mutate(num = n()) %>%
+  summarise(
+    mean_count = mean(count, na.rm = TRUE),
+    predict = mean(expect_admin_area_2, na.rm = TRUE),
+    b = mean(b_admin_area_2, na.rm = TRUE),
+    p = mean(p_admin_area_2, na.rm = TRUE),
+    num_obs = mean(num),
+    count_expect = sum(expect_admin_area_2, na.rm = TRUE),
+    count = sum(count, na.rm = TRUE),
+    diff_percent = 100 * (count_expect - count) / count_expect,
+    count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
+    .groups = "drop"
+  )
 
 
 # # Step 5: Save Output ----------------------------------------------------------
 print("Saving results...")
 write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
 write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
-write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
+#write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
+write.csv(summary_disruption_admin1, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE) 
+write.csv(summary_disruption_admin2, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE) 
