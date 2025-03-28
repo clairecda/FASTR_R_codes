@@ -590,9 +590,12 @@ if (RUN_DISTRICT_MODEL) {
 #-------------------------------------------------------------------------------------------------------------
 # STEP 3: PREPARE RESULTS FOR VISUALIZATION
 #-------------------------------------------------------------------------------------------------------------
+# Convert period_id first
+data_disruption <- data_disruption %>%
+  mutate(period_id = format(as.Date(date), "%Y%m"))
 
 summary_disruption_admin1 <- data_disruption %>%
-  group_by(admin_area_1, date, indicator_common_id) %>%
+  group_by(admin_area_1, period_id, indicator_common_id) %>%
   mutate(num = n()) %>%
   summarise(
     mean_count = mean(count, na.rm = TRUE),
@@ -607,10 +610,8 @@ summary_disruption_admin1 <- data_disruption %>%
     .groups = "drop"
   )
 
-
-
 summary_disruption_admin2 <- data_disruption %>%
-  group_by(admin_area_2, date, indicator_common_id) %>%
+  group_by(admin_area_2, period_id, indicator_common_id) %>%
   mutate(num = n()) %>%
   summarise(
     mean_count = mean(count, na.rm = TRUE),
@@ -627,7 +628,7 @@ summary_disruption_admin2 <- data_disruption %>%
 
 if (RUN_DISTRICT_MODEL) {
   summary_disruption_admin3 <- data_disruption %>%
-    group_by(admin_area_3, date, indicator_common_id) %>%
+    group_by(admin_area_3, period_id, indicator_common_id) %>%
     mutate(num = n()) %>%
     summarise(
       mean_count = mean(count, na.rm = TRUE),
@@ -642,6 +643,7 @@ if (RUN_DISTRICT_MODEL) {
       .groups = "drop"
     )
 }
+
 
 # Step 5: Save Outputs ----------------------------------------------------------
 print("Saving results...")
