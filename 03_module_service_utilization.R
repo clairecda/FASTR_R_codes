@@ -44,269 +44,145 @@ library(tidyr)
 #-------------------------------------------------------------------------------------------------------------
 print("Loading data for control chart analysis...")
 data_utilization <- read.csv("M2_adjusted_data_admin_area.csv")        # adjusted data aggregated at the lowest geo level, used for visualization
+data <- read.csv("M1_output_outliers.csv")                             # data with outliers tagged 
 
-data <- read.csv("M1_output_outliers.csv")                  
 
-print("Loading disruption data...")
-disruption_data <- read_excel("Disruption Database.xlsx")
+print("Data loaded. Cleaning and filtering...")
 
-geo_cols <- names(data)[grepl("^admin_area_", names(data))]
-print(paste("Detected geo_cols:", paste(geo_cols, collapse = ", ")))
-
-# Create 'date' column from 'year' and 'month'
 data <- data %>%
-  mutate(date = as.Date(paste(year, month, "01", sep = "-")))
+  mutate(date = as.Date(paste(year, month, "01", sep = "-"))) %>%
+  filter(outlier_flag != 1) %>%
+  drop_na(!!sym(SELECTEDCOUNT))
 
-# Remove outliers before processing
+print("Grouping by panel (indicator + admin area)...")
+
 data <- data %>%
-  filter(outlier_flag != 1) %>%  # Exclude flagged outliers
-  drop_na(!!sym(SELECTEDCOUNT))  # Drop missing volume data
+  group_by(indicator_common_id, admin_area_2) %>%
+  mutate(panelvar = cur_group_id()) %>%
+  ungroup()
 
-# Control Chart Analysis Function
-control_chart_analysis <- function(cleaned_data, geo_cols, selected_count) {
-  print("Starting control chart analysis...")
+print("Aggregating data to province level...")
+
+province_data <- data %>%
+  group_by(panelvar, indicator_common_id, admin_area_1, admin_area_2, date) %>%
+  summarise(count = sum(!!sym(SELECTEDCOUNT), na.rm = TRUE), .groups = "drop") %>%
+  rename(count_original = count)
+
+print("Filling missing months and metadata...")
+
+province_data <- province_data %>%
+  group_by(panelvar) %>%
+  complete(date = seq(min(date), max(date), by = "month")) %>%
+  ungroup() %>%
+  group_by(panelvar) %>%
+  fill(indicator_common_id, admin_area_1, admin_area_2, .direction = "downup") %>%
+  ungroup()
+
+print("Removing months with extremely low counts...")
+
+province_data <- province_data %>%
+  group_by(panelvar) %>%
+  mutate(globalmean = mean(count_original, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(count = ifelse(count_original / globalmean < 0.5, NA, count_original))
+
+print("Interpolating missing/removed values for modeling...")
+
+province_data <- province_data %>%
+  group_by(panelvar) %>%
+  arrange(date) %>%
+  mutate(count = zoo::na.approx(count, na.rm = FALSE, maxgap = Inf, rule = 2)) %>%
+  ungroup()
+
+print("Running robust control chart analysis for each panel...")
+
+robust_control_chart <- function(panel_data, selected_count) {
+  panel_data <- panel_data %>% mutate(month_factor = factor(month(date)))
   
-  
-  # Generate `panelvar` (group ID for indicator & province)
-  print("Creating panel variable...")
-  cleaned_data <- cleaned_data %>%
-    group_by(indicator_common_id, admin_area_2) %>%
-    mutate(panelvar = cur_group_id()) %>%
-    ungroup()
-  
-  # Aggregate at `admin_area_2` Level while keeping `admin_area_1`
-  print("Aggregating data at province level...")
-  province_data <- cleaned_data %>%
-    group_by(panelvar, indicator_common_id, admin_area_1, admin_area_2, date) %>%
-    summarise(!!sym(selected_count) := sum(!!sym(selected_count), na.rm = TRUE), .groups = "drop")
-  
-  # Expand missing months within each `panelvar`
-  print("Expanding missing months for each panel...")
-  province_data <- province_data %>%
-    group_by(panelvar) %>%
-    complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month"),
-             fill = setNames(list(NA), selected_count)) %>%
-    ungroup()
-  
-  
-  # Fill missing province and indicator names
-  print("Filling missing province and indicator names...")
-  province_data <- province_data %>%
-    group_by(panelvar) %>%
-    complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month"),
-             fill = setNames(list(NA), selected_count)) %>%
-    fill(indicator_common_id, admin_area_1, admin_area_2, .direction = "downup") %>%  # Fill missing attributes
-    ungroup()
-  
-  print("Filling complete.")
-  
-  # Drop months with low volume (less than 50% of the global mean)
-  print("Dropping months with abnormally low volume...")
-  province_data <- province_data %>%
-    group_by(panelvar) %>%
-    mutate(globalmean = mean(!!sym(selected_count), na.rm = TRUE)) %>%
-    ungroup() %>%
-    mutate(!!sym(selected_count) := ifelse(!!sym(selected_count) / globalmean < 0.5, NA, !!sym(selected_count)))
-  
-  print(paste("After filtering low-volume months:", nrow(province_data), "rows"))
-  
-  # Proceed with control chart processing
-  panel_list <- unique(province_data$panelvar)
-  results_list <- list()
-  
-  for (panel in panel_list) {
-    print(paste("Processing panel:", panel))
-    panel_data <- province_data %>% filter(panelvar == panel)
-    
-    min_date <- min(panel_data$date, na.rm = TRUE)
-    max_date <- max(panel_data$date, na.rm = TRUE)
-    
-    # Expand missing months within the time range
-    panel_data <- panel_data %>%
-      complete(date = seq(min_date, max_date, by = "month"), fill = setNames(list(NA), selected_count))
-    
-    # Interpolate missing values
-    panel_data <- panel_data %>%
-      mutate(!!sym(selected_count) := zoo::na.approx(!!sym(selected_count), na.rm = FALSE, maxgap = Inf))
-    
-    # Regression for deseasonalization
-    if (sum(!is.na(panel_data[[selected_count]])) >= 12) {
-      print(paste("Running regression for panel", panel))
-      panel_data <- panel_data %>%
-        mutate(
-          count_predict = tryCatch(
-            predict(lm(!!sym(selected_count) ~ factor(month(date)) + as.numeric(date),
-                       data = panel_data, na.action = na.omit),
-                    newdata = panel_data),
-            error = function(e) NA  # If error, return NA
-          )
-        )
-    } else {
-      print(paste("Not enough data for regression in panel", panel, "- using median"))
-      panel_data <- panel_data %>%
-        mutate(count_predict = median(!!sym(selected_count), na.rm = TRUE))
-    }
-    
-    # # Rolling Mean Smoothing
-    # panel_data <- panel_data %>%
-    #   mutate(
-    #     count_smooth = zoo::rollmean(count_predict, k = min(12, n()), 
-    #                                  fill = median(count_predict, na.rm = TRUE), align = "center"),
-    #     residual = !!sym(selected_count) - count_smooth,
-    #     sd_residual = ifelse(sd(residual, na.rm = TRUE) > 0, sd(residual, na.rm = TRUE), 1),
-    #     control = residual / sd_residual
-    #   )
-    
-    # Lead-Lag Mean Smoothing (style)
-    for (i in 1:12) {
-      panel_data <- panel_data %>%
-        mutate(!!paste0("vf", i) := lead(count_predict, i),
-               !!paste0("vl", i) := lag(count_predict, i))
-    }
-    
-    panel_data <- panel_data %>%
-      mutate(count_smooth = rowMeans(select(., starts_with("vf"), starts_with("vl"), "count_predict"), na.rm = TRUE)) %>%
-      select(-starts_with("vf"), -starts_with("vl"))
-    
-    # Compute residuals and control values
-    panel_data <- panel_data %>%
-      mutate(
-        residual = !!sym(selected_count) - count_smooth,
-        sd_residual = ifelse(sd(residual, na.rm = TRUE) > 0, sd(residual, na.rm = TRUE), 1),
-        control = residual / sd_residual
-      )
-    
-    # For the last 6 months -> replace count_smooth with NA
-    last_6_months <- max(panel_data$date, na.rm = TRUE) - months(6)
-    panel_data <- panel_data %>%
-      mutate(count_smooth = ifelse(date >= last_6_months, NA, count_smooth))
-    
-    # Tag unusual timepoints 
-    panel_data <- panel_data %>%
-      mutate(
-        tag = case_when(
-          abs(control) >= 2 ~ 1,  # Unusual deviation
-          abs(!!sym(selected_count) - count_smooth) / count_smooth < 0.05 ~ 0,  # Normal fluctuations
-          abs(control) <= 0.5 ~ 0,  # Within normal range
-          TRUE ~ NA_real_
-        )
-      ) %>%
-      mutate(tag = as.numeric(tag))  # Ensure tag is numeric
-    
-    # Initialize tagged1 and tagged2
-    panel_data <- panel_data %>%
-      mutate(tagged1 = 0, tagged2 = 0)
-    
-    # Propagate anomalies forward within each panel
-    panel_data <- panel_data %>%
-      arrange(panelvar, date) %>%
-      mutate(
-        tagged1 = case_when( #fwd tagging
-          tag == 1 ~ 1,  
-          lag(tagged1, default = 0) == 1 & control > 0 ~ 1, 
-          TRUE ~ 0
-        )
-      ) %>%
-      arrange(panelvar, desc(date)) %>%
-      mutate(
-        tagged2 = case_when(
-          tag == 1 ~ 1,  
-          lead(tagged2, default = 0) == 1 & control > 0 ~ 1,
-          TRUE ~ 0  
-        )
-      ) %>%
-      mutate(tagged = ifelse(tagged1 == 1 | tagged2 == 1, 1, 0))  # Final tagged column
-    results_list[[as.character(panel)]] <- panel_data
-    
+  if (sum(!is.na(panel_data[[selected_count]])) >= 12) {
+    mod <- rlm(as.formula(paste(selected_count, "~ month_factor + as.numeric(date)")), data = panel_data, maxit = 100)
+    panel_data <- panel_data %>% mutate(count_predict = predict(mod, newdata = panel_data))
+  } else {
+    panel_data <- panel_data %>% mutate(count_predict = median(panel_data[[selected_count]], na.rm = TRUE))
   }
   
-  final_results <- bind_rows(results_list)
+  panel_data <- panel_data %>%
+    arrange(date) %>%
+    mutate(count_smooth = zoo::rollmedian(count_predict, k = SMOOTH_K, fill = NA, align = "center"),
+           count_smooth = ifelse(is.na(count_smooth), count_predict, count_smooth))
   
-  print("Applying taggedmean logic for systemic disruptions...")
-  final_results <- final_results %>%
-    mutate(tagged = as.numeric(tagged)) %>%
-    group_by(date) %>%
-    mutate(taggedmean = sum(tagged, na.rm = TRUE) / n_distinct(panelvar)) %>%  # Proportion of groups tagged
-    ungroup() %>%
-    mutate(tagged = ifelse(taggedmean > 0.3, 1, tagged))
+  # Compare against raw counts
+  panel_data <- panel_data %>%
+    mutate(residual = count_original - count_smooth)
+  
+  mad_resid <- mad(panel_data$residual, constant = 1, na.rm = TRUE)
+  panel_data <- panel_data %>% mutate(robust_control = residual / (mad_resid + 1e-6))
+  
+  panel_data <- panel_data %>%
+    mutate(tag_sharp = ifelse(!is.na(robust_control) & abs(robust_control) >= THRESHOLD, 1, 0))
+  
+  panel_data <- panel_data %>%
+    mutate(
+      mild_flag = ifelse(!is.na(robust_control) & abs(robust_control) >= 1 & abs(robust_control) < THRESHOLD, 1, 0),
+      mild_cumulative = zoo::rollapply(mild_flag, width = 3, align = "right", fill = NA, FUN = sum, na.rm = TRUE),
+      tag_sustained = ifelse(mild_cumulative >= 3 & abs(robust_control) >= 1.5, 1, 0)
+    )
+  
+  # Tag "dips" in the data
+  panel_data <- panel_data %>%
+    mutate(dip_flag = ifelse(is.na(count_original) | count_original < DIP_THRESHOLD * count_smooth, 1, 0))   # Updated line with parameterized threshold
+  
+  dip_rle <- rle(panel_data$dip_flag)
+  dip_tag <- inverse.rle(with(dip_rle, list(lengths = lengths, values = ifelse(values == 1 & lengths >= 3, 1, 0))))
+  panel_data$tag_sustained_dip <- dip_tag
+  
+  panel_data <- panel_data %>%
+    mutate(
+      is_missing = is.na(count_original) | count_original == 0,
+      missing_roll = zoo::rollapply(is_missing, width = 3, align = "right", fill = NA, FUN = sum, na.rm = TRUE),
+      tag_missing = ifelse(missing_roll >= 2, 1, 0)
+    )
+  
+  # Tag "rises" in the data
+  panel_data <- panel_data %>%
+    mutate(rise_flag = ifelse(!is.na(count_original) & count_original > RISE_THRESHOLD * count_smooth, 1, 0))
+  
+  rise_rle <- rle(panel_data$rise_flag)
+  rise_tag <- inverse.rle(with(rise_rle, list(lengths = lengths, values = ifelse(values == 1 & lengths >= 3, 1, 0))))
+  panel_data$tag_sustained_rise <- rise_tag
   
   
-  print("Control chart analysis complete.")
-  return(final_results)
+  
+  # Final tagging
+  
+  panel_data <- panel_data %>%
+    mutate(tagged = case_when(
+      tag_sharp == 1 |
+        tag_sustained == 1 |
+        tag_sustained_dip == 1 |
+        tag_sustained_rise == 1 |
+        tag_missing == 1 ~ 1,
+      TRUE ~ 0
+    ))
+  
+  # NAs in 'tagged' are replaced with 0
+  panel_data$tagged[is.na(panel_data$tagged)] <- 0
+  
+  return(panel_data)
 }
 
-# Merge Control Chart Results with Disruption Database
-merge_disruption_data <- function(control_chart_results, disruption_data) {
-  print("Merging with disruption database...")
-  
-  # Fix country spelling for Guinea
-  disruption_data <- disruption_data %>%
-    mutate(admin_area_1 = ifelse(country_keep == "Guinea", "Guinée", country_keep)) %>%
-    mutate(
-      start_date = as.Date(sprintf("%d-%02d-01", startdate_year, startdate_month)),
-      end_date = as.Date(sprintf("%d-%02d-01", enddate_year, enddate_month))
-    ) %>%
-    select(admin_area_1, admin_area_2 = province_keep, indicator_common_id = indicatortype_keep, 
-           start_date, end_date, disruption_reason)
-  
-  print("Disruption database processed.")
-  
-  # Perform Left Join but Preserve Original Data
-  merged_data <- control_chart_results %>%
-    left_join(disruption_data, by = "admin_area_1") %>%
-    mutate(
-      # Apply 'ALL' Logic for Provinces
-      admin_area_2 = case_when(
-        is.na(admin_area_2.y) ~ admin_area_2.x,  # If no match, keep original
-        admin_area_2.y == "ALL" ~ admin_area_2.x,  # Apply to all provinces
-        TRUE ~ admin_area_2.y  # If specific match, use it
-      ),
-      # Apply 'ALL' Logic for Indicators
-      indicator_common_id = case_when(
-        is.na(indicator_common_id.y) ~ indicator_common_id.x,  # If no match, keep original
-        indicator_common_id.y == "ALL" ~ indicator_common_id.x,  # Apply to all indicators
-        TRUE ~ indicator_common_id.y  # If specific match, use it
-      )
-    ) %>%
-    select(-admin_area_2.x, -admin_area_2.y, -indicator_common_id.x, -indicator_common_id.y)  # Remove redundant columns
-  
-  print("Applied 'ALL' logic for provinces and indicators.")
-  
-  merged_data <- merged_data %>%
-    mutate(
-      disruption_applies = case_when(
-        is.na(start_date) ~ 0,  # If no disruption, do nothing
-        date >= start_date & date <= end_date ~ 1,  # Apply only if within the correct period
-        TRUE ~ 0  # Otherwise, ignore the disruption
-      ),
-      tagged = case_when(
-        disruption_applies == 1 ~ 1,  # Apply tag only if disruption applies
-        TRUE ~ tagged  # Keep original tagging from control chart
-      ),
-      disruption_reason = case_when(
-        disruption_applies == 1 ~ disruption_reason,  # Keep disruption reason only where it applies
-        TRUE ~ NA_character_  # Otherwise, set to NA
-      )
-    ) %>%
-    select(-start_date, -end_date, -disruption_applies)  # Remove unnecessary columns
-  
-  print("Final merging complete. All time periods preserved.")
-  
-  #Ensure Proper Column Order
-  merged_data <- merged_data %>%
-    relocate(admin_area_1, admin_area_2, .before = count) %>%  # Move admin_area_1 & admin_area_2 to the start
-    relocate(indicator_common_id, .before = count)  # Keep indicator_common_id in place
-  
-  print("Column cleanup completed.")
-  
-  return(merged_data)
+# Run for all panels
+panel_list <- unique(province_data$panelvar)
+
+results_list <- list()
+for(panel in panel_list) {
+  print(paste0("Processing panel ID: ", panel))
+  panel_data <- province_data %>% filter(panelvar == panel)
+  panel_results <- robust_control_chart(panel_data, "count")
+  results_list[[as.character(panel)]] <- panel_results
 }
 
-
-
-# Run Control Chart Analysis - Merge Disruption Data
-control_chart_results <- control_chart_analysis(data, geo_cols, SELECTEDCOUNT)
-final_results <- merge_disruption_data(control_chart_results, disruption_data)
+final_results <- bind_rows(results_list)
 
 M3_chartout <- final_results
 print("Control chart analysis complete")
@@ -317,6 +193,7 @@ print("Control chart analysis complete")
 # Step 1: Load and Prepare Data
 print("Loading and preparing data for disruption analysis...")
 # Select only necessary columns from M3_chartout to avoid duplication
+
 M3_chartout_selected <- final_results %>%
   select(date, indicator_common_id, admin_area_2, tagged)  # Keep only relevant columns
 
@@ -330,15 +207,6 @@ print("Running panel regressions...")
 indicators <- unique(data_disruption$indicator_common_id)
 districts <- unique(data_disruption$admin_area_3)
 provinces <- unique(data_disruption$admin_area_2)
-
-# Identify the lowest available geographic level for clustering
-geo_cols <- colnames(data_disruption) %>% str_subset("^admin_area_[0-9]+$")
-lowest_geo_level <- if (length(geo_cols) > 0) {
-  geo_cols[which.max(as.numeric(str_extract(geo_cols, "[0-9]+")))]
-} else {
-  stop("No geographic levels detected in the dataset!")
-}
-print(paste("Using geographic level for clustering:", lowest_geo_level))
 
 
 # Step 4a: Run Regression for Each Indicator -----------------------------------
@@ -372,11 +240,19 @@ for (indicator in indicators) {
     indicator_data <- indicator_data %>%
       mutate(expect_admin_area_1 = predict(model, newdata = indicator_data))
     
-    for (pmonth in unique(indicator_data$date[indicator_data$tagged == 1])) {
-      coeff <- coef(model)["tagged"]
-      indicator_data <- indicator_data %>%
-        mutate(expect_admin_area_1 = ifelse(date == pmonth, expect_admin_area_1 - coeff, expect_admin_area_1))
-    }
+    
+    
+    
+    disruption_effect <- coef(model)["tagged"]
+    
+    
+    indicator_data <- indicator_data %>%
+      mutate(expect_admin_area_1 = predict(model, newdata = indicator_data),
+             expect_admin_area_1 = ifelse(tagged == 1,
+                                          expect_admin_area_1 - disruption_effect,
+                                          expect_admin_area_1))
+    
+    
     
     indicator_data <- indicator_data %>%
       group_by(date) %>%
@@ -441,7 +317,7 @@ for (indicator in indicators) {
     model_province <- tryCatch(
       feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
             data = province_data,
-            cluster = as.formula(paste0("~", lowest_geo_level))),
+            cluster = ~admin_area_3),
       error = function(e) {
         print(paste("Regression failed for:", indicator, "in", province, "Error:", e$message))
         return(NULL)
@@ -598,14 +474,16 @@ summary_disruption_admin1 <- data_disruption %>%
   group_by(admin_area_1, period_id, indicator_common_id) %>%
   mutate(num = n()) %>%
   summarise(
-    mean_count = mean(count, na.rm = TRUE),
-    predict = mean(expect_admin_area_1, na.rm = TRUE),
+    count_original = mean(count, na.rm = TRUE),
+    count_expect = mean(expect_admin_area_1, na.rm = TRUE),
     b = mean(b_admin_area_1, na.rm = TRUE),
     p = mean(p_admin_area_1, na.rm = TRUE),
     num_obs = mean(num),
-    count_expect = sum(expect_admin_area_1, na.rm = TRUE),
-    count = sum(count, na.rm = TRUE),
+    count_expect_sum = sum(expect_admin_area_1, na.rm = TRUE),
+    count_sum = sum(count, na.rm = TRUE),
     diff_percent = 100 * (count_expect - count) / count_expect,
+    diff_percent_sum = 100 * (count_expect_sum - count_sum) / count_expect_sum,
+    count_expect_diff_sum = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect_sum, count_sum),
     count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
     .groups = "drop"
   )
@@ -614,31 +492,36 @@ summary_disruption_admin2 <- data_disruption %>%
   group_by(admin_area_2, period_id, indicator_common_id) %>%
   mutate(num = n()) %>%
   summarise(
-    mean_count = mean(count, na.rm = TRUE),
-    predict = mean(expect_admin_area_2, na.rm = TRUE),
+    count_original = mean(count, na.rm = TRUE),
+    count_expect = mean(expect_admin_area_1, na.rm = TRUE),
     b = mean(b_admin_area_2, na.rm = TRUE),
     p = mean(p_admin_area_2, na.rm = TRUE),
     num_obs = mean(num),
-    count_expect = sum(expect_admin_area_2, na.rm = TRUE),
-    count = sum(count, na.rm = TRUE),
+    count_expect_sum = sum(expect_admin_area_2, na.rm = TRUE),
+    count_sum = sum(count, na.rm = TRUE),
     diff_percent = 100 * (count_expect - count) / count_expect,
+    diff_percent_sum = 100 * (count_expect_sum - count_sum) / count_expect_sum,
+    count_expect_diff_sum = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect_sum, count_sum),
     count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
     .groups = "drop"
   )
+
 
 if (RUN_DISTRICT_MODEL) {
   summary_disruption_admin3 <- data_disruption %>%
     group_by(admin_area_3, period_id, indicator_common_id) %>%
     mutate(num = n()) %>%
     summarise(
-      mean_count = mean(count, na.rm = TRUE),
-      predict = mean(expect_admin_area_3, na.rm = TRUE),
+      count_original = mean(count, na.rm = TRUE),
+      count_expect = mean(expect_admin_area_1, na.rm = TRUE),
       b = mean(b_admin_area_3, na.rm = TRUE),
       p = mean(p_admin_area_3, na.rm = TRUE),
       num_obs = mean(num),
-      count_expect = sum(expect_admin_area_3, na.rm = TRUE),
-      count = sum(count, na.rm = TRUE),
+      count_expect_sum = sum(expect_admin_area_3, na.rm = TRUE),
+      count_sum = sum(count, na.rm = TRUE),
       diff_percent = 100 * (count_expect - count) / count_expect,
+      diff_percent_sum = 100 * (count_expect_sum - count_sum) / count_expect_sum,
+      count_expect_diff_sum = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect_sum, count_sum),
       count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
       .groups = "drop"
     )
@@ -649,7 +532,6 @@ if (RUN_DISTRICT_MODEL) {
 print("Saving results...")
 write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
 write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
-#write.csv(data_disruption, "M3_disruptions_analysis.csv", row.names = FALSE)
 write.csv(summary_disruption_admin1, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE) 
 write.csv(summary_disruption_admin2, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE) 
 if (RUN_DISTRICT_MODEL) {
