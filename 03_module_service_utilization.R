@@ -1,10 +1,27 @@
-SELECTEDCOUNT <- "count"  # Change as needed
-DIFFPERCENT <- 10       # Threshold: actual volume differs from predicted by more than ± DIFFPERCENT (e.g. 10%)
-RUN_DISTRICT_MODEL <- FALSE  # Set to FALSE to skip admin_area_3-level (e.g. district or LGA) regression
+SELECTEDCOUNT <- "count" 
+
+SMOOTH_K <- 3                        # Window size (in months) for rolling median smoothing of predicted counts.
+                                     # Used in the control chart to reduce noise in trend estimation.
+
+THRESHOLD <- 2                       # Threshold (in MAD units) for detecting sharp deviations in robust control chart.
+                                     # If residual/MAD > THRESHOLD, the month is flagged as a sharp disruption.
+
+DIP_THRESHOLD <- 0.90                # Threshold for dips: a month is flagged if actual count falls below
+                                     # 90% of the smoothed expected volume (i.e., a ≥10% drop).
+                                     # Set to 0.80 for a more conservative detection -> to flag big drops.
+
+RISE_THRESHOLD <- 1 / DIP_THRESHOLD  # Threshold for rises: a month is flagged if actual count exceeds
+                                     # ~111% of expected volume (i.e., a ≥10% rise). Mirrors the dip logic.
+
+DIFFPERCENT <- 10                    # Difference threshold (in percent): if the actual volume differs from the predicted
+                                     # volume by more than ±10%, use the predicted value in plotting disruptions.
+
+RUN_DISTRICT_MODEL <- FALSE          # Set to TRUE to run regressions at the lowest geographic level (admin_area_3).
+                                     # Set to FALSE for faster runtime.
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Mar 28
+# Last edit: 2025 Apr 3
 # Module: SERVICE UTILIZATION
 
 
@@ -33,7 +50,7 @@ RUN_DISTRICT_MODEL <- FALSE  # Set to FALSE to skip admin_area_3-level (e.g. dis
 # Load required libraries
 library(lubridate)
 library(zoo)
-library(readxl)
+library(MASS)    # For the rlm() function >> robust regression
 library(fixest)  # For panel regressions (alternative to 'xtreg' in Stata)
 library(stringr)
 library(dplyr)
@@ -229,7 +246,7 @@ for (indicator in indicators) {
   model <- tryCatch(
     feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")), 
           data = indicator_data, 
-          cluster = as.formula(paste0("~", lowest_geo_level))),
+          cluster = ~admin_area_3),
     error = function(e) {
       print(paste("Regression failed for:", indicator, "Error:", e$message))
       return(NULL)
@@ -401,7 +418,7 @@ if (RUN_DISTRICT_MODEL) {
       model_district <- tryCatch(
         feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
               data = district_data,
-              cluster = as.formula(paste0("~", lowest_geo_level))),
+              cluster = ~admin_area_3),
         error = function(e) {
           print(paste("Regression failed for:", indicator, "in", district, "Error:", e$message))
           return(NULL)
@@ -468,41 +485,53 @@ if (RUN_DISTRICT_MODEL) {
 #-------------------------------------------------------------------------------------------------------------
 # Convert period_id first
 data_disruption <- data_disruption %>%
-  mutate(period_id = format(as.Date(date), "%Y%m"))
+  mutate(period_id = as.integer(format(as.Date(date), "%Y%m")))
 
 summary_disruption_admin1 <- data_disruption %>%
   group_by(admin_area_1, period_id, indicator_common_id) %>%
-  mutate(num = n()) %>%
   summarise(
-    count_original = mean(count, na.rm = TRUE),
-    count_expect = mean(expect_admin_area_1, na.rm = TRUE),
-    b = mean(b_admin_area_1, na.rm = TRUE),
-    p = mean(p_admin_area_1, na.rm = TRUE),
-    num_obs = mean(num),
-    count_expect_sum = sum(expect_admin_area_1, na.rm = TRUE),
-    count_sum = sum(count, na.rm = TRUE),
-    diff_percent = 100 * (count_expect - count) / count_expect,
-    diff_percent_sum = 100 * (count_expect_sum - count_sum) / count_expect_sum,
-    count_expect_diff_sum = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect_sum, count_sum),
-    count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
+    count_original     = mean(count, na.rm = TRUE),
+    count_expect       = mean(expect_admin_area_1, na.rm = TRUE),
+    b                  = mean(b_admin_area_1, na.rm = TRUE),
+    p                  = mean(p_admin_area_1, na.rm = TRUE),
+    num_obs            = n(),
+    count_expect_sum   = sum(expect_admin_area_1, na.rm = TRUE),
+    count_sum          = sum(count, na.rm = TRUE),
+    diff_percent       = 100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(count, na.rm = TRUE)) /
+      mean(expect_admin_area_1, na.rm = TRUE),
+    diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
+    count_expect_diff_sum = ifelse(
+      abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
+      count_expect_sum, count_sum),
+    count_expect_diff = ifelse(
+      abs(100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(count, na.rm = TRUE)) /
+            mean(expect_admin_area_1, na.rm = TRUE)) > DIFFPERCENT,
+      mean(expect_admin_area_1, na.rm = TRUE), mean(count, na.rm = TRUE)
+    ),
     .groups = "drop"
   )
 
+
 summary_disruption_admin2 <- data_disruption %>%
   group_by(admin_area_2, period_id, indicator_common_id) %>%
-  mutate(num = n()) %>%
   summarise(
-    count_original = mean(count, na.rm = TRUE),
-    count_expect = mean(expect_admin_area_1, na.rm = TRUE),
-    b = mean(b_admin_area_2, na.rm = TRUE),
-    p = mean(p_admin_area_2, na.rm = TRUE),
-    num_obs = mean(num),
-    count_expect_sum = sum(expect_admin_area_2, na.rm = TRUE),
-    count_sum = sum(count, na.rm = TRUE),
-    diff_percent = 100 * (count_expect - count) / count_expect,
-    diff_percent_sum = 100 * (count_expect_sum - count_sum) / count_expect_sum,
-    count_expect_diff_sum = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect_sum, count_sum),
-    count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
+    count_original     = mean(count, na.rm = TRUE),
+    count_expect       = mean(expect_admin_area_2, na.rm = TRUE),
+    b                  = mean(b_admin_area_2, na.rm = TRUE),
+    p                  = mean(p_admin_area_2, na.rm = TRUE),
+    num_obs            = n(),
+    count_expect_sum   = sum(expect_admin_area_2, na.rm = TRUE),
+    count_sum          = sum(count, na.rm = TRUE),
+    diff_percent       = 100 * (count_expect - count_original) / count_expect,
+    diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
+    count_expect_diff_sum = ifelse(
+      abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
+      count_expect_sum, count_sum
+    ),
+    count_expect_diff = ifelse(
+      abs(100 * (count_expect - count_original) / count_expect) > DIFFPERCENT,
+      count_expect, count_original
+    ),
     .groups = "drop"
   )
 
@@ -510,23 +539,27 @@ summary_disruption_admin2 <- data_disruption %>%
 if (RUN_DISTRICT_MODEL) {
   summary_disruption_admin3 <- data_disruption %>%
     group_by(admin_area_3, period_id, indicator_common_id) %>%
-    mutate(num = n()) %>%
     summarise(
-      count_original = mean(count, na.rm = TRUE),
-      count_expect = mean(expect_admin_area_1, na.rm = TRUE),
-      b = mean(b_admin_area_3, na.rm = TRUE),
-      p = mean(p_admin_area_3, na.rm = TRUE),
-      num_obs = mean(num),
-      count_expect_sum = sum(expect_admin_area_3, na.rm = TRUE),
-      count_sum = sum(count, na.rm = TRUE),
-      diff_percent = 100 * (count_expect - count) / count_expect,
-      diff_percent_sum = 100 * (count_expect_sum - count_sum) / count_expect_sum,
-      count_expect_diff_sum = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect_sum, count_sum),
-      count_expect_diff = ifelse(abs(diff_percent) > DIFFPERCENT, count_expect, count),
+      count_original     = mean(count, na.rm = TRUE),
+      count_expect       = mean(expect_admin_area_3, na.rm = TRUE),
+      b                  = mean(b_admin_area_3, na.rm = TRUE),
+      p                  = mean(p_admin_area_3, na.rm = TRUE),
+      num_obs            = n(),
+      count_expect_sum   = sum(expect_admin_area_3, na.rm = TRUE),
+      count_sum          = sum(count, na.rm = TRUE),
+      diff_percent       = 100 * (count_expect - count_original) / count_expect,
+      diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
+      count_expect_diff_sum = ifelse(
+        abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
+        count_expect_sum, count_sum
+      ),
+      count_expect_diff = ifelse(
+        abs(100 * (count_expect - count_original) / count_expect) > DIFFPERCENT,
+        count_expect, count_original
+      ),
       .groups = "drop"
     )
 }
-
 
 # Step 5: Save Outputs ----------------------------------------------------------
 print("Saving results...")
