@@ -8,6 +8,9 @@ EXCLUDED_FROM_ADJUSTMENT <- c("indicator_a", "indicator_b", "indicator_c")
 #   1. Outliers: Replaces flagged outliers with 12-month rolling averages (excluding outliers).
 #   2. Completeness: Replaces missing count with 12-month rolling averages (excluding outliers).
 
+# Ce script ajuste dynamiquement les données brutes pour :
+#   1. Les valeurs aberrantes : Remplace les valeurs identifiées comme aberrantes par une moyenne mobile sur 12 mois (hors valeurs aberrantes).
+#   2. L'exhaustivité : Remplace les valeurs manquantes par une moyenne mobile sur 12 mois (hors valeurs aberrantes).
 
 # -------------------------- KEY OUTPUT ----------------------------------------------------------------------
 # FILE: M2_adjusted_data.csv              # Dataset including facility-level adjusted volumes for all adjustment scenarios.
