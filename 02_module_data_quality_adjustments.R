@@ -2,7 +2,7 @@ EXCLUDED_FROM_ADJUSTMENT <- c("indicator_a", "indicator_b", "indicator_c")
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
-# Last edit: 2025 Mar 28
+# Last edit: 2025 Apr 7
 
 # This script dynamically adjusts raw data for:
 #   1. Outliers: Replaces flagged outliers with 12-month rolling averages (excluding outliers).
@@ -98,47 +98,58 @@ apply_adjustments <- function(data, outlier_data, completeness_data, geo_cols,
 apply_adjustments <- function(completeness_data, outlier_data, adjust_outliers = FALSE, adjust_completeness = FALSE) {
   cat("Applying dynamic adjustments...\n")
   
-  # Convert to data.table for performance
   setDT(outlier_data)
   setDT(completeness_data)
   
-  # Initialize `data` as a merged dataset from completeness and outliers
+  # Merge outlier info
   data <- merge(
-    completeness_data, 
-    outlier_data[, .(facility_id, indicator_common_id, year, month, outlier_flag)], 
-    by = c("facility_id", "indicator_common_id", "year", "month"), 
+    completeness_data,
+    outlier_data[, .(facility_id, indicator_common_id, year, month, outlier_flag)],
+    by = c("facility_id", "indicator_common_id", "year", "month"),
     all.x = TRUE
   )
   data[, outlier_flag := fifelse(is.na(outlier_flag), 0, outlier_flag)]
-  
-  # Initialize working count column
   data[, count_working := as.numeric(count)]
   
-  # Outlier Adjustment --------------------------------------------------------------------------------------
+  # ----------------------------------------
+  # Outlier Adjustment
+  # ----------------------------------------
   if (adjust_outliers) {
-    cat(" -> Adjusting outliers...\n")
+    cat(" -> Adjusting outliers with rolling average...\n")
     data[, rolling_avg_outlier := frollapply(
-      count * (outlier_flag == 0), 
-      n = 12, 
-      FUN = function(x) mean(x[x > 0], na.rm = TRUE), 
-      fill = NA, align = "center"), 
-      by = .(facility_id, indicator_common_id)
-    ]
+      count * (outlier_flag == 0),
+      n = 12,
+      FUN = function(x) mean(x[x > 0], na.rm = TRUE),
+      fill = NA, align = "center"
+    ), by = .(facility_id, indicator_common_id)]
+    
     data[outlier_flag == 1 & !is.na(rolling_avg_outlier), count_working := rolling_avg_outlier]
   }
   
-  # Completeness Adjustment --------------------------------------------------------------------------------
+  # ----------------------------------------
+  # Completeness Adjustment
+  # ----------------------------------------
   if (adjust_completeness) {
-    cat(" -> Adjusting completeness issues...\n")
+    cat(" -> Adjusting missing data with rolling + fallback methods...\n")
+    
+    # 1. Rolling average
     data[, rolling_avg_completeness := rollapplyr(
-      count_working, width = 12, FUN = function(x) {
-        valid_x <- x[!is.na(x) & x > 0]  # Remove NAs and zeros
-        if (length(valid_x) >= 6) return(mean(valid_x, na.rm = TRUE)) else return(NA_real_)
-      }, fill = NA, partial = TRUE, align = "center"),
-      by = .(facility_id, indicator_common_id)
-    ]
-    data[completeness_flag == 0 & is.na(count_working) & !is.na(rolling_avg_completeness), 
-         count_working := rolling_avg_completeness]
+      count_working,
+      width = 12,
+      FUN = function(x) {
+        valid_x <- x[!is.na(x) & x > 0]
+        if (length(valid_x) >= 6) mean(valid_x, na.rm = TRUE) else NA_real_
+      },
+      fill = NA, partial = TRUE, align = "center"
+    ), by = .(facility_id, indicator_common_id)]
+    
+    # 2. Fallback mean per facility-indicator
+    data[, fallback_mean := mean(count_working[!is.na(count_working) & count_working > 0], na.rm = TRUE),
+         by = .(facility_id, indicator_common_id)]
+    
+    # Apply fallback logic
+    data[is.na(count_working) & !is.na(rolling_avg_completeness), count_working := rolling_avg_completeness]
+    data[is.na(count_working) & !is.na(fallback_mean), count_working := fallback_mean]
   }
   
   return(data)
@@ -153,7 +164,7 @@ apply_adjustments_scenarios <- function(completeness_data, outlier_data) {
   # Detect geo columns dynamically from completeness_data
   geo_cols <- colnames(completeness_data) %>% str_subset("^admin_area_[0-9]+$")
   
-  # FIX: Properly extract geo_cols without `with = FALSE`
+  # Properly extract geo_cols without `with = FALSE`
   geo_data <- completeness_data %>%
     select(c("facility_id", all_of(geo_cols))) %>%
     distinct()
@@ -194,16 +205,17 @@ apply_adjustments_scenarios <- function(completeness_data, outlier_data) {
   df_adjusted[, period_id := as.integer(paste0(year, sprintf("%02d", month)))]
   df_adjusted[, quarter_id := as.integer(paste0(year, sprintf("%02d", (month - 1) %/% 3 + 1)))]
   
-  # FIX: Ensure geo_cols are reattached correctly
+
   df_adjusted <- df_adjusted %>%
     left_join(geo_data, by = "facility_id")
   
-  # NEW: Attach outlier_flag
+  # Attach outlier_flag and replace NAs with 0
   df_adjusted <- df_adjusted %>%
     left_join(
       outlier_data %>% select(all_of(join_cols), outlier_flag),
       by = join_cols
-    )
+    ) %>%
+    mutate(outlier_flag = ifelse(is.na(outlier_flag), 0, outlier_flag))
   
   return(df_adjusted)
 }
