@@ -61,16 +61,19 @@ library(tidyr)
 #-------------------------------------------------------------------------------------------------------------
 print("Loading data for control chart analysis...")
 data_utilization <- read.csv("M2_adjusted_data_admin_area.csv")        # adjusted data aggregated at the lowest geo level, used for visualization
-data <- read.csv("M2_adjusted_data.csv")                             # data with outliers tagged 
+data <- read.csv("M2_adjusted_data.csv")                               # data with outliers tagged 
 
 
 print("Data loaded. Cleaning and filtering...")
 
 data <- data %>%
-  mutate(date = as.Date(paste(year, month, "01", sep = "-"))) %>%
-  filter(outlier_flag != 1) %>%  # Exclude outliers
-  filter(!is.na(!!sym(SELECTEDCOUNT))) %>%
-  mutate(count_model = !!sym(SELECTEDCOUNT))  # Define modeling column
+  mutate(
+    date = as.Date(paste(year, month, "01", sep = "-")),
+    is_missing = is.na(count_final_none),
+    count_model = !!sym(SELECTEDCOUNT)
+  ) %>%
+  filter(outlier_flag != 1)
+
 
 
 print("Grouping by panel (indicator + admin area)...")
