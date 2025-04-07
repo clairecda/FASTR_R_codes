@@ -198,6 +198,13 @@ apply_adjustments_scenarios <- function(completeness_data, outlier_data) {
   df_adjusted <- df_adjusted %>%
     left_join(geo_data, by = "facility_id")
   
+  # NEW: Attach outlier_flag
+  df_adjusted <- df_adjusted %>%
+    left_join(
+      outlier_data %>% select(all_of(join_cols), outlier_flag),
+      by = join_cols
+    )
+  
   return(df_adjusted)
 }
 
