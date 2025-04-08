@@ -938,7 +938,19 @@ province_name_replacements <- c(
   "og Ogun State" = "Ogun", "on Ondo State" = "Ondo", "os Osun State" = "Osun",
   "oy Oyo State" = "Oyo", "pl Plateau State" = "Plateau", "ri Rivers State" = "Rivers",
   "so Sokoto State" = "Sokoto", "ta Taraba State" = "Taraba", "yo Yobe State" = "Yobe",
-  "za Zamfara State" = "Zamfara"
+  "za Zamfara State" = "Zamfara",
+  
+  
+  #guinea
+  
+  "DSV Conakry" = "Conakry",
+  "IRS Faranah" = "Faranah",
+  "IRS Kankan" = "Kankan",
+  "IRS Kindia" = "Kindia",
+  "IRS Mamou" = "Mamou",
+  "IRS Boké" = "BokÃ©",
+  "IRS Labé" = "LabÃ©",
+  "IRS Nzérékoré" = "N'ZÃ©rÃ©korÃ©"
 )
 
 # ------------------------------ Part 1: Key Functions ------------------------------------
