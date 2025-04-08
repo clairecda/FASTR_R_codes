@@ -191,6 +191,15 @@ apply_adjustments_scenarios <- function(completeness_data, outlier_data) {
     ) %>%
       select(all_of(join_cols), count_working)  # Select only necessary columns
     
+    # Revert adjustments for excluded indicators
+    data_adjusted <- data_adjusted %>%
+      mutate(count_working = ifelse(
+        indicator_common_id %in% EXCLUDED_FROM_ADJUSTMENT,
+        count,
+        count_working
+      ))
+    
+    
     colnames(data_adjusted)[colnames(data_adjusted) == "count_working"] <- paste0("count_final_", name)
     results[[name]] <- data_adjusted
   }
