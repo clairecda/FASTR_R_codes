@@ -1,4 +1,4 @@
-SELECTEDCOUNT <- "count_final_completeness" 
+SELECTEDCOUNT <- "count_final_none" 
 
 SMOOTH_K <- 3                        # Window size (in months) for rolling median smoothing of predicted counts.
                                      # Used in the control chart to reduce noise in trend estimation.
@@ -193,6 +193,16 @@ robust_control_chart <- function(panel_data, selected_count) {
   
   # NAs in 'tagged' are replaced with 0
   panel_data$tagged[is.na(panel_data$tagged)] <- 0
+  
+  
+  # Add tagging logic for the last 6 months
+  panel_data <- panel_data %>%
+    group_by(admin_area_2) %>%
+    mutate(
+      last_6_months = ifelse(date >= max(date) - months(6), 1, 0),  # Tag last 6 months
+      tagged = ifelse(last_6_months == 1, 1, tagged)  # Set tagged to 1 for the last 6 months
+    ) %>%
+    ungroup()
   
   return(panel_data)
 }
