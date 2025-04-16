@@ -32,12 +32,16 @@ consistency_params <- list(
   consistency_pairs = list(
     pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
     pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
-    pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
+    pair_anc = c("anc1", "anc4")          # ANC1 / ANC4
+    #,pair_malaria = c("rdt_positive_plus_micro", "confirmed_malaria_treated_with_act")  # Placeholder: (rdt_positive + micro_positive) = confirmed_treated
+    
   ),
   consistency_ranges = list(
     pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
     pair_penta = c(lower = 1, upper = Inf),       # Penta1 / Penta3 > 1
     pair_anc = c(lower = 1, upper = Inf)          # ANC1 / ANC4 > 1
+    #,pair_malaria = c(lower = 0.9, upper = 1.1)  # Placeholder range: values should be close
+    
   )
 )
 
@@ -67,12 +71,33 @@ library(data.table)
 # Define Functions ------------------------------------------------------------------------------------------
 load_and_preprocess_data <- function(file_path) {
   print("Loading and preprocessing data...")
+  
   data <- read.csv(file_path) %>%
     mutate(
       date = as.Date(paste(year, month, "1", sep = "-")),
       panelvar = paste(indicator_common_id, facility_id, sep = "_")
     )
+  
   geo_cols <- colnames(data)[grepl("^admin_area_", colnames(data))]
+  
+  # Optional: Add malaria consistency composite if all three indicators are available
+  malaria_indicators <- c("rdt_positive", "micro_positive", "confirmed_malaria_treated_with_act")
+  available_malaria <- malaria_indicators %in% unique(data$indicator_common_id)
+  
+  if (all(available_malaria)) {
+    print("Adding malaria consistency indicator: rdt_positive_plus_micro")
+    
+    malaria_sum <- data %>%
+      filter(indicator_common_id %in% c("rdt_positive", "micro_positive")) %>%
+      group_by(facility_id, year, month, period_id, quarter_id, across(all_of(geo_cols))) %>%
+      summarise(count = sum(count, na.rm = TRUE), .groups = "drop") %>%
+      mutate(indicator_common_id = "rdt_positive_plus_micro")
+    
+    data <- bind_rows(data, malaria_sum)
+  } else {
+    print("Skipping malaria consistency: one or more indicators missing")
+  }
+  
   return(list(data = data, geo_cols = geo_cols))
 }
 
@@ -530,7 +555,7 @@ dqa_without_consistency <- function(
 }
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("nigeria_data_hmis.csv")
+inputs <- load_and_preprocess_data("guinea_data_updated.csv")
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
