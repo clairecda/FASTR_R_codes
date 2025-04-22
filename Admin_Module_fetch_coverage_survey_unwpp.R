@@ -6,6 +6,8 @@
 # FETCH FROM DHS AND MICS
 # FETCH POPULATION DATA FROM UNWPP AND WB
 
+readRenviron("~/Desktop/FASTR/R codes/.Renviron")  
+
 
 # ----------------------------------------
 # Load required libraries
@@ -19,6 +21,9 @@ library(tidyr)
 library(stringr)
 library(haven)
 library(countrycode)
+library(data.table)
+library(RCurl)
+
 
 # ----------------------------------------
 # Set DHS indicator codes
@@ -111,9 +116,7 @@ mics_data <- as.data.frame(mics_sdmx)
 # ----------------------------------------
 # Pull UNWPP data via API
 # ----------------------------------------
-headers <- c(
-  "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImNsYWlyZS5ib3VsYW5nZUBnbWFpbC5jb20iLCJuYmYiOjE3NDQ4MTIxOTcsImV4cCI6MTc3NjM0ODE5NywiaWF0IjoxNzQ0ODEyMTk3LCJpc3MiOiJkb3RuZXQtdXNlci1qd3RzIiwiYXVkIjoiZGF0YS1wb3J0YWwtYXBpIn0.aA9PK8v4GfPnjji7q1-LL8INgcQ_XpzPOaqdZNWXLII"
-)
+headers <- c("Authorization" = Sys.getenv("UNWPP_TOKEN"))
 
 # --- Get location list ---
 base_url <- "https://population.un.org/dataportalapi/api/v1/locations/?pageSize=100&pageNumber="
@@ -150,27 +153,28 @@ indicator_map <- tibble::tibble(
 fetch_wpp_data <- function(loc_id, indicator_id, start_year = 2020, end_year = 2025) {
   indicator_id <- as.character(indicator_id)
   loc_id <- as.character(loc_id)
-  
+
   url <- paste0(
     "https://population.un.org/dataportalapi/api/v1/data/indicators/", indicator_id,
     "/locations/", loc_id,
     "/start/", start_year, "/end/", end_year, "?pagingInHeader=true&format=json"
   )
-  
+
   response <- tryCatch({
     getURL(url, .opts = list(httpheader = headers, followlocation = TRUE))
   }, error = function(e) return(NULL))
-  
+
   if (is.null(response) || nchar(response) < 10) return(NULL)
-  
+
   parsed <- tryCatch(fromJSON(response, flatten = TRUE), error = function(e) return(NULL))
-  
+
   if (!is.null(parsed) && is.data.frame(parsed)) {
     return(parsed)
   } else {
     return(NULL)
   }
 }
+
 
 
 # --- Main loop ---
@@ -323,21 +327,6 @@ clean_mics <- function(df) {
     select(admin_area_1, year, indicator_id, indicator_common_id, survey_value, source, source_detail, survey_type)
 }
 
-# clean_wpp <- function(df, indicator_code, indicator_common_id) {
-#   df %>%
-#     filter(!is.na(value)) %>%
-#     transmute(
-#       admin_area_1 = countrycode(countryiso3code, origin = "iso3c", destination = "country.name"),
-#       year = as.integer(date),
-#       indicator_id = indicator_code,
-#       indicator_common_id = indicator_common_id,
-#       survey_value = value,
-#       source = "WPP",
-#       source_detail = indicator.value,
-#       survey_type = "modeled"
-#     )
-# }
-
 clean_unwpp <- function(df) {
   df %>%
     filter(
@@ -374,8 +363,6 @@ clean_unwpp <- function(df) {
     )
 }
 
-
-
 standardize_admin_area_1 <- function(df) {
   df %>%
     mutate(
@@ -406,16 +393,13 @@ mics_tidy <- clean_mics(mics_data) %>%
   mutate(admin_area_1 = countrycode(admin_area_1, origin = "iso3c", destination = "country.name")) %>%
   standardize_admin_area_1()
 
-# # Clean World Bank WPP data
-# wpp_pop_total <- clean_wpp(wb_data_list[["SP.POP.TOTL"]], "SP.POP.TOTL", "poptot")
-# wpp_cbr <- clean_wpp(wb_data_list[["SP.DYN.CBRT.IN"]], "SP.DYN.CBRT.IN", "crudebr")
-
 # Clean UNWPP data
 unwpp_tidy <- clean_unwpp(unwpp_raw) %>%
   standardize_admin_area_1()
 
-
-
+# # Clean World Bank WPP data
+# wpp_pop_total <- clean_wpp(wb_data_list[["SP.POP.TOTL"]], "SP.POP.TOTL", "poptot")
+# wpp_cbr <- clean_wpp(wb_data_list[["SP.DYN.CBRT.IN"]], "SP.DYN.CBRT.IN", "crudebr")
 # ----------------------------------------
 # Final bind and selection
 # ----------------------------------------
@@ -429,3 +413,12 @@ all_survey <- bind_rows(
     indicator_common_id, survey_value,
     source, source_detail, survey_type
   )
+
+
+
+# ----------------------------------------
+# Write outputs with fwrite (faster)
+# ----------------------------------------
+fwrite(unwpp_tidy, "unwpp_tidy.csv")
+fwrite(unwpp_raw, "unwpp_raw.csv")
+fwrite(all_survey, "all_survey.csv")
