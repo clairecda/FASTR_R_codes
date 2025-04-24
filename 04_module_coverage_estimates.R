@@ -134,6 +134,7 @@ process_hmis_adjusted_volume <- function(adjusted_volume_data, count_col = SELEC
     hmis_countries = hmis_countries
   )
 }
+
 #Part 2 - prepare survey data
 process_survey_data <- function(survey_data, name_replacements, hmis_countries,
                                 min_year = MIN_YEAR, max_year = CURRENT_YEAR) {
@@ -147,11 +148,13 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     mutate(admin_area_1 = dplyr::recode(admin_area_1, !!!name_replacements)) %>%
     filter(admin_area_1 %in% hmis_countries)
   
+  
   survey_filtered <- if (is_national) {
     survey_data %>% filter(admin_area_2 == "NATIONAL")
   } else {
     survey_data %>% filter(admin_area_2 != "NATIONAL")
   }
+  
   
   full_years <- seq(min_year, max_year)
   
@@ -235,8 +238,21 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
       survey_carried[[carry_col]] <- survey_carried[[avg_col]]
     }
   }
-  survey_final <- left_join(survey_carried, survey_raw_only,
-                            by = c("admin_area_1", "year", if (!is_national) "admin_area_2" else NULL))
+  
+  if (is_national) {
+    survey_raw_only <- survey_raw_only %>%
+      mutate(admin_area_2 = "NATIONAL")
+    
+    survey_carried <- survey_carried %>%
+      mutate(admin_area_2 = "NATIONAL")
+  }
+  
+  survey_final <- full_join(survey_raw_only, survey_carried,
+                            by = c("admin_area_1", "admin_area_2", "year")) %>%
+    mutate(across(where(is.numeric), ~ ifelse(is.nan(.), NA_real_, .))) %>%
+    arrange(admin_area_1, if (!is_national) admin_area_2 else NULL, year)
+  
+  
   
   return(survey_final)
 }
@@ -545,15 +561,15 @@ prepare_combined_coverage_from_projected <- function(projected_data, survey_data
       values_to = "coverage_original_estimate"
     )
   
-  # Join and finalize
-  projected_data %>%
-    left_join(survey_raw_long, by = join_keys) %>%
+  # Full join ensures you retain all survey-only years
+  full_join(projected_data, survey_raw_long, by = join_keys) %>%
     mutate(
-      coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate)
+      coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate),
+      admin_area_2 = if (has_admin_area_2) admin_area_2 else "NATIONAL"
     ) %>%
     transmute(
       admin_area_1,
-      admin_area_2 = if (has_admin_area_2) admin_area_2 else "NATIONAL",
+      admin_area_2,
       year,
       indicator_common_id,
       denominator,
