@@ -178,31 +178,6 @@ mics_url <- paste0(
 mics_sdmx <- readSDMX(mics_url)
 mics_data <- as.data.frame(mics_sdmx)
 
-# # ----------------------------------------
-# # Pull World Bank WPP data via API
-# # ----------------------------------------
-# wb_indicators <- c("SP.POP.TOTL", "SP.DYN.CBRT.IN")
-# wb_countries <- c("AF", "BD", "GH", "LB", "CM", "CD", "ET", "GN", "HT", "MD",
-#                   "KE", "MW", "ML", "NG", "SN", "SL", "TD", "UG", "ZM", "GU", "TJ")
-# 
-# fetch_wb_data <- function(indicator, countries, start_year, end_year) {
-#   url <- paste0(
-#     "https://api.worldbank.org/v2/country/",
-#     paste(countries, collapse = ";"),
-#     "/indicator/", indicator,
-#     "?date=", start_year, ":", end_year,
-#     "&format=json&per_page=10000"
-#   )
-#   res <- GET(url)
-#   json <- fromJSON(content(res, as = "text", encoding = "UTF-8"), flatten = TRUE)
-#   if (length(json) < 2) return(NULL)
-#   json[[2]]
-# }
-# 
-# wb_data_list <- lapply(wb_indicators, function(ind) {
-#   fetch_wb_data(ind, wb_countries, 2010, 2024)
-# })
-# names(wb_data_list) <- wb_indicators
 
 # ----------------------------------------
 # Pull UNWPP data via API
