@@ -19,10 +19,10 @@ library(haven)       # For reading `.dta` Stata files
 
 # ------------------------------ Define File Paths -------------------------------
 # Input Datasets
-adjusted_volume_data <- read.csv("M2_adjusted_data_national.csv")
+adjusted_volume_data <- read.csv("M2_adjusted_data_national.csv", fileEncoding = "UTF-8")
 adjusted_volume_data_subnational <- read.csv("M2_adjusted_data_admin_area.csv", fileEncoding = "UTF-8")
 survey_data_unified <- read.csv("survey_data_unified.csv", fileEncoding = "UTF-8")
-population_estimates_only <- read.csv("population_estimates_only.csv")
+population_estimates_only <- read.csv("population_estimates_only.csv", fileEncoding = "UTF-8")
 
 # ------------------------------ Define Parameters --------------------------------
 # Coverage Estimation Parameters
@@ -162,6 +162,19 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     arrange(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2" else NULL))), indicator_common_id, source, year) %>%
     mutate(survey_value_carry = zoo::na.locf(survey_value, na.rm = FALSE)) %>%
     ungroup()
+
+  survey_raw_only <- survey_extended %>%
+    filter(str_detect(tolower(source), "dhs")) %>%
+    select(admin_area_1, any_of("admin_area_2"), year, indicator_common_id, survey_value) %>%
+    group_by(across(everything())) %>%
+    summarise(survey_value = mean(survey_value, na.rm = TRUE), .groups = "drop") %>%
+    pivot_wider(
+      names_from = indicator_common_id,
+      values_from = survey_value,
+      names_glue = "rawsurvey_{indicator_common_id}"
+    )
+  
+  
   
   survey_wide <- survey_extended %>%
     mutate(source = case_when(
@@ -222,8 +235,10 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
       survey_carried[[carry_col]] <- survey_carried[[avg_col]]
     }
   }
+  survey_final <- left_join(survey_carried, survey_raw_only,
+                            by = c("admin_area_1", "year", if (!is_national) "admin_area_2" else NULL))
   
-  return(survey_carried)
+  return(survey_final)
 }
 
 #Part 2b - prepare unwpp data
@@ -249,27 +264,21 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
   has_admin_area_2 <- "admin_area_2" %in% names(hmis_data)
   
   if (has_admin_area_2) {
-    # Subnational (province-level): no population data used
     data <- hmis_data %>%
       full_join(survey_data, by = c("admin_area_1", "admin_area_2", "year"))
   } else {
-    # National-level: use population data
     data <- hmis_data %>%
       full_join(survey_data,     by = c("admin_area_1", "year")) %>%
       full_join(population_data, by = c("admin_area_1", "year"))
   }
   
-  # Define indicator requirements
   indicator_vars <- list(
     anc1 = c("countanc1", "anc1carry"),
     delivery = c("countdelivery", "deliverycarry"),
-    penta1 = c("countpenta1", "penta1carry")
+    penta1 = c("countpenta1", "penta1carry"),
+    livebirth = c("countlivebirth"),
+    bcg = c("countbcg", "bcgcarry")
   )
-  
-  # Add BCG for national only
-  if (!has_admin_area_2) {
-    indicator_vars$bcg <- c("countbcg", "bcgcarry")
-  }
   
   available_vars <- names(data)
   
@@ -278,50 +287,74 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
     if (all(required_vars %in% available_vars)) formula else NA_real_
   }
   
-  data <- data %>%
-    mutate(
-      danc1_pregnancy = safe_mutate("anc1", countanc1 / anc1carry),
-      danc1_livebirth = safe_mutate("anc1", danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE) * (1 - (TWIN_RATE / 2)) * (1 - STILLBIRTH_RATE)),
-      danc1_dpt       = safe_mutate("anc1", danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE) / (1 - (TWIN_RATE / 2)) * (1 - STILLBIRTH_RATE) * (1 - NEONATAL_MORTALITY_RATE)),
-      danc1_mcv       = safe_mutate("anc1", danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE) * (1 - (TWIN_RATE / 2)) * (1 - STILLBIRTH_RATE) * (1 - INFANT_MORTALITY_RATE)),
-      
-      ddelivery_pregnancy = safe_mutate("delivery", (countdelivery / deliverycarry) / (1 - PREGNANCY_LOSS_RATE)),
-      ddelivery_livebirth = safe_mutate("delivery", (countdelivery / deliverycarry) * (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE)),
-      ddelivery_dpt       = safe_mutate("delivery", (countdelivery / deliverycarry) * (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE) * (1 - NEONATAL_MORTALITY_RATE)),
-      ddelivery_mcv       = safe_mutate("delivery", (countdelivery / deliverycarry) * (1 + TWIN_RATE) * (1 - STILLBIRTH_RATE) * (1 - INFANT_MORTALITY_RATE)),
-      
-      dpenta1_dpt = safe_mutate("penta1", countpenta1 / penta1carry),
-      dpenta1_mcv = safe_mutate("penta1", (countpenta1 / penta1carry) * (1 - POSTNEONATAL_MORTALITY_RATE)),
-      dpenta1_measles1 = safe_mutate("penta1", (countpenta1 / penta1carry) * (1 - POSTNEONATAL_MORTALITY_RATE)),
-      dpenta1_measles2 = safe_mutate("penta1", (countpenta1 / penta1carry) * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
-      
-    )
+  safe_calc <- function(expr) {
+    tryCatch(expr, error = function(e) NA_real_)
+  }
   
-  if (!has_admin_area_2) {
+  if (all(indicator_vars$livebirth %in% available_vars)) {
+    data <- data %>% mutate(
+      dlivebirths_livebirth   = safe_mutate("livebirth", countlivebirth),
+      dlivebirths_pregnancy   = safe_calc(dlivebirths_livebirth * (1 - 0.5 * TWIN_RATE) / ((1 - STILLBIRTH_RATE) * (1 - PREGNANCY_LOSS_RATE))),
+      dlivebirths_delivery    = safe_calc(dlivebirths_pregnancy * (1 - PREGNANCY_LOSS_RATE)),
+      dlivebirths_birth       = safe_calc(dlivebirths_livebirth / (1 - STILLBIRTH_RATE)),
+      dlivebirths_dpt         = safe_calc(dlivebirths_livebirth * (1 - NEONATAL_MORTALITY_RATE)),
+      dlivebirths_measles1    = safe_calc(dlivebirths_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
+      dlivebirths_measles2    = safe_calc(dlivebirths_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+    )
+  }
+  
+  if (all(indicator_vars$anc1 %in% available_vars)) {
+    data <- data %>% mutate(
+      danc1_pregnancy         = safe_mutate("anc1", countanc1 / anc1carry),
+      danc1_delivery          = safe_calc(danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE)),
+      danc1_birth             = safe_calc(danc1_delivery / (1 - 0.5 * TWIN_RATE)),
+      danc1_livebirth         = safe_calc(danc1_birth * (1 - STILLBIRTH_RATE)),
+      danc1_dpt               = safe_calc(danc1_livebirth * (1 - NEONATAL_MORTALITY_RATE)),
+      danc1_measles1          = safe_calc(danc1_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
+      danc1_measles2          = safe_calc(danc1_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+    )
+  }
+  
+  if (all(indicator_vars$delivery %in% available_vars)) {
+    data <- data %>% mutate(
+      ddelivery_livebirth     = safe_mutate("delivery", countdelivery / deliverycarry),
+      ddelivery_birth         = safe_calc(ddelivery_livebirth / (1 - STILLBIRTH_RATE)),
+      ddelivery_pregnancy     = safe_calc(ddelivery_birth * (1 - 0.5 * TWIN_RATE) / (1 - PREGNANCY_LOSS_RATE)),
+      ddelivery_dpt           = safe_calc(ddelivery_livebirth * (1 - NEONATAL_MORTALITY_RATE)),
+      ddelivery_measles1      = safe_calc(ddelivery_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
+      ddelivery_measles2      = safe_calc(ddelivery_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+    )
+  }
+  
+  if (all(indicator_vars$penta1 %in% available_vars)) {
+    data <- data %>% mutate(
+      dpenta1_dpt             = safe_mutate("penta1", countpenta1 / penta1carry),
+      dpenta1_measles1        = safe_calc(dpenta1_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
+      dpenta1_measles2        = safe_calc(dpenta1_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+    )
+  }
+  
+  if (!has_admin_area_2 && all(indicator_vars$bcg %in% available_vars)) {
     data <- data %>% mutate(
       dbcg_pregnancy = safe_mutate("bcg", (countbcg / bcgcarry) / (1 - PREGNANCY_LOSS_RATE) / (1 + TWIN_RATE) / (1 - STILLBIRTH_RATE)),
       dbcg_livebirth = safe_mutate("bcg", countbcg / bcgcarry),
       dbcg_dpt = safe_mutate("bcg", (countbcg / bcgcarry) * (1 - NEONATAL_MORTALITY_RATE)),
       dbcg_mcv = safe_mutate("bcg", (countbcg / bcgcarry) * (1 - NEONATAL_MORTALITY_RATE) * (1 - POSTNEONATAL_MORTALITY_RATE))
     )
-    
-    # Add WPP-based denominators for national only
+  }
+  
+  if (!has_admin_area_2) {
     data <- data %>% mutate(nummonth = if_else(is.na(nummonth) | nummonth == 0, 12, nummonth)) %>%
       mutate(
-        dwpp_pregnancy = if_else(!is.na(crudebr_unwpp) & !is.na(poptot_mics),
-                                 (crudebr_unwpp / 1000) * poptot_mics / (1 + TWIN_RATE), NA_real_),
-        
-        dwpp_livebirth = if_else(!is.na(crudebr_unwpp) & !is.na(poptot_mics),
-                                 (crudebr_unwpp / 1000) * poptot_mics, NA_real_),
-        
+        dwpp_pregnancy = if_else(!is.na(crudebr_unwpp) & !is.na(poptot_unwpp),
+                                 (crudebr_unwpp / 1000) * poptot_unwpp / (1 + TWIN_RATE), NA_real_),
+        dwpp_livebirth = if_else(!is.na(crudebr_unwpp) & !is.na(poptot_unwpp),
+                                 (crudebr_unwpp / 1000) * poptot_unwpp, NA_real_),
         dwpp_dpt = if_else(!is.na(totu1pop_unwpp), totu1pop_unwpp, NA_real_),
-        
         dwpp_measles1 = if_else(!is.na(totu1pop_unwpp) & !is.na(nmrcarry),
                                 totu1pop_unwpp * (1 - (nmrcarry / 100)), NA_real_),
-        
         dwpp_measles2 = if_else(!is.na(totu1pop_unwpp) & !is.na(nmrcarry) & !is.na(postnmr),
                                 totu1pop_unwpp * (1 - (nmrcarry / 100)) * (1 - (2 * postnmr / 100)), NA_real_),
-        
         across(starts_with("dwpp"), ~ if_else(!is.na(.x), .x * (nummonth / 12), NA_real_))
       )
   }
@@ -421,7 +454,20 @@ evaluate_coverage_by_denominator <- function(data) {
     carry_values,
     by = c(geo_keys, "indicator_common_id")
   ) %>%
-    mutate(squared_error = (coverage - reference_value)^2)
+    mutate(
+      squared_error = (coverage - reference_value)^2,
+      source_type = case_when(
+          # Reference-based: numerator and denominator share a source
+          str_starts(denominator, "danc1_")   & indicator_common_id == "anc1"    ~ "reference_based",
+          str_starts(denominator, "ddelivery_") & indicator_common_id == "delivery" ~ "reference_based",
+          str_starts(denominator, "dpenta1_")   & indicator_common_id == "penta1"   ~ "reference_based",
+          str_starts(denominator, "dbcg_")      & indicator_common_id == "bcg"      ~ "reference_based",
+          
+          # Everything else is independent
+          TRUE ~ "independent"
+      )
+    )
+  
   
   ranked <- coverage_with_error %>%
     filter(!is.na(squared_error)) %>%
@@ -480,6 +526,44 @@ project_coverage_from_all <- function(ranked_coverage) {
   return(all_projected)
 }
 
+#Part 6 - prepare outputs
+prepare_combined_coverage_from_projected <- function(projected_data, survey_data) {
+  has_admin_area_2 <- "admin_area_2" %in% names(projected_data)
+  join_keys <- if (has_admin_area_2) {
+    c("admin_area_1", "admin_area_2", "year", "indicator_common_id")
+  } else {
+    c("admin_area_1", "year", "indicator_common_id")
+  }
+  
+  # Convert wide rawsurvey_* columns to long
+  survey_raw_long <- survey_data %>%
+    select(all_of(join_keys[1:(length(join_keys)-1)]), starts_with("rawsurvey_")) %>%
+    pivot_longer(
+      cols = starts_with("rawsurvey_"),
+      names_to = "indicator_common_id",
+      names_prefix = "rawsurvey_",
+      values_to = "coverage_original_estimate"
+    )
+  
+  # Join and finalize
+  projected_data %>%
+    left_join(survey_raw_long, by = join_keys) %>%
+    mutate(
+      coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate)
+    ) %>%
+    transmute(
+      admin_area_1,
+      admin_area_2 = if (has_admin_area_2) admin_area_2 else "NATIONAL",
+      year,
+      indicator_common_id,
+      denominator,
+      coverage_original_estimate,
+      coverage_avgsurveyprojection = avgsurveyprojection,
+      coverage_cov = coverage,
+      rank,
+      source_type
+    )
+}
 
 
 # ------------------------------ Main Execution -----------------------------------
@@ -532,3 +616,18 @@ subnational_coverage_eval <- evaluate_coverage_by_denominator(denominators_provi
 # 5 - project survey coverage forward using HMIS deltas
 national_coverage_projected <- project_coverage_from_all(national_coverage_eval$full_ranking)
 subnational_coverage_projected <- project_coverage_from_all(subnational_coverage_eval$full_ranking)
+
+# 6 - prepare results and save
+national_combined_clean <- prepare_combined_coverage_from_projected(
+  projected_data = national_coverage_projected,
+  survey_data = survey_processed_national
+)
+
+subnational_combined_clean <- prepare_combined_coverage_from_projected(
+  projected_data = subnational_coverage_projected,
+  survey_data = survey_processed_province
+)
+
+write.csv(national_combined_clean, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
+write.csv(subnational_combined_clean, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
