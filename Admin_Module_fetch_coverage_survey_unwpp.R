@@ -237,7 +237,7 @@ target_locations <- locations_df %>%
 # --- List of indicator IDs and short names ---
 indicator_map <- tibble::tibble(
   indicator_id = c(2, 22, 24, 41, 46, 47, 49, 55),
-  short = c("CPModP", "IMR", "U5MR", "womenrepage", "totu5pop", "totu1pop", "totpop", "CBR")
+  short = c("CPModP", "IMR", "U5MR", "womenrepage", "totu5pop", "totu1pop", "poptot", "CBR")
 )
 
 # --- Fetch function ---
@@ -368,7 +368,12 @@ clean_dhs_national <- function(df) {
 
 clean_dhs_subnational <- function(df) {
   df %>%
-    filter(!is.na(Value), IsPreferred == 1) %>%
+    filter(
+      !is.na(Value),
+      IsPreferred == 1,
+      ByVariableLabel == "Two years preceding the survey"
+    ) %>%
+    
     mutate(
       admin_area_2 = str_remove(CharacteristicLabel, "^\\.*\\s*"),
       region_unique_id = CharacteristicId,
@@ -468,7 +473,7 @@ clean_unwpp <- function(df) {
         indicator_id == "Total number of live births by sex" ~ "livebirth",
         indicator_id == "Annual population by 5-year age groups and by sex" ~ "totu5pop",
         indicator_id == "Annual population by 1-year age groups and by sex" ~ "totu1pop",
-        indicator_id == "Total population by sex" ~ "totpop",
+        indicator_id == "Total population by sex" ~ "poptot",
         indicator_id == "Infant mortality rate (IMR)" ~ "imr",
         indicator_id == "Under-five mortality rate (U5MR)" ~ "u5mr",
         indicator_id == "Female population of reproductive age (15-49 years)" ~ "womenrepage",
