@@ -214,7 +214,6 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     }
   }
   
-  # --- STEP 6: Calculate postnmr ---
   survey_wide <- survey_wide %>%
     mutate(postnmr = ifelse(
       "avgsurvey_imr" %in% names(.) & "avgsurvey_nmr" %in% names(.),
@@ -559,7 +558,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     c("admin_area_1", "year", "indicator_common_id")
   }
   
-  # --- Step 1: Convert raw survey to long format ---
+
   raw_survey_long <- raw_survey_wide %>%
     pivot_longer(
       cols = starts_with("rawsurvey_"),
@@ -571,7 +570,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     select(all_of(join_keys), coverage_original_estimate) %>%
     distinct()
   
-  # --- Step 2: Get min year per indicator/location group ---
+
   min_years <- raw_survey_long %>%
     filter(!is.na(year)) %>%
     group_by(across(setdiff(join_keys, "year"))) %>%
@@ -580,7 +579,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
   
   max_year <- max(projected_data$year, na.rm = TRUE)
   
-  # --- Step 3: VALID suffix-to-indicator rules ---
+
   valid_suffix_map <- list(
     pregnancy  = c("anc1", "anc4"),
     livebirth  = c("bcg"),
@@ -589,8 +588,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     measles1   = c("measles1"),
     measles2   = c("measles2")
   )
-  
-  # --- Step 4: Get valid indicator–denominator pairs ---
+
   valid_denominator_map <- projected_data %>%
     select(admin_area_1, admin_area_2 = if (has_admin_area_2) "admin_area_2" else NULL,
            indicator_common_id, denominator) %>%
@@ -601,7 +599,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     filter(map2_lgl(indicator_common_id, suffix, ~ .x %in% valid_suffix_map[[.y]])) %>%
     select(-suffix)
   
-  # --- Step 5: Expand only valid grid ---
+
   expansion_grid <- min_years %>%
     inner_join(valid_denominator_map, by = setdiff(join_keys, "year")) %>%
     rowwise() %>%
@@ -610,14 +608,12 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     ungroup() %>%
     select(-min_year)
   
-  # --- Step 6: Join survey values into expanded grid ---
   survey_expanded <- left_join(
     expansion_grid,
     raw_survey_long,
     by = join_keys
   )
   
-  # --- Step 7: Final join with projections and reshape ---
   combined <- full_join(
     projected_data,
     survey_expanded,
