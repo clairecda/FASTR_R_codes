@@ -623,24 +623,37 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
       coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate),
       admin_area_2 = if (!has_admin_area_2) "NATIONAL" else admin_area_2
     ) %>%
+    group_by(across(all_of(c(setdiff(join_keys, "year"), "denominator")))) %>%
+    mutate(
+      suppress_year = ifelse(
+        !is.na(coverage_original_estimate) & !is.na(avgsurveyprojection) & !is.na(coverage),
+        year, NA_integer_
+      ),
+      suppress_year = min(suppress_year, na.rm = TRUE),
+      coverage_original_estimate = ifelse(
+        !is.na(coverage_original_estimate) &
+          !is.na(avgsurveyprojection) &
+          !is.na(coverage) &
+          year > suppress_year,
+        NA_real_,
+        coverage_original_estimate
+      )
+    ) %>%
+    ungroup() %>%
+    select(-suppress_year) %>%
     transmute(
       admin_area_1,
       admin_area_2,
       year,
       indicator_common_id,
       denominator,
-      coverage_original_estimate = ifelse(
-        !is.na(coverage_original_estimate) &
-          !is.na(avgsurveyprojection) &
-          !is.na(coverage),
-        NA_real_,
-        coverage_original_estimate
-      ),
+      coverage_original_estimate,
       coverage_avgsurveyprojection = avgsurveyprojection,
       coverage_cov = coverage,
       rank,
       source_type
     )
+  
   
   return(combined)
 }
