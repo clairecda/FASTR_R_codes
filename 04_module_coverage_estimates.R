@@ -15,7 +15,8 @@ library(dplyr)       # For `mutate()`, `group_by()`, `summarise()`, `filter()`, 
 library(tidyr)       # For `pivot_longer()`, `pivot_wider()`, `complete()`
 library(zoo)         # For `na.locf()` in `carry_forward_survey_data()`
 library(stringr)     # For `str_subset()` to detect `geo_cols`
-library(haven)       # For reading `.dta` Stata files
+library(purrr)
+
 
 # ------------------------------ Define File Paths -------------------------------
 # Input Datasets
@@ -148,7 +149,6 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     mutate(admin_area_1 = dplyr::recode(admin_area_1, !!!name_replacements)) %>%
     filter(admin_area_1 %in% hmis_countries)
   
-  
   survey_filtered <- if (is_national) {
     survey_data %>% filter(admin_area_2 == "NATIONAL")
   } else {
@@ -156,21 +156,21 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
   }
   
   
-  full_years <- seq(min_year, max_year)
+  survey_filtered <- survey_filtered %>%
+    mutate(source = case_when(
+      str_detect(tolower(source), "dhs")   ~ "dhs",
+      str_detect(tolower(source), "mics")  ~ "mics",
+      str_detect(tolower(source), "unwpp") ~ "unwpp",
+      TRUE ~ tolower(source)
+    ))
   
-  survey_extended <- survey_filtered %>%
-    filter(year %in% full_years) %>%
-    group_by(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2" else NULL))), indicator_common_id, source) %>%
-    tidyr::complete(year = full_years) %>%
-    arrange(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2" else NULL))), indicator_common_id, source, year) %>%
-    mutate(survey_value_carry = zoo::na.locf(survey_value, na.rm = FALSE)) %>%
-    ungroup()
-
-  survey_raw_only <- survey_extended %>%
-    filter(str_detect(tolower(source), "dhs")) %>%
-    select(admin_area_1, any_of("admin_area_2"), year, indicator_common_id, survey_value) %>%
-    group_by(across(everything())) %>%
-    summarise(survey_value = mean(survey_value, na.rm = TRUE), .groups = "drop") %>%
+  
+  raw_survey_values <- survey_filtered %>%
+    filter(source %in% c("dhs", "mics")) %>%
+    group_by(admin_area_1, admin_area_2, year, indicator_common_id) %>%
+    arrange(factor(source, levels = c("dhs", "mics"))) %>%  # DHS preferred
+    summarise(survey_value = first(survey_value), .groups = "drop") %>%
+    filter(year >= min_year & year <= max_year) %>%
     pivot_wider(
       names_from = indicator_common_id,
       values_from = survey_value,
@@ -178,14 +178,22 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     )
   
   
+  full_years <- seq(min_year, max_year)
+  
+  survey_extended <- survey_filtered %>%
+    filter(year %in% full_years) %>%
+    group_by(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2"))),
+             indicator_common_id, source) %>%
+    tidyr::complete(year = full_years) %>%
+    arrange(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2"))),
+            indicator_common_id, source, year) %>%
+    mutate(survey_value_carry = zoo::na.locf(survey_value, na.rm = FALSE)) %>%
+    ungroup()
+  
   
   survey_wide <- survey_extended %>%
-    mutate(source = case_when(
-      str_detect(tolower(source), "dhs")  ~ "dhs",
-      str_detect(tolower(source), "mics") ~ "mics",
-      TRUE                                ~ tolower(source)
-    )) %>%
-    select(all_of(c("admin_area_1", if (!is_national) "admin_area_2" else NULL)), year, indicator_common_id, source, survey_value_carry) %>%
+    select(all_of(c("admin_area_1", if (!is_national) "admin_area_2")),
+           year, indicator_common_id, source, survey_value_carry) %>%
     pivot_wider(
       names_from  = c(source, indicator_common_id),
       values_from = survey_value_carry,
@@ -193,36 +201,28 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
       values_fn   = mean
     )
   
+  
   for (ind in indicators) {
-    dhs_col <- paste0(ind, "_dhs")
+    dhs_col  <- paste0(ind, "_dhs")
     mics_col <- paste0(ind, "_mics")
-    avg_col <- paste0("avgsurvey_", ind)
+    avg_col  <- paste0("avgsurvey_", ind)
     
-    dhs_exists  <- dhs_col %in% names(survey_wide)
-    mics_exists <- mics_col %in% names(survey_wide)
-    
-    if (is_national) {
-      if (dhs_exists || mics_exists) {
-        survey_wide[[avg_col]] <- coalesce(
-          if (dhs_exists) survey_wide[[dhs_col]] else NULL,
-          if (mics_exists) survey_wide[[mics_col]] else NULL
-        )
-      }
-    } else {
-      if (dhs_exists) {
-        survey_wide[[avg_col]] <- survey_wide[[dhs_col]]
-      }
+    if (dhs_col %in% names(survey_wide) || mics_col %in% names(survey_wide)) {
+      survey_wide[[avg_col]] <- dplyr::coalesce(
+        survey_wide[[dhs_col]], survey_wide[[mics_col]]
+      )
     }
   }
   
-  if (all(c("avgsurvey_imr", "avgsurvey_nmr") %in% names(survey_wide))) {
-    survey_wide <- survey_wide %>%
-      mutate(postnmr = avgsurvey_imr - avgsurvey_nmr)
-  } else {
-    survey_wide$postnmr <- NA_real_
-  }
+  # --- STEP 6: Calculate postnmr ---
+  survey_wide <- survey_wide %>%
+    mutate(postnmr = ifelse(
+      "avgsurvey_imr" %in% names(.) & "avgsurvey_nmr" %in% names(.),
+      avgsurvey_imr - avgsurvey_nmr,
+      NA_real_
+    ))
   
-  carry_group <- if (is_national) c("admin_area_1") else c("admin_area_1", "admin_area_2")
+  carry_group <- if (is_national) "admin_area_1" else c("admin_area_1", "admin_area_2")
   
   survey_carried <- survey_wide %>%
     group_by(across(all_of(carry_group))) %>%
@@ -234,27 +234,22 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
   for (ind in c(indicators, "postnmr")) {
     avg_col   <- paste0("avgsurvey_", ind)
     carry_col <- paste0(ind, "carry")
-    if (avg_col %in% colnames(survey_carried)) {
+    if (avg_col %in% names(survey_carried)) {
       survey_carried[[carry_col]] <- survey_carried[[avg_col]]
     }
   }
   
+  
   if (is_national) {
-    survey_raw_only <- survey_raw_only %>%
-      mutate(admin_area_2 = "NATIONAL")
-    
-    survey_carried <- survey_carried %>%
-      mutate(admin_area_2 = "NATIONAL")
+    survey_carried <- survey_carried %>% mutate(admin_area_2 = "NATIONAL")
+    raw_survey_values <- raw_survey_values %>% mutate(admin_area_2 = "NATIONAL")
   }
   
-  survey_final <- full_join(survey_raw_only, survey_carried,
-                            by = c("admin_area_1", "admin_area_2", "year")) %>%
-    mutate(across(where(is.numeric), ~ ifelse(is.nan(.), NA_real_, .))) %>%
-    arrange(admin_area_1, if (!is_national) admin_area_2 else NULL, year)
-  
-  
-  
-  return(survey_final)
+  return(list(
+    carried = survey_carried %>%
+      arrange(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2", "year")))),
+    raw = raw_survey_values
+  ))
 }
 
 #Part 2b - prepare unwpp data
@@ -393,8 +388,16 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
 
 #Part 4 - calculate coverage and compare all denominators
 evaluate_coverage_by_denominator <- function(data) {
+  # Determine if this is national-level data
   has_admin_area_2 <- "admin_area_2" %in% names(data)
-  geo_keys <- if (has_admin_area_2) c("admin_area_1", "admin_area_2", "year") else c("admin_area_1", "year")
+  is_national_level <- has_admin_area_2 && all(data$admin_area_2 == "NATIONAL")
+  
+  geo_keys <- if (has_admin_area_2) {
+    c("admin_area_1", "admin_area_2", "year")
+  } else {
+    c("admin_area_1", "year")
+  }
+  
   
   # Numerators
   numerator_long <- data %>%
@@ -406,15 +409,23 @@ evaluate_coverage_by_denominator <- function(data) {
     ) %>%
     filter(numerator_col != "count") %>%
     mutate(indicator_common_id = str_remove(numerator_col, "^count")) %>%
-    select(-numerator_col)
+    select(-numerator_col) %>%
+    distinct()
+  
+  # Denominator pattern: match all relevant *_suffix style names
+  denom_pattern <- "^(d.*)_(pregnancy|livebirth|dpt|measles1|measles2)$"
+  
+  # Denominator-to-indicator map (based on suffix only)
+  suffix_indicator_map <- tribble(
+    ~suffix,       ~indicators,
+    "pregnancy",   c("anc1", "anc4"),
+    "livebirth",   "bcg",
+    "dpt",         c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3", "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
+    "measles1",    "measles1",
+    "measles2",    "measles2"
+  )
   
   # Denominators
-  denom_pattern <- if (has_admin_area_2) {
-    "^d(anc1|delivery|penta1)_(pregnancy|livebirth|dpt|mcv|measles1|measles2)$"
-  } else {
-    "^d(anc1|delivery|penta1|bcg|wpp)_(pregnancy|livebirth|dpt|mcv|measles1|measles2)$"
-  }
-  
   denominator_long <- data %>%
     select(all_of(geo_keys), matches(denom_pattern)) %>%
     pivot_longer(
@@ -423,26 +434,20 @@ evaluate_coverage_by_denominator <- function(data) {
       values_to = "denominator_value"
     ) %>%
     mutate(
-      denominator_type = case_when(
-        str_detect(denominator, "_pregnancy$") ~ "pregnancy",
-        str_detect(denominator, "_livebirth$") ~ "livebirth",
-        str_detect(denominator, "_delivery$") ~ "delivery",
-        str_detect(denominator, "_dpt$") ~ "penta",
-        str_detect(denominator, "_measles1$") ~ "measles1",
-        str_detect(denominator, "_measles2$") ~ "measles2",
-        TRUE ~ NA_character_
-      ),
-      indicator_common_id = case_when(
-        denominator_type == "pregnancy" ~ list(c("anc1", "anc4")),
-        denominator_type == "delivery"  ~ list("delivery"),
-        denominator_type == "livebirth" ~ list(c("bcg", "skilled")),
-        denominator_type == "penta"     ~ list(c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3", "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2")),
-        denominator_type == "measles1"  ~ list("measles1"),
-        denominator_type == "measles2"  ~ list("measles2"),
-        TRUE ~ list(NA_character_)
-      )
+      denominator_type = str_extract(denominator, "(pregnancy|livebirth|dpt|measles1|measles2)"),
+      indicator_common_id = purrr::map(denominator_type, ~ {
+        matched <- suffix_indicator_map %>% filter(suffix == .x)
+        if (nrow(matched) == 0) NA_character_ else matched$indicators[[1]]
+      })
     ) %>%
-    unnest(indicator_common_id)
+    unnest_longer(indicator_common_id) %>%
+    filter(!is.na(indicator_common_id)) %>%
+    distinct()
+  
+  
+  
+  numerator_long <- distinct(numerator_long)
+  denominator_long <- distinct(denominator_long)
   
   # Join numerator and denominator
   coverage_data <- full_join(
@@ -463,8 +468,11 @@ evaluate_coverage_by_denominator <- function(data) {
       names_pattern = "(.*)carry$",
       values_to = "reference_value"
     ) %>%
-    drop_na(reference_value)
+    drop_na(reference_value) %>%
+    group_by(across(all_of(c(geo_keys, "indicator_common_id")))) %>%
+    summarise(reference_value = mean(reference_value, na.rm = TRUE), .groups = "drop")
   
+  # Calculate error
   coverage_with_error <- left_join(
     coverage_data,
     carry_values,
@@ -473,18 +481,16 @@ evaluate_coverage_by_denominator <- function(data) {
     mutate(
       squared_error = (coverage - reference_value)^2,
       source_type = case_when(
-          # Reference-based: numerator and denominator share a source
-          str_starts(denominator, "danc1_")   & indicator_common_id == "anc1"    ~ "reference_based",
-          str_starts(denominator, "ddelivery_") & indicator_common_id == "delivery" ~ "reference_based",
-          str_starts(denominator, "dpenta1_")   & indicator_common_id == "penta1"   ~ "reference_based",
-          str_starts(denominator, "dbcg_")      & indicator_common_id == "bcg"      ~ "reference_based",
-          
-          # Everything else is independent
-          TRUE ~ "independent"
+        str_starts(denominator, "danc1_")      & indicator_common_id == "anc1"     ~ "reference_based",
+        str_starts(denominator, "ddelivery_")  & indicator_common_id == "delivery" ~ "reference_based",
+        str_starts(denominator, "dpenta1_")    & indicator_common_id == "penta1"   ~ "reference_based",
+        str_starts(denominator, "dbcg_")       & indicator_common_id == "bcg"      ~ "reference_based",
+        str_starts(denominator, "dwpp_")                                       ~ "unwpp_based",
+        TRUE ~ "independent"
       )
     )
   
-  
+  # Rank by error
   ranked <- coverage_with_error %>%
     filter(!is.na(squared_error)) %>%
     group_by(across(all_of(geo_keys)), indicator_common_id) %>%
@@ -492,6 +498,7 @@ evaluate_coverage_by_denominator <- function(data) {
     mutate(rank = row_number()) %>%
     ungroup()
   
+  # Best-only output
   best <- ranked %>%
     filter(rank == 1) %>%
     select(all_of(geo_keys), indicator_common_id,
@@ -543,29 +550,82 @@ project_coverage_from_all <- function(ranked_coverage) {
 }
 
 #Part 6 - prepare outputs
-prepare_combined_coverage_from_projected <- function(projected_data, survey_data) {
+prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_wide) {
   has_admin_area_2 <- "admin_area_2" %in% names(projected_data)
+  
   join_keys <- if (has_admin_area_2) {
     c("admin_area_1", "admin_area_2", "year", "indicator_common_id")
   } else {
     c("admin_area_1", "year", "indicator_common_id")
   }
   
-  # Convert wide rawsurvey_* columns to long
-  survey_raw_long <- survey_data %>%
-    select(all_of(join_keys[1:(length(join_keys)-1)]), starts_with("rawsurvey_")) %>%
+  # --- Step 1: Convert raw survey to long format ---
+  raw_survey_long <- raw_survey_wide %>%
     pivot_longer(
       cols = starts_with("rawsurvey_"),
       names_to = "indicator_common_id",
       names_prefix = "rawsurvey_",
       values_to = "coverage_original_estimate"
-    )
+    ) %>%
+    filter(!is.na(coverage_original_estimate)) %>%
+    select(all_of(join_keys), coverage_original_estimate) %>%
+    distinct()
   
-  # Full join ensures you retain all survey-only years
-  full_join(projected_data, survey_raw_long, by = join_keys) %>%
+  # --- Step 2: Get min year per indicator/location group ---
+  min_years <- raw_survey_long %>%
+    filter(!is.na(year)) %>%
+    group_by(across(setdiff(join_keys, "year"))) %>%
+    summarise(min_year = min(year), .groups = "drop") %>%
+    filter(!is.na(min_year) & is.finite(min_year))
+  
+  max_year <- max(projected_data$year, na.rm = TRUE)
+  
+  # --- Step 3: VALID suffix-to-indicator rules ---
+  valid_suffix_map <- list(
+    pregnancy  = c("anc1", "anc4"),
+    livebirth  = c("bcg"),
+    dpt        = c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3",
+                   "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
+    measles1   = c("measles1"),
+    measles2   = c("measles2")
+  )
+  
+  # --- Step 4: Get valid indicator–denominator pairs ---
+  valid_denominator_map <- projected_data %>%
+    select(admin_area_1, admin_area_2 = if (has_admin_area_2) "admin_area_2" else NULL,
+           indicator_common_id, denominator) %>%
+    distinct() %>%
+    mutate(
+      suffix = str_extract(denominator, "(pregnancy|livebirth|dpt|measles1|measles2)")
+    ) %>%
+    filter(map2_lgl(indicator_common_id, suffix, ~ .x %in% valid_suffix_map[[.y]])) %>%
+    select(-suffix)
+  
+  # --- Step 5: Expand only valid grid ---
+  expansion_grid <- min_years %>%
+    inner_join(valid_denominator_map, by = setdiff(join_keys, "year")) %>%
+    rowwise() %>%
+    mutate(year = list(seq.int(min_year, max_year))) %>%
+    unnest(year) %>%
+    ungroup() %>%
+    select(-min_year)
+  
+  # --- Step 6: Join survey values into expanded grid ---
+  survey_expanded <- left_join(
+    expansion_grid,
+    raw_survey_long,
+    by = join_keys
+  )
+  
+  # --- Step 7: Final join with projections and reshape ---
+  combined <- full_join(
+    projected_data,
+    survey_expanded,
+    by = c(join_keys, "denominator")
+  ) %>%
     mutate(
       coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate),
-      admin_area_2 = if (has_admin_area_2) admin_area_2 else "NATIONAL"
+      admin_area_2 = if (!has_admin_area_2) "NATIONAL" else admin_area_2
     ) %>%
     transmute(
       admin_area_1,
@@ -573,14 +633,21 @@ prepare_combined_coverage_from_projected <- function(projected_data, survey_data
       year,
       indicator_common_id,
       denominator,
-      coverage_original_estimate,
+      coverage_original_estimate = ifelse(
+        !is.na(coverage_original_estimate) &
+          !is.na(avgsurveyprojection) &
+          !is.na(coverage),
+        NA_real_,
+        coverage_original_estimate
+      ),
       coverage_avgsurveyprojection = avgsurveyprojection,
       coverage_cov = coverage,
       rank,
       source_type
     )
+  
+  return(combined)
 }
-
 
 # ------------------------------ Main Execution -----------------------------------
 # 1 - prepare the hmis data
@@ -592,7 +659,6 @@ hmis_processed_subnational <- process_hmis_adjusted_volume(
 )
 
 
-
 # 2 - prepare the survey data
 survey_processed_national <- process_survey_data(
   survey_data = survey_data_unified %>% filter(admin_area_2 == "NATIONAL"),
@@ -600,12 +666,12 @@ survey_processed_national <- process_survey_data(
   hmis_countries = hmis_processed$hmis_countries
 )
 
-
 survey_processed_province <- process_survey_data(
   survey_data = survey_data_unified %>% filter(admin_area_2 != "NATIONAL"),
   name_replacements = name_replacements,
   hmis_countries = hmis_processed_subnational$hmis_countries
 )
+
 
 national_population_processed <- process_national_population_data(
   population_data = population_estimates_only,
@@ -616,14 +682,15 @@ national_population_processed <- process_national_population_data(
 # 3 - calculate the denominators
 denominators_national <- calculate_denominators(
   hmis_data = hmis_processed$annual_hmis,
-  survey_data = survey_processed_national,
+  survey_data = survey_processed_national$carried,
   population_data = national_population_processed
 )
 
 denominators_province <- calculate_denominators(
   hmis_data = hmis_processed_subnational$annual_hmis,
-  survey_data = survey_processed_province
+  survey_data = survey_processed_province$carried
 )
+
 
 # 4 - calculate coverage and compare the denominators
 national_coverage_eval <- evaluate_coverage_by_denominator(denominators_national)
@@ -634,16 +701,17 @@ national_coverage_projected <- project_coverage_from_all(national_coverage_eval$
 subnational_coverage_projected <- project_coverage_from_all(subnational_coverage_eval$full_ranking)
 
 # 6 - prepare results and save
-national_combined_clean <- prepare_combined_coverage_from_projected(
+combined_national <- prepare_combined_coverage_from_projected(
   projected_data = national_coverage_projected,
-  survey_data = survey_processed_national
+  raw_survey_wide = survey_processed_national$raw
 )
 
-subnational_combined_clean <- prepare_combined_coverage_from_projected(
+combined_province <- prepare_combined_coverage_from_projected(
   projected_data = subnational_coverage_projected,
-  survey_data = survey_processed_province
+  raw_survey_wide = survey_processed_province$raw
 )
 
-write.csv(national_combined_clean, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
-write.csv(subnational_combined_clean, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+write.csv(combined_national, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
+write.csv(combined_province, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
 
