@@ -6,7 +6,7 @@ DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Feb 13
+# Last edit: 2025 Apr 30
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to evaluate the reliability of HMIS data by
@@ -57,7 +57,7 @@ dqa_rules <- list(
 
 # ------------------------------------- KEY OUTPUTS ----------------------------------------------------------
 # FILE: M1_output_outliers.csv             # Detailed facility-level data with identified outliers and adjusted volumes.
-# FILE: M1_completeness_long_format.csv    # Facility-level completeness data in a detailed long format, including reported and expected months.
+# FILE: M1_output_completeness.csv         # Facility-level completeness data in a detailed long format, including reported and expected months.
 # FILE: M1_output_consistency_geo.csv      # District-level consistency results - use in visualizer
 # FILE: M1_facility_dqa.csv                # Facility-level results from DQA analysis.
 
@@ -105,15 +105,18 @@ load_and_preprocess_data <- function(file_path) {
 validate_consistency_pairs <- function(consistency_params, data) {
   print("Validating consistency pairs based on available indicators...")
   
+  if (!"indicator_common_id" %in% names(data)) {
+    stop("Column 'indicator_common_id' not found in input data.")
+  }
+  
+  available_indicators <- unique(data$indicator_common_id)
   consistency_pairs_names <- names(consistency_params$consistency_pairs)
   
-  # Identify valid consistency pairs
   valid_consistency_pairs <- consistency_params$consistency_pairs[sapply(
     consistency_params$consistency_pairs, 
-    function(pair) all(pair %in% unique(data$indicator_common_id))
+    function(pair) all(pair %in% available_indicators)
   )]
   
-  # Retain only valid ranges
   consistency_params$consistency_pairs <- valid_consistency_pairs
   consistency_params$consistency_ranges <- consistency_params$consistency_ranges[names(valid_consistency_pairs)]
   
@@ -123,8 +126,13 @@ validate_consistency_pairs <- function(consistency_params, data) {
                   paste(removed_pairs, collapse = ", ")))
   }
   
+  if (length(valid_consistency_pairs) == 0) {
+    message("No valid consistency pairs found. Skipping consistency analysis.")
+  }
+
   return(consistency_params)
 }
+
 
 # PART 1 OUTLIERS ----------------------------------------------------------------------------------------------
 outlier_analysis <- function(data, geo_cols, outlier_params) {
@@ -651,19 +659,69 @@ if (!is.null(facility_consistency_results)) {
 }
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
-print("Saving results from outlier analysis...")
-write.csv(outlier_data_main, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
+print("Preparing and saving results from outlier analysis...")
+outlier_data_export <- outlier_data_main %>%
+  select(
+    facility_id,
+    period_id,
+    indicator_common_id,
+    outlier_flag
+  )
+
+write.csv(outlier_data_export, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
 
 if (length(consistency_params$consistency_pairs) > 0) {
-  print("Saving all data outputs from consistency analysis...")
-  write.csv(geo_consistency_results, "M1_output_consistency_geo.csv", row.names = FALSE)           # Geo-level consistency results
-  write.csv(facility_consistency_results, "M1_output_consistency_facility.csv", row.names = FALSE) # Facility-level consistency results
+  print("Preparing and saving all data outputs from consistency analysis...")
+  
+  # Dynamically find lowest geo level column
+  geo_cols <- colnames(geo_consistency_results)[grepl("^admin_area_", colnames(geo_consistency_results))]
+  lowest_geo_col <- geo_cols[order(as.integer(gsub("admin_area_", "", geo_cols)), decreasing = TRUE)][1]
+  
+  # Prepare geo-level output
+  geo_consistency_export <- geo_consistency_results %>%
+    select(
+      all_of(lowest_geo_col),
+      period_id,
+      ratio_type,
+      sconsistency
+    )
+  
+  # Prepare facility-level output
+  facility_consistency_export <- facility_consistency_results %>%
+    select(
+      facility_id,
+      period_id,
+      ratio_type,
+      sconsistency
+    )
+  
+  # Write both outputs
+  write.csv(geo_consistency_export, "M1_output_consistency_geo.csv", row.names = FALSE)
+  write.csv(facility_consistency_export, "M1_output_consistency_facility.csv", row.names = FALSE)
 }
 
-print("Saving results from completeness analysis...")
-write.csv(completeness_results, "M1_completeness_long_format.csv", row.names = FALSE)              # Facility-month completeness
 
-print("Saving results from DQA analysis...")
-write.csv(dqa_results, "M1_facility_dqa.csv", row.names = FALSE)                                   # Facility-level DQA results
+print("Preparing and saving results from completeness analysis...")
+completeness_export <- completeness_results %>%
+  select(
+    facility_id,
+    indicator_common_id,
+    period_id,
+    completeness_flag
+  )
+
+write.csv(completeness_export, "M1_output_completeness.csv", row.names = FALSE)
+
+
+print("Preparing and saving results from DQA analysis...")
+dqa_export <- dqa_results %>%
+  select(
+    facility_id,
+    period_id,
+    dqa_mean,
+    dqa_score
+  )
+
+write.csv(dqa_export, "M1_output_dqa.csv", row.names = FALSE)
 
 print("DQA Analysis completed. All outputs saved.")
