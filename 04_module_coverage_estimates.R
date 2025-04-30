@@ -656,30 +656,29 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
       admin_area_2 = if (!has_admin_area_2) "NATIONAL" else admin_area_2
     )
   
-
   if (is_national) {
     if ("coverage_original_estimate" %in% names(combined)) {
       combined <- combined %>%
         group_by(across(all_of(c(setdiff(join_keys, "year"), "denominator")))) %>%
         mutate(
-          suppress_year = ifelse(
-            !is.na(coverage_original_estimate) & !is.na(avgsurveyprojection) & !is.na(coverage),
-            year, NA_integer_
+          last_survey_year = if (all(is.na(coverage_original_estimate))) NA_integer_ else max(year[!is.na(coverage_original_estimate)], na.rm = TRUE),
+          avgsurveyprojection = case_when(
+            year == last_survey_year ~ coverage_original_estimate,
+            year > last_survey_year ~ avgsurveyprojection,
+            TRUE ~ NA_real_
           ),
-          suppress_year = if (all(is.na(suppress_year))) NA_integer_ else min(suppress_year, na.rm = TRUE),
           coverage_original_estimate = ifelse(
-            !is.na(coverage_original_estimate) &
-              !is.na(avgsurveyprojection) &
-              !is.na(coverage) &
-              year > suppress_year,
+            year > last_survey_year,
             NA_real_,
             coverage_original_estimate
           )
         ) %>%
         ungroup() %>%
-        select(-suppress_year)
+        select(-last_survey_year)
     }
   }
+  
+  
   combined <- combined %>%
     transmute(
       admin_area_1,

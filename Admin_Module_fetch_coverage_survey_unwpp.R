@@ -29,11 +29,12 @@ library(RCurl)
 # ----------------------------------------
 
 dhs_indicators_base <- c(
+  "RH_ANCP_W_SKP",  # ANC1 from skilled provider
+  "RH_ANCN_W_N01",  # Exactly 1 ANC visit
+  "RH_ANCN_W_N4P",  # ANC4+
   "RH_DELP_C_DHF",  # Institutional delivery
-  "RH_ANCP_W_SKP",  # Skilled delivery
-  "RH_ANCN_W_N4P",  # ANC4
   
-  "FP_SRCM_W_TOT",  # mCPR (Percentage of women currently using modern contraceptive methods: Total)
+  "FP_SRCM_W_TOT",  # mCPR
   
   "CM_PNMR_C_NSB",  # Stillbirth rate
   "CM_ECMT_C_IMR",  # IMR
@@ -43,17 +44,13 @@ dhs_indicators_base <- c(
   "FE_FRTR_W_TFR",  # Total fertility rate
   
   "CH_VAC1_C_BCG",  # BCG
-  
   "CH_VAC1_C_DP1",  # Penta1
   "CH_VAC1_C_DP3",  # Penta3
-  
   "CH_VAC1_C_OP1",  # Polio1
   "CH_VAC1_C_OP2",  # Polio2
   "CH_VAC1_C_OP3",  # Polio3
-  
-  "CH_VAC1_C_MSL",  # Measles
+  "CH_VAC1_C_MSL",  # Measles1
   "CH_VAC1_C_MS2",  # Measles2
-  
   "CH_VAC1_C_RT1",  # Rotavirus 1
   "CH_VAC1_C_RT2"   # Rotavirus 2
 )
@@ -68,83 +65,39 @@ dhs_countries <- c(
   "TJ", "LR", "MG", "SO"
 )
 
-library(countrycode)
+
 
 # ----------------------------------------
-# Pull availability of both ANC indicators
+# Pull DHS national and subnational data
 # ----------------------------------------
-
-# Check availability of RH_ANCN_W_N01
-ancn_data <- dhs_data(
-  indicatorIds = "RH_ANCN_W_N01",
-  breakdown = "national",
-  f = "json"
-)
-ancn_available <- unique(ancn_data$DHS_CountryCode)
-
-# Check availability of RH_ANCP_W_SKP
-skp_data <- dhs_data(
-  indicatorIds = "RH_ANCP_W_SKP",
-  breakdown = "national",
-  f = "json"
-)
-skp_available <- unique(skp_data$DHS_CountryCode)
-
-# ----------------------------------------
-# Identify availability status by country
-# ----------------------------------------
-
-anc1_missing_skp_present <- setdiff(skp_available, ancn_available) %>%
-  intersect(dhs_countries)
-
-both_missing <- setdiff(dhs_countries, union(ancn_available, skp_available))
-
-message("ANC1 missing but SKP present: ", 
-        paste(sort(countrycode(anc1_missing_skp_present, origin = "iso2c", destination = "country.name")), collapse = ", "))
-
-message("ANC1 and SKP both missing: ", 
-        paste(sort(countrycode(both_missing, origin = "iso2c", destination = "country.name")), collapse = ", "))
-
-# ----------------------------------------
-# Pull DHS national and subnational data with fallback
-# ----------------------------------------
-
 dhs_national_list <- lapply(dhs_countries, function(iso) {
-  use_ancn <- iso %in% ancn_available
-  primary_indicator <- if (use_ancn) "RH_ANCN_W_N01" else "RH_ANCP_W_SKP"
-  indicators <- c(primary_indicator, dhs_indicators_base)
-  
   tryCatch({
     dhs_data(
-      indicatorIds = unique(indicators),
+      indicatorIds = unique(dhs_indicators_base),
       countryIds = iso,
       breakdown = "national",
       f = "json"
     ) %>%
-      mutate(LevelRank = as.character(LevelRank))  # Coerce here too
+      mutate(LevelRank = as.character(LevelRank))
   }, error = function(e) {
-    message("No national data for ", iso, 
-            " using indicator ", primary_indicator, " → Skipping...")
+    message("❗ No NATIONAL DHS data for ", iso, 
+            " [Indicators: ", paste(dhs_indicators_base, collapse = ", "), "] → Skipping...")
     NULL
   })
 })
 
 dhs_subnational_list <- lapply(dhs_countries, function(iso) {
-  use_ancn <- iso %in% ancn_available
-  primary_indicator <- if (use_ancn) "RH_ANCN_W_N01" else "RH_ANCP_W_SKP"
-  indicators <- c(primary_indicator, dhs_indicators_base)
-  
   tryCatch({
     dhs_data(
-      indicatorIds = unique(indicators),
+      indicatorIds = unique(dhs_indicators_base),
       countryIds = iso,
       breakdown = "subnational",
       f = "json"
     ) %>%
-      mutate(LevelRank = as.character(LevelRank))  # Force consistent type
+      mutate(LevelRank = as.character(LevelRank))
   }, error = function(e) {
-    message("No subnational data for ", iso, 
-            " using indicator ", primary_indicator, " → Skipping...")
+    message("❗ No SUBNATIONAL DHS data for ", iso, 
+            " [Indicators: ", paste(dhs_indicators_base, collapse = ", "), "] → Skipping...")
     NULL
   })
 })
@@ -326,8 +279,8 @@ clean_dhs_national <- function(df) {
         indicator_id == "ch_vac1_c_rt2"  ~ "rota2",
         indicator_id == "rh_delp_c_dhf"  ~ "delivery",
         indicator_id == "rh_ancn_w_n4p"  ~ "anc4",
-        indicator_id == "rh_ancn_w_n01"  ~ "anc1",
-        indicator_id == "rh_ancp_w_skp"  ~ "skilled",
+        indicator_id == "rh_ancn_w_n01"  ~ "anc1_old",
+        indicator_id == "rh_ancp_w_skp"  ~ "anc1",
         indicator_id == "fp_srcm_w_tot"  ~ "fp",
         indicator_id == "cm_pnmr_c_nsb"  ~ "still",
         indicator_id == "cm_ecmt_c_imr"  ~ "imr",
@@ -366,8 +319,8 @@ clean_dhs_subnational <- function(df) {
         indicator_id == "ch_vac1_c_rt2"  ~ "rota2",
         indicator_id == "rh_delp_c_dhf"  ~ "delivery",
         indicator_id == "rh_ancn_w_n4p"  ~ "anc4",
-        indicator_id == "rh_ancn_w_n01"  ~ "anc1",
-        indicator_id == "rh_ancp_w_skp"  ~ "skilled",
+        indicator_id == "rh_ancn_w_n01"  ~ "anc1_old",
+        indicator_id == "rh_ancp_w_skp"  ~ "anc1",
         indicator_id == "fp_srcm_w_tot"  ~ "fp",
         indicator_id == "cm_pnmr_c_nsb"  ~ "still",
         indicator_id == "cm_ecmt_c_imr"  ~ "imr",
@@ -530,7 +483,7 @@ all_data <- bind_rows(
 
 # Indicator classification
 percent_indicators <- c(
-  "anc1", "anc4", "delivery", "skilled", "fp",
+  "anc1", "anc4", "delivery", "anc1_old", "fp",
   "penta1", "penta3", "bcg", "polio1", "polio2", "polio3",
   "measles1", "measles2", "rota1", "rota2"
 )
