@@ -29,6 +29,7 @@ outlier_data <- read.csv("M1_output_outliers.csv")
 completeness_data <- read.csv("M1_output_completeness.csv")
 
 # Define Functions ------------------------------------------------------------------------------------------
+geo_cols <- colnames(raw_data)[grepl("^admin_area_[0-9]+$", colnames(raw_data))]
 
 # Function to Apply Adjustments Across Scenarios ------------------------------------------------------------
 apply_adjustments <- function(raw_data, completeness_data, outlier_data,
@@ -100,6 +101,11 @@ apply_adjustments <- function(raw_data, completeness_data, outlier_data,
 apply_adjustments_scenarios <- function(raw_data, completeness_data, outlier_data) {
   cat("Applying adjustments across scenarios...\n")
   
+  # Ensure all inputs are data.tables
+  setDT(raw_data)
+  setDT(completeness_data)
+  setDT(outlier_data)
+  
   join_cols <- c("facility_id", "indicator_common_id", "period_id")
   
   scenarios <- list(
@@ -121,20 +127,25 @@ apply_adjustments_scenarios <- function(raw_data, completeness_data, outlier_dat
       outlier_data = outlier_data,
       adjust_outliers = adjustment$adjust_outliers,
       adjust_completeness = adjustment$adjust_completeness
-    ) %>%
-      select(all_of(join_cols), count, count_working) %>%
-      mutate(count_working = ifelse(
-        indicator_common_id %in% EXCLUDED_FROM_ADJUSTMENT,
-        count,
-        count_working
-      ))
+    )
     
-    colnames(data_adjusted)[colnames(data_adjusted) == "count_working"] <- paste0("count_final_", name)
-    results[[name]] <- data_adjusted %>% select(-count)
+    # Keep only needed columns
+    data_adjusted <- data_adjusted[, .(facility_id, indicator_common_id, period_id, count, count_working)]
+    
+    # Apply exclusion logic
+    data_adjusted[indicator_common_id %in% EXCLUDED_FROM_ADJUSTMENT, count_working := count]
+    
+    # Rename working count column
+    setnames(data_adjusted, "count_working", paste0("count_final_", name))
+    
+    # Drop raw count column
+    data_adjusted[, count := NULL]
+    
+    results[[name]] <- data_adjusted
   }
   
-  df_adjusted <- Reduce(function(x, y) merge(x, y, by = join_cols, all.x = TRUE, all.y = TRUE), results)
-  
+  # Merge all scenario outputs
+  df_adjusted <- Reduce(function(x, y) merge(x, y, by = join_cols, all = TRUE), results)
   
   return(df_adjusted)
 }
@@ -149,17 +160,10 @@ adjusted_data_final <- apply_adjustments_scenarios(
   outlier_data = outlier_data
 )
 
-# Extract geo columns from raw_data
-geo_cols <- colnames(raw_data) %>% str_subset("^admin_area_[0-9]+$")
+geo_lookup <- unique(raw_data[, c("facility_id", geo_cols), with = FALSE])
 
-# Join geography into adjusted data
-adjusted_data_geo <- adjusted_data_final %>%
-  left_join(
-    raw_data %>%
-      select(facility_id, all_of(geo_cols)) %>%
-      distinct(),
-    by = "facility_id"
-  )
+setDT(adjusted_data_final)
+adjusted_data_geo <- merge(adjusted_data_final, geo_lookup, by = "facility_id", all.x = TRUE)
 
 # Aggregate at lowest available admin area level
 adjusted_data_admin_area_final <- adjusted_data_geo %>%
