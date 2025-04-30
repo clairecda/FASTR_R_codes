@@ -238,6 +238,32 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     }
   }
   
+  # Force vaccine avgsurvey_* columns to exist so fallback carry can be created
+  if (!is_national) {
+    fallback_vaccine_indicators <- c("bcg", "penta1", "penta3")
+    for (ind in fallback_vaccine_indicators) {
+      avg_col <- paste0("avgsurvey_", ind)
+      carry_col <- paste0(ind, "carry")
+      
+      if (!(avg_col %in% names(survey_carried))) {
+        survey_carried[[avg_col]] <- NA_real_
+      }
+      if (!(carry_col %in% names(survey_carried))) {
+        survey_carried[[carry_col]] <- NA_real_
+      }
+    }
+  }
+  
+  if (!is_national) {
+    for (ind in c("bcg", "penta1", "penta3")) {
+      carry_col <- paste0(ind, "carry")
+      if (carry_col %in% names(survey_carried)) {
+        survey_carried[[carry_col]] <- ifelse(is.na(survey_carried[[carry_col]]), 0.70, survey_carried[[carry_col]])
+      }
+    }
+  }
+  
+  
   
   if (is_national) {
     survey_carried <- survey_carried %>% mutate(admin_area_2 = "NATIONAL")
@@ -618,29 +644,43 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     projected_data,
     survey_expanded,
     by = c(join_keys, "denominator")
-  ) %>%
+  )
+  
+
+  is_national <- all(is.na(combined$admin_area_2)) || all(combined$admin_area_2 == "NATIONAL")
+  
+
+  combined <- combined %>%
     mutate(
       coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate),
       admin_area_2 = if (!has_admin_area_2) "NATIONAL" else admin_area_2
-    ) %>%
-    group_by(across(all_of(c(setdiff(join_keys, "year"), "denominator")))) %>%
-    mutate(
-      suppress_year = ifelse(
-        !is.na(coverage_original_estimate) & !is.na(avgsurveyprojection) & !is.na(coverage),
-        year, NA_integer_
-      ),
-      suppress_year = min(suppress_year, na.rm = TRUE),
-      coverage_original_estimate = ifelse(
-        !is.na(coverage_original_estimate) &
-          !is.na(avgsurveyprojection) &
-          !is.na(coverage) &
-          year > suppress_year,
-        NA_real_,
-        coverage_original_estimate
-      )
-    ) %>%
-    ungroup() %>%
-    select(-suppress_year) %>%
+    )
+  
+
+  if (is_national) {
+    if ("coverage_original_estimate" %in% names(combined)) {
+      combined <- combined %>%
+        group_by(across(all_of(c(setdiff(join_keys, "year"), "denominator")))) %>%
+        mutate(
+          suppress_year = ifelse(
+            !is.na(coverage_original_estimate) & !is.na(avgsurveyprojection) & !is.na(coverage),
+            year, NA_integer_
+          ),
+          suppress_year = if (all(is.na(suppress_year))) NA_integer_ else min(suppress_year, na.rm = TRUE),
+          coverage_original_estimate = ifelse(
+            !is.na(coverage_original_estimate) &
+              !is.na(avgsurveyprojection) &
+              !is.na(coverage) &
+              year > suppress_year,
+            NA_real_,
+            coverage_original_estimate
+          )
+        ) %>%
+        ungroup() %>%
+        select(-suppress_year)
+    }
+  }
+  combined <- combined %>%
     transmute(
       admin_area_1,
       admin_area_2,
@@ -700,7 +740,6 @@ denominators_province <- calculate_denominators(
   survey_data = survey_processed_province$carried
 )
 
-
 # 4 - calculate coverage and compare the denominators
 national_coverage_eval <- evaluate_coverage_by_denominator(denominators_national)
 subnational_coverage_eval <- evaluate_coverage_by_denominator(denominators_province)
@@ -714,6 +753,7 @@ combined_national <- prepare_combined_coverage_from_projected(
   projected_data = national_coverage_projected,
   raw_survey_wide = survey_processed_national$raw
 )
+
 
 combined_province <- prepare_combined_coverage_from_projected(
   projected_data = subnational_coverage_projected,
