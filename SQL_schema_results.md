@@ -171,3 +171,46 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
   count_expect_sum NUMERIC
 );
 ```
+
+------------------------------------------------------------------------
+
+## Module 04 - Coverage Estimates
+
+*note for Tim: we might not use all the fields but there was a request to look at all the possible denominators in the viz,* *so I kept the filter columns* 
+
+- `denominator`: Denominator used (e.g., `danc1_pregnancy`, `ddelivery_livebirth`)\
+- `coverage_original_estimate`: Survey-based estimate (when available)\
+- `coverage_avgsurveyprojection`: Projected survey estimate (when survey data is missing)\
+- `coverage_cov`: Coverage calculated from HMIS\
+
+
+``` js
+CREATE TABLE ro_m4_coverage_combined_national_csv (
+  admin_area_1 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  denominator TEXT NOT NULL,
+  coverage_original_estimate NUMERIC,
+  coverage_avgsurveyprojection NUMERIC,
+  coverage_cov NUMERIC
+);
+```
+
+### Coverage results (sub-national level) - SQL table schema
+
+For each **indicator** and **year**, this result object is presented as a **histogram**:
+
+- **X-axis:** Names of sub-national areas (`admin_area_2`), ordered from **highest to lowest** coverage.
+- **Y-axis:** Coverage estimate (`coverage_cov`), representing the proportion of the target population covered.
+
+``` js
+CREATE TABLE ro_combined_coverage_province_csv (
+  admin_area_1 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  denominator TEXT NOT NULL,
+  coverage_cov NUMERIC
+);
+
+```
