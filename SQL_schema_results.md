@@ -174,15 +174,12 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
 
 ------------------------------------------------------------------------
 
-## Module 04 - Coverage Estimates
+## Module 04 - Coverage Estimates - SQL table schema
 
-*note for Tim: we might not use all the fields but there was a request to look at all the possible denominators in the viz,* *so I kept the filter columns* 
-
-- `denominator`: Denominator used (e.g., `danc1_pregnancy`, `ddelivery_livebirth`)\
-- `coverage_original_estimate`: Survey-based estimate (when available)\
-- `coverage_avgsurveyprojection`: Projected survey estimate (when survey data is missing)\
-- `coverage_cov`: Coverage calculated from HMIS\
-
+-   `denominator`: Denominator used (e.g., `danc1_pregnancy`, `ddelivery_livebirth`)\
+-   `coverage_original_estimate`: Survey-based estimate (when available)\
+-   `coverage_avgsurveyprojection`: Projected survey estimate (when survey data is missing)\
+-   `coverage_cov`: Coverage calculated from HMIS data\
 
 ``` js
 CREATE TABLE ro_m4_coverage_combined_national_csv (
@@ -201,7 +198,8 @@ CREATE TABLE ro_m4_coverage_combined_national_csv (
 For each **indicator** and **year**, this result object is presented as a **histogram**:
 
 - **X-axis:** Names of sub-national areas (`admin_area_2`), ordered from **highest to lowest** coverage.
-- **Y-axis:** Coverage estimate (`coverage_cov`), representing the proportion of the target population covered.
+- **Y-axis:** Coverage estimate (`coverage_cov`), which is the proportion of the target population covered in %.
+- **Stratifier:** Coverage can be calculated using several denominator definitions, so the plot could be **faceted by `denominator`** to compare results across different estimation methods.
 
 ``` js
 CREATE TABLE ro_combined_coverage_province_csv (
@@ -212,5 +210,4 @@ CREATE TABLE ro_combined_coverage_province_csv (
   denominator TEXT NOT NULL,
   coverage_cov NUMERIC
 );
-
 ```
