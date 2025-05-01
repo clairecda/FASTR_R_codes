@@ -96,6 +96,15 @@ process_hmis_adjusted_volume <- function(adjusted_volume_data, count_col = SELEC
       mutate(admin_area_2 = recode(admin_area_2, !!!province_name_replacements))
   }
   
+  # Ensure year and month exist
+  if (!all(c("year", "month") %in% names(adjusted_volume_data))) {
+    adjusted_volume_data <- adjusted_volume_data %>%
+      mutate(
+        year = as.integer(substr(period_id, 1, 4)),
+        month = as.integer(substr(period_id, 5, 6))
+      )
+  }
+  
   group_vars <- if (has_admin2) c("admin_area_1", "admin_area_2", "year") else c("admin_area_1", "year")
   
   adjusted_volume <- adjusted_volume_data %>%
