@@ -64,7 +64,7 @@ raw_data <- read.csv("guinea_data_updated.csv")
 outlier_data <- read.csv("M1_output_outliers.csv")
 data_utilization <- read.csv("M2_adjusted_data_admin_area.csv")        # adjusted data aggregated at the lowest geo level, used for visualization
 data <- read.csv("M2_adjusted_data.csv")                               # data with outliers tagged 
-
+data_adjusted <- data
 
 # Extract geo columns
 geo_cols <- names(raw_data)[grepl("^admin_area_", names(raw_data))]
@@ -597,10 +597,26 @@ if (RUN_DISTRICT_MODEL) {
 
 # Step 5: Save Outputs ----------------------------------------------------------
 print("Saving results...")
-write.csv(data, "M3_service_utilization.csv", row.names = FALSE)
-write.csv(M3_chartout, "M3_chartout.csv", row.names = FALSE)
-write.csv(summary_disruption_admin1, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE) 
-write.csv(summary_disruption_admin2, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE) 
+write.csv(data_adjusted, "M3_service_utilization.csv", row.names = FALSE)
+
+M3_chartout_export <- M3_chartout_selected %>%
+  mutate(period_id = as.integer(format(date, "%Y%m"))) %>%
+  select(admin_area_2, indicator_common_id, period_id, tagged)
+
+write.csv(M3_chartout_export, "M3_chartout.csv", row.names = FALSE)
+
+summary_disruption_admin1_export <- summary_disruption_admin1 %>%
+  select(admin_area_1, indicator_common_id, period_id, count_sum, count_expect_sum)
+
+write.csv(summary_disruption_admin1_export, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE)
+
+summary_disruption_admin2_export <- summary_disruption_admin2 %>%
+  select(admin_area_2, indicator_common_id, period_id, count_sum, count_expect_sum)
+
+write.csv(summary_disruption_admin2_export, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE)
+
 if (RUN_DISTRICT_MODEL) {
-  write.csv(summary_disruption_admin3, "M3_disruptions_analysis_admin_area_3.csv", row.names = FALSE)
+  summary_disruption_admin3_export <- summary_disruption_admin3 %>%
+    select(admin_area_3, indicator_common_id, period_id, count_sum, count_expect_sum)
+  write.csv(summary_disruption_admin3_export, "M3_disruptions_analysis_admin_area_3.csv", row.names = FALSE)
 }
