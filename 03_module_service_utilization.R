@@ -1,9 +1,9 @@
-SELECTEDCOUNT <- "count_final_none" 
+SELECTEDCOUNT <- "count_final_completeness"  #use count_final_none or count_final_completeness
 
-SMOOTH_K <- 3                        # Window size (in months) for rolling median smoothing of predicted counts.
-                                     # Used in the control chart to reduce noise in trend estimation.
+SMOOTH_K <- 7                        # Window size (in months) for rolling median smoothing of predicted counts.
+                                     # Used in the control chart to reduce noise in trend estimation. MUST BE ODD
 
-THRESHOLD <- 2                       # Threshold (in MAD units) for detecting sharp deviations in robust control chart.
+THRESHOLD <- 1.5                     # Threshold (in MAD units) for detecting sharp deviations in robust control chart.
                                      # If residual/MAD > THRESHOLD, the month is flagged as a sharp disruption.
 
 DIP_THRESHOLD <- 0.90                # Threshold for dips: a month is flagged if actual count falls below
@@ -60,31 +60,43 @@ library(tidyr)
 # STEP 1: CONTROL CHART ANALYSIS
 #-------------------------------------------------------------------------------------------------------------
 print("Loading data for control chart analysis...")
+raw_data <- read.csv("guinea_data_updated.csv")
+outlier_data <- read.csv("M1_output_outliers.csv")
 data_utilization <- read.csv("M2_adjusted_data_admin_area.csv")        # adjusted data aggregated at the lowest geo level, used for visualization
 data <- read.csv("M2_adjusted_data.csv")                               # data with outliers tagged 
 
 
-print("Data loaded. Cleaning and filtering...")
+# Extract geo columns
+geo_cols <- names(raw_data)[grepl("^admin_area_", names(raw_data))]
+geo_data <- raw_data %>%
+  select(facility_id, all_of(geo_cols)) %>%
+  distinct()
 
+
+print("Preparing data for province-level control chart analysis...")
 data <- data %>%
+  left_join(geo_data, by = "facility_id") %>%
+  left_join(
+    outlier_data %>% select(facility_id, indicator_common_id, period_id, outlier_flag),
+    by = c("facility_id", "indicator_common_id", "period_id")
+  ) %>%
   mutate(
-    date = as.Date(paste(year, month, "01", sep = "-")),
+    outlier_flag = coalesce(outlier_flag, 0L),
+    year = as.integer(substr(period_id, 1, 4)),
+    month = as.integer(substr(period_id, 5, 6)),
+    date = as.Date(sprintf("%04d-%02d-01", year, month)),
     is_missing = is.na(count_final_none),
-    count_model = !!sym(SELECTEDCOUNT)
+    count_model = .data[[SELECTEDCOUNT]]
   ) %>%
   filter(outlier_flag != 1)
 
-
-
-print("Grouping by panel (indicator + admin area)...")
-
+print("Assigning panel IDs...")
 data <- data %>%
   group_by(indicator_common_id, admin_area_2) %>%
   mutate(panelvar = cur_group_id()) %>%
   ungroup()
 
 print("Aggregating data to province level...")
-
 province_data <- data %>%
   group_by(indicator_common_id, admin_area_1, admin_area_2, date) %>%
   summarise(count_model = sum(count_model, na.rm = TRUE), .groups = "drop") %>%
@@ -93,35 +105,34 @@ province_data <- data %>%
   ungroup() %>%
   rename(count_original = count_model)
 
-
 print("Filling missing months and metadata...")
-
 province_data <- province_data %>%
   group_by(panelvar) %>%
-  complete(date = seq(min(date), max(date), by = "month")) %>%
-  ungroup() %>%
-  group_by(panelvar) %>%
+  complete(date = seq(min(date, na.rm = TRUE), max(date, na.rm = TRUE), by = "month")) %>%
   fill(indicator_common_id, admin_area_1, admin_area_2, .direction = "downup") %>%
   ungroup()
 
 print("Removing months with extremely low counts...")
-
 province_data <- province_data %>%
   group_by(panelvar) %>%
-  mutate(globalmean = mean(count_original, na.rm = TRUE)) %>%
-  ungroup() %>%
-  mutate(count = ifelse(count_original / globalmean < 0.5, NA, count_original))
+  mutate(
+    globalmean = mean(count_original, na.rm = TRUE),
+    count = ifelse(count_original / globalmean < 0.5, NA_real_, count_original)
+  ) %>%
+  ungroup()
 
 print("Interpolating missing/removed values for modeling...")
-
 province_data <- province_data %>%
   group_by(panelvar) %>%
   arrange(date) %>%
-  mutate(count = zoo::na.approx(count, na.rm = FALSE, maxgap = Inf, rule = 2)) %>%
+  mutate(
+    count = zoo::na.approx(count, na.rm = FALSE, maxgap = Inf, rule = 2)
+  ) %>%
   ungroup()
 
 print("Running robust control chart analysis for each panel...")
 
+# Function control chart
 robust_control_chart <- function(panel_data, selected_count) {
   panel_data <- panel_data %>% mutate(month_factor = factor(month(date)))
   
@@ -237,6 +248,8 @@ M3_chartout_selected <- final_results %>%
 data_disruption <- data %>%
   left_join(M3_chartout_selected, by = c("date", "indicator_common_id", "admin_area_2")) %>%
   mutate(tagged = replace_na(tagged, 0))  # Ensure missing tagged values are set to 0
+
+
 
 # Step 2: Run Panel Regressions
 print("Running panel regressions...")

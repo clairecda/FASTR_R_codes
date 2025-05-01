@@ -59,7 +59,7 @@ CREATE TABLE ro_m1_dqa_csv (
 
 ## Module 02 - Data Quality Adjustment
 
-at the facility level
+### Adjusted data (at the facility level) - SQL table schema
 
 ``` js
 CREATE TABLE ro_m2_adjusted_data_csv (
@@ -73,7 +73,9 @@ CREATE TABLE ro_m2_adjusted_data_csv (
 );
 ```
 
-Re the `ro_m2_adjusted_data_admin_area_csv` below –\> this table aggregates to the lowest available geographic level. In some cases, this includes `admin_area_1`, `admin_area_2`, `admin_area_3`, and `admin_area_4`, depending on what is available in the source data.
+### Adjusted data (aggregated at the smallest geo-level available for example District) - SQL table schema
+
+Re the `ro_m2_adjusted_data_admin_area_csv` below –\> this table aggregates to the lowest available geographic level. In some cases, this includes `admin_area_1`, `admin_area_2`, `admin_area_3`, and `admin_area_4`, depending on what is available in the source data. note for Tim \>\> in some cases we might also have `admin_area_4` as a field !!
 
 ``` js
 CREATE TABLE ro_m2_adjusted_data_admin_area_csv (
@@ -89,7 +91,7 @@ CREATE TABLE ro_m2_adjusted_data_admin_area_csv (
 );
 ```
 
-national level...
+### Adjusted data (aggregated at the national-level) - SQL table schema
 
 ``` js
 CREATE TABLE ro_m2_adjusted_data_national_csv (
@@ -100,5 +102,72 @@ CREATE TABLE ro_m2_adjusted_data_national_csv (
   count_final_outliers NUMERIC,
   count_final_completeness NUMERIC,
   count_final_both NUMERIC
+);
+```
+
+------------------------------------------------------------------------
+
+## Module 03 - Service Utilization
+
+### Service Utilization (Facility Level) - SQL table schema
+
+``` js
+CREATE TABLE ro_m3_service_utilization_csv (
+  facility_id TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  count_final_none NUMERIC,
+  count_final_outliers NUMERIC,
+  count_final_completeness NUMERIC,
+  count_final_both NUMERIC
+);
+```
+
+### Control Chart (tagging disruption) - SQL table schema
+
+``` js
+CREATE TABLE ro_m3_chartout_csv (
+  admin_area_2 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  tagged INTEGER NOT NULL
+);
+```
+
+### Disruptions Analysis (National level) - SQL table schema
+
+``` js
+CREATE TABLE ro_m3_disruptions_analysis_admin_area_1_csv (
+  admin_area_1 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  count_sum NUMERIC,
+  count_expect_sum NUMERIC
+);
+```
+
+### Disruptions Analysis (Sub-National level) - SQL table schema
+
+``` js
+CREATE TABLE ro_m3_disruptions_analysis_admin_area_2_csv (
+  admin_area_2 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  count_sum NUMERIC,
+  count_expect_sum NUMERIC
+);
+```
+
+### Disruptions Analysis (District level) - SQL table schema
+
+*Note: This output is optional. It will only be generated if the user enables RUN_DISTRICT_MODEL in the script.*
+
+``` js
+CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
+  admin_area_3 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  count_sum NUMERIC,
+  count_expect_sum NUMERIC
 );
 ```
