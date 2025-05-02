@@ -652,12 +652,12 @@ write.csv(summary_disruption_admin2_export, "M3_disruptions_analysis_admin_area_
 # Summary Disruptions - Admin Area 3 (Optional)
 if (RUN_DISTRICT_MODEL) {
   summary_disruption_admin3_export <- summary_disruption_admin3 %>%
-    dplyr::mutate(
+    mutate(
       year = as.integer(period_id %/% 100),
       quarter = ((period_id %% 100 - 1) %/% 3) + 1,
       quarter_id = sprintf("%d%02d", year, quarter)
     ) %>%
-    dplyr::select(admin_area_3, indicator_common_id, period_id, quarter_id, year, count_sum, count_expect_sum)
+    select(admin_area_3, indicator_common_id, period_id, quarter_id, year, count_sum, count_expect_sum)
   
   write.csv(summary_disruption_admin3_export, "M3_disruptions_analysis_admin_area_3.csv", row.names = FALSE)
 }
