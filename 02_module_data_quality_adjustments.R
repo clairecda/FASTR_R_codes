@@ -175,7 +175,7 @@ adjusted_data_export <- adjusted_data_final %>%
   dplyr::left_join(geo_lookup, by = "facility_id") %>%
   dplyr::left_join(period_lookup, by = "period_id") %>%
   dplyr::select(
-    facility_id, admin_area_1, admin_area_2, admin_area_3,
+    facility_id, admin_area_3, admin_area_2, admin_area_1,
     period_id, quarter_id, year, indicator_common_id,
     dplyr::everything()
   )
