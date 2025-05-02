@@ -4,6 +4,8 @@ MADS <- 10                           # Number of MADs
 GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
+PROJECT_DATA_HMIS <- "guinea_data_updated.csv"
+
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
 # Last edit: 2025 Apr 30
@@ -563,7 +565,7 @@ dqa_without_consistency <- function(
 }
 
 # ------------------- Main Execution ----------------------------------------------------------------------------
-inputs <- load_and_preprocess_data("guinea_data_updated.csv")
+inputs <- load_and_preprocess_data(PROJECT_DATA_HMIS)
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
@@ -663,7 +665,11 @@ print("Preparing and saving results from outlier analysis...")
 outlier_data_export <- outlier_data_main %>%
   select(
     facility_id,
+    admin_area_3,
+    admin_area_2,
     period_id,
+    quarter_id,
+    year,
     indicator_common_id,
     outlier_flag
   )
@@ -682,6 +688,8 @@ if (length(consistency_params$consistency_pairs) > 0) {
     select(
       all_of(lowest_geo_col),
       period_id,
+      quarter_id,
+      year,
       ratio_type,
       sconsistency
     )
@@ -690,7 +698,11 @@ if (length(consistency_params$consistency_pairs) > 0) {
   facility_consistency_export <- facility_consistency_results %>%
     select(
       facility_id,
+      admin_area_3,
+      admin_area_2,
       period_id,
+      quarter_id,
+      year,
       ratio_type,
       sconsistency
     )
@@ -705,8 +717,12 @@ print("Preparing and saving results from completeness analysis...")
 completeness_export <- completeness_results %>%
   select(
     facility_id,
+    admin_area_3,
+    admin_area_2,
     indicator_common_id,
     period_id,
+    quarter_id,
+    year,
     completeness_flag
   )
 
@@ -717,7 +733,11 @@ print("Preparing and saving results from DQA analysis...")
 dqa_export <- dqa_results %>%
   select(
     facility_id,
+    admin_area_3,
+    admin_area_2,
     period_id,
+    quarter_id,
+    year,
     dqa_mean,
     dqa_score
   )

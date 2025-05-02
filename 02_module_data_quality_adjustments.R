@@ -1,5 +1,7 @@
 EXCLUDED_FROM_ADJUSTMENT <- c("indicator_a", "indicator_b", "indicator_c")
 
+PROJECT_DATA_HMIS <- "guinea_data_updated.csv"
+
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
 # Last edit: 2025 Apr 7
@@ -24,7 +26,7 @@ library(zoo)         # For rolling averages
 library(stringr)     # For `str_subset()`
 library(dplyr)
 
-raw_data <- read.csv("guinea_data_updated.csv")
+raw_data <- read.csv(PROJECT_DATA_HMIS)
 outlier_data <- read.csv("M1_output_outliers.csv")
 completeness_data <- read.csv("M1_output_completeness.csv")
 
@@ -153,45 +155,75 @@ apply_adjustments_scenarios <- function(raw_data, completeness_data, outlier_dat
 # ------------------- Main Execution ------------------------------------------------------------------------
 print("Running adjustments analysis...")
 
-# Run Adjustment Scenarios
+# Step 1: Apply adjustment scenarios
 adjusted_data_final <- apply_adjustments_scenarios(
   raw_data = raw_data,
   completeness_data = completeness_data,
   outlier_data = outlier_data
 )
 
-geo_lookup <- unique(raw_data[, c("facility_id", geo_cols), with = FALSE])
+# Step 2: Metadata lookups
+geo_lookup <- raw_data %>%
+  dplyr::distinct(facility_id, admin_area_1, admin_area_2, admin_area_3)
 
-setDT(adjusted_data_final)
-adjusted_data_geo <- merge(adjusted_data_final, geo_lookup, by = "facility_id", all.x = TRUE)
+period_lookup <- raw_data %>%
+  dplyr::distinct(period_id, quarter_id, year)
 
-# Aggregate at lowest available admin area level
-adjusted_data_admin_area_final <- adjusted_data_geo %>%
-  group_by(across(all_of(geo_cols)), indicator_common_id, period_id) %>%
-  summarise(
+# Step 3: Facility-level output (with metadata)
+adjusted_data_export <- adjusted_data_final %>%
+  as.data.frame() %>%
+  dplyr::left_join(geo_lookup, by = "facility_id") %>%
+  dplyr::left_join(period_lookup, by = "period_id") %>%
+  dplyr::select(
+    facility_id, admin_area_1, admin_area_2, admin_area_3,
+    period_id, quarter_id, year, indicator_common_id,
+    dplyr::everything()
+  )
+
+# Step 4: Admin area (level 2 and 3) output
+geo_cols <- grep("^admin_area_[0-9]+$", names(adjusted_data_export), value = TRUE)
+
+adjusted_data_admin_area_final <- adjusted_data_export %>%
+  dplyr::group_by(dplyr::across(dplyr::all_of(geo_cols)), indicator_common_id, period_id) %>%
+  dplyr::summarise(
     count_final_none = sum(count_final_none, na.rm = TRUE),
     count_final_outliers = sum(count_final_outliers, na.rm = TRUE),
     count_final_completeness = sum(count_final_completeness, na.rm = TRUE),
     count_final_both = sum(count_final_both, na.rm = TRUE),
     .groups = "drop"
+  ) %>%
+  dplyr::left_join(period_lookup, by = "period_id") %>%
+  dplyr::select(
+    dplyr::all_of(geo_cols),
+    period_id, quarter_id, year, indicator_common_id,
+    dplyr::everything()
   )
 
-# Aggregate at national level (admin_area_1)
-adjusted_data_national_final <- adjusted_data_geo %>%
-  group_by(admin_area_1, indicator_common_id, period_id) %>%
-  summarise(
+# Step 5: National-level output (admin_area_1 only)
+adjusted_data_national_final <- adjusted_data_export %>%
+  dplyr::group_by(admin_area_1, indicator_common_id, period_id) %>%
+  dplyr::summarise(
     count_final_none = sum(count_final_none, na.rm = TRUE),
     count_final_outliers = sum(count_final_outliers, na.rm = TRUE),
     count_final_completeness = sum(count_final_completeness, na.rm = TRUE),
     count_final_both = sum(count_final_both, na.rm = TRUE),
     .groups = "drop"
+  ) %>%
+  dplyr::left_join(period_lookup, by = "period_id") %>%
+  dplyr::select(
+    admin_area_1, period_id, quarter_id, year, indicator_common_id,
+    dplyr::everything()
   )
 
+# Step 6: Remove admin_area_1 before saving facility-level output
+adjusted_data_export_clean <- adjusted_data_export %>%
+  dplyr::select(-admin_area_1)
 
-# Save Outputs
-write.csv(adjusted_data_final, "M2_adjusted_data.csv", row.names = FALSE)
-write.csv(adjusted_data_admin_area_final, "M2_adjusted_data_admin_area.csv", row.names = FALSE)
-write.csv(adjusted_data_national_final, "M2_adjusted_data_national.csv", row.names = FALSE)
+# Step 7: Save outputs
+write.csv(adjusted_data_export_clean,        "M2_adjusted_data.csv",              row.names = FALSE)
+write.csv(adjusted_data_admin_area_final,    "M2_adjusted_data_admin_area.csv",   row.names = FALSE)
+write.csv(adjusted_data_national_final,      "M2_adjusted_data_national.csv",     row.names = FALSE)
 
 print("Adjustments completed and saved.")
+
 

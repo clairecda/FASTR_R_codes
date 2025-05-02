@@ -10,6 +10,12 @@ NEONATAL_MORTALITY_RATE <- 0.03
 POSTNEONATAL_MORTALITY_RATE <- 0.02
 INFANT_MORTALITY_RATE <- 0.05   
 
+
+
+PROJECT_DATA_COVERAGE <-"survey_data_unified.csv"
+PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
+
+
 # ------------------------------ Load Required Libraries -------------------------
 library(dplyr)       # For `mutate()`, `group_by()`, `summarise()`, `filter()`, `arrange()`
 library(tidyr)       # For `pivot_longer()`, `pivot_wider()`, `complete()`
@@ -22,8 +28,8 @@ library(purrr)
 # Input Datasets
 adjusted_volume_data <- read.csv("M2_adjusted_data_national.csv", fileEncoding = "UTF-8")
 adjusted_volume_data_subnational <- read.csv("M2_adjusted_data_admin_area.csv", fileEncoding = "UTF-8")
-survey_data_unified <- read.csv("survey_data_unified.csv", fileEncoding = "UTF-8")
-population_estimates_only <- read.csv("population_estimates_only.csv", fileEncoding = "UTF-8")
+survey_data_unified <- read.csv(PROJECT_DATA_COVERAGE, fileEncoding = "UTF-8")
+population_estimates_only <- read.csv(PROJECT_DATA_POPULATION, fileEncoding = "UTF-8")
 
 # ------------------------------ Define Parameters --------------------------------
 # Coverage Estimation Parameters

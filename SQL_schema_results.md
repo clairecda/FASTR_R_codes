@@ -4,10 +4,14 @@
 
 ``` js
 CREATE TABLE ro_m1_output_outliers_csv (
-  facility_id text NOT NULL,
-  period_id integer NOT NULL,
-  indicator_common_id text NOT NULL,
-  outlier_flag integer NOT NULL
+  facility_id TEXT NOT NULL,
+  admin_area_3 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  outlier_flag INTEGER NOT NULL
 );
 ```
 
@@ -17,19 +21,28 @@ Re the `ro_m1_consistency_geo_csv` …. the `admin_area` field is dynamically se
 
 ``` js
 CREATE TABLE ro_m1_consistency_geo_csv (
-  admin_area text NOT NULL,
-  period_id integer NOT NULL,
-  ratio_type text NOT NULL,
-  sconsistency integer NOT NULL
+  facility_id TEXT,
+  admin_area_3 TEXT,
+  admin_area_2 TEXT,
+  admin_area TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  ratio_type TEXT NOT NULL,
+  sconsistency INTEGER NOT NULL
 );
 ```
 
 ``` js
 CREATE TABLE ro_m1_consistency_facility_csv (
-  facility_id text NOT NULL,
-  period_id integer NOT NULL,
-  ratio_type text NOT NULL,
-  sconsistency integer NOT NULL
+  facility_id TEXT NOT NULL,
+  admin_area_3 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  ratio_type TEXT NOT NULL,
+  sconsistency INTEGER NOT NULL
 );
 ```
 
@@ -37,10 +50,14 @@ CREATE TABLE ro_m1_consistency_facility_csv (
 
 ``` js
 CREATE TABLE ro_m1_completeness_csv (
-  facility_id text NOT NULL,
-  indicator_common_id text NOT NULL,
-  period_id integer NOT NULL,
-  completeness_flag integer NOT NULL
+  facility_id TEXT NOT NULL,
+  admin_area_3 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
+  indicator_common_id TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  completeness_flag INTEGER NOT NULL
 );
 ```
 
@@ -48,10 +65,14 @@ CREATE TABLE ro_m1_completeness_csv (
 
 ``` js
 CREATE TABLE ro_m1_dqa_csv (
-  facility_id text NOT NULL,
-  period_id integer NOT NULL,
-  dqa_mean numeric NOT NULL,
-  dqa_score numeric NOT NULL
+  facility_id TEXT NOT NULL,
+  admin_area_3 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
+  period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  dqa_mean NUMERIC NOT NULL,
+  dqa_score NUMERIC NOT NULL
 );
 ```
 
@@ -64,8 +85,12 @@ CREATE TABLE ro_m1_dqa_csv (
 ``` js
 CREATE TABLE ro_m2_adjusted_data_csv (
   facility_id TEXT NOT NULL,
-  indicator_common_id TEXT NOT NULL,
+  admin_area_3 TEXT,
+  admin_area_2 TEXT,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  indicator_common_id TEXT NOT NULL,
   count_final_none NUMERIC,
   count_final_outliers NUMERIC,
   count_final_completeness NUMERIC,
@@ -82,8 +107,11 @@ CREATE TABLE ro_m2_adjusted_data_admin_area_csv (
   admin_area_1 TEXT,
   admin_area_2 TEXT,
   admin_area_3 TEXT,
-  indicator_common_id TEXT NOT NULL,
+  admin_area_4 TEXT,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  indicator_common_id TEXT NOT NULL,
   count_final_none NUMERIC,
   count_final_outliers NUMERIC,
   count_final_completeness NUMERIC,
@@ -96,8 +124,10 @@ CREATE TABLE ro_m2_adjusted_data_admin_area_csv (
 ``` js
 CREATE TABLE ro_m2_adjusted_data_national_csv (
   admin_area_1 TEXT NOT NULL,
-  indicator_common_id TEXT NOT NULL,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  indicator_common_id TEXT NOT NULL,
   count_final_none NUMERIC,
   count_final_outliers NUMERIC,
   count_final_completeness NUMERIC,
@@ -114,8 +144,12 @@ CREATE TABLE ro_m2_adjusted_data_national_csv (
 ``` js
 CREATE TABLE ro_m3_service_utilization_csv (
   facility_id TEXT NOT NULL,
-  indicator_common_id TEXT NOT NULL,
+  admin_area_3 TEXT,
+  admin_area_2 TEXT,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  indicator_common_id TEXT NOT NULL,
   count_final_none NUMERIC,
   count_final_outliers NUMERIC,
   count_final_completeness NUMERIC,
@@ -130,6 +164,8 @@ CREATE TABLE ro_m3_chartout_csv (
   admin_area_2 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
   tagged INTEGER NOT NULL
 );
 ```
@@ -141,6 +177,8 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_1_csv (
   admin_area_1 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
   count_sum NUMERIC,
   count_expect_sum NUMERIC
 );
@@ -153,6 +191,8 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_2_csv (
   admin_area_2 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
   count_sum NUMERIC,
   count_expect_sum NUMERIC
 );
@@ -167,6 +207,8 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
   admin_area_3 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   period_id INTEGER NOT NULL,
+  quarter_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
   count_sum NUMERIC,
   count_expect_sum NUMERIC
 );
