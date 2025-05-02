@@ -87,7 +87,6 @@ CREATE TABLE ro_m2_adjusted_data_csv (
   facility_id TEXT NOT NULL,
   admin_area_3 TEXT,
   admin_area_2 TEXT,
-  admin_area_1 TEXT,
   period_id INTEGER NOT NULL,
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
