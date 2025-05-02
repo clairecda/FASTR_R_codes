@@ -21,10 +21,7 @@ Re the `ro_m1_consistency_geo_csv` …. the `admin_area` field is dynamically se
 
 ``` js
 CREATE TABLE ro_m1_consistency_geo_csv (
-  facility_id TEXT,
-  admin_area_3 TEXT,
-  admin_area_2 TEXT,
-  admin_area TEXT NOT NULL,
+  admin_area_* TEXT NOT NULL, -- admin_area_3 default
   period_id INTEGER NOT NULL,
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
@@ -85,8 +82,8 @@ CREATE TABLE ro_m1_dqa_csv (
 ``` js
 CREATE TABLE ro_m2_adjusted_data_csv (
   facility_id TEXT NOT NULL,
-  admin_area_3 TEXT,
-  admin_area_2 TEXT,
+  admin_area_3 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
   period_id INTEGER NOT NULL,
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
@@ -104,10 +101,10 @@ Re the `ro_m2_adjusted_data_admin_area_csv` below –\> this table aggregates to
 
 ``` js
 CREATE TABLE ro_m2_adjusted_data_admin_area_csv (
-  admin_area_1 TEXT,
-  admin_area_2 TEXT,
-  admin_area_3 TEXT,
-  admin_area_4 TEXT,
+  admin_area_1 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
+  admin_area_3 TEXT NOT NULL,
+  // admin_area_4 TEXT NOT NULL, -- unsure how to manage this, if admin area 4 not used then drop
   period_id INTEGER NOT NULL,
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
@@ -144,8 +141,8 @@ CREATE TABLE ro_m2_adjusted_data_national_csv (
 ``` js
 CREATE TABLE ro_m3_service_utilization_csv (
   facility_id TEXT NOT NULL,
-  admin_area_3 TEXT,
-  admin_area_2 TEXT,
+  admin_area_3 TEXT NOT NULL,
+  admin_area_2 TEXT NOT NULL,
   period_id INTEGER NOT NULL,
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
