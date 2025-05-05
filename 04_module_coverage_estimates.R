@@ -784,13 +784,32 @@ combined_province <- prepare_combined_coverage_from_projected(
   raw_survey_wide = survey_processed_province$raw
 )
 
-# Prepare final outputs for visualization (drop unused columns)
+# # Prepare final outputs for visualization (drop unused columns)
+# combined_national_export <- combined_national %>%
+#   select(admin_area_1, indicator_common_id, year, denominator,
+#          coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
+# 
+# combined_province_export <- combined_province %>%
+#   select(admin_area_1, admin_area_2, indicator_common_id, year, denominator, coverage_cov)
+
+
+# Filter to keep only best independent coverage estimates and exclude 2025
 combined_national_export <- combined_national %>%
+  filter(source_type == "independent", year < 2025) %>%
+  group_by(admin_area_1, indicator_common_id, year) %>%
+  filter(rank == min(rank, na.rm = TRUE)) %>%
+  ungroup() %>%
   select(admin_area_1, indicator_common_id, year, denominator,
          coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
 
 combined_province_export <- combined_province %>%
+  filter(source_type == "independent", year < 2025) %>%
+  group_by(admin_area_1, admin_area_2, indicator_common_id, year) %>%
+  filter(rank == min(rank, na.rm = TRUE)) %>%
+  ungroup() %>%
   select(admin_area_1, admin_area_2, indicator_common_id, year, denominator, coverage_cov)
+
+
 
 # Write cleaned CSVs
 write.csv(combined_national_export, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
