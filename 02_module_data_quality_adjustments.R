@@ -1,6 +1,5 @@
-EXCLUDED_FROM_ADJUSTMENT <- c("indicator_a", "indicator_b", "indicator_c")
 
-PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
+PROJECT_DATA_HMIS <- "data_nigeria_full.csv"
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
@@ -25,6 +24,8 @@ library(data.table)  # For fast data processing & merging
 library(zoo)         # For rolling averages
 library(stringr)     # For `str_subset()`
 library(dplyr)
+
+EXCLUDED_FROM_ADJUSTMENT <- c("u5_deaths", "maternal_deaths")
 
 raw_data <- read.csv(PROJECT_DATA_HMIS)
 outlier_data <- read.csv("M1_output_outliers.csv")
@@ -136,6 +137,13 @@ apply_adjustments_scenarios <- function(raw_data, completeness_data, outlier_dat
     
     # Apply exclusion logic
     data_adjusted[indicator_common_id %in% EXCLUDED_FROM_ADJUSTMENT, count_working := count]
+    
+    # Report excluded indicators
+    excluded_inds <- unique(data_adjusted[indicator_common_id %in% EXCLUDED_FROM_ADJUSTMENT, indicator_common_id])
+    if (length(excluded_inds) > 0) {
+      cat(" -> Indicators excluded from adjustment in scenario '", name, "':\n  ", paste(excluded_inds, collapse = ", "), "\n", sep = "")
+    }
+    
     
     # Rename working count column
     setnames(data_adjusted, "count_working", paste0("count_final_", name))
