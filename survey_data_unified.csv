@@ -1194,7 +1194,7 @@ Mali,NATIONAL,2021,anc4,percent,0.447,DHS National,ML2021MIS,household
 Nigeria,NATIONAL,1990,tfr,rate,6,DHS National,NG1990DHS,household
 Nigeria,NATIONAL,1990,crudebr,rate,38.1,DHS National,NG1990DHS,household
 Nigeria,NATIONAL,1990,womenrepage,survey_count,8781,DHS National,NG1990DHS,household
-Nigeria,NATIONAL,1990,fp,percent,1,DHS National,NG1990DHS,household
+Nigeria,NATIONAL,1990,fp,percent,0.4,DHS National,NG1990DHS,household
 Nigeria,NATIONAL,1990,imr,rate,87,DHS National,NG1990DHS,household
 Nigeria,NATIONAL,1990,nmr,rate,42,DHS National,NG1990DHS,household
 Nigeria,NATIONAL,1990,anc1,percent,0.587,DHS National,NG1990DHS,household
@@ -1211,7 +1211,7 @@ Nigeria,NATIONAL,1990,measles1,percent,0.173,DHS National,NG1990DHS,household
 Nigeria,NATIONAL,2003,tfr,rate,5.7,DHS National,NG2003DHS,household
 Nigeria,NATIONAL,2003,crudebr,rate,41.7,DHS National,NG2003DHS,household
 Nigeria,NATIONAL,2003,womenrepage,survey_count,7620,DHS National,NG2003DHS,household
-Nigeria,NATIONAL,2003,fp,percent,1,DHS National,NG2003DHS,household
+Nigeria,NATIONAL,2003,fp,percent,0.8,DHS National,NG2003DHS,household
 Nigeria,NATIONAL,2003,imr,rate,100,DHS National,NG2003DHS,household
 Nigeria,NATIONAL,2003,nmr,rate,48,DHS National,NG2003DHS,household
 Nigeria,NATIONAL,2003,anc1,percent,0.583,DHS National,NG2003DHS,household
@@ -1228,7 +1228,7 @@ Nigeria,NATIONAL,2003,measles1,percent,0.178,DHS National,NG2003DHS,household
 Nigeria,NATIONAL,2008,tfr,rate,5.7,DHS National,NG2008DHS,household
 Nigeria,NATIONAL,2008,crudebr,rate,40.6,DHS National,NG2008DHS,household
 Nigeria,NATIONAL,2008,womenrepage,survey_count,33385,DHS National,NG2008DHS,household
-Nigeria,NATIONAL,2008,fp,percent,1,DHS National,NG2008DHS,household
+Nigeria,NATIONAL,2008,fp,percent,0.1,DHS National,NG2008DHS,household
 Nigeria,NATIONAL,2008,imr,rate,75,DHS National,NG2008DHS,household
 Nigeria,NATIONAL,2008,nmr,rate,40,DHS National,NG2008DHS,household
 Nigeria,NATIONAL,2008,still,number,228,DHS National,NG2008DHS,household
@@ -1252,7 +1252,7 @@ Nigeria,NATIONAL,2010,anc1,percent,0.548,DHS National,NG2010MIS,household
 Nigeria,NATIONAL,2013,tfr,rate,5.5,DHS National,NG2013DHS,household
 Nigeria,NATIONAL,2013,crudebr,rate,39.4,DHS National,NG2013DHS,household
 Nigeria,NATIONAL,2013,womenrepage,survey_count,38948,DHS National,NG2013DHS,household
-Nigeria,NATIONAL,2013,fp,percent,1,DHS National,NG2013DHS,household
+Nigeria,NATIONAL,2013,fp,percent,0.1,DHS National,NG2013DHS,household
 Nigeria,NATIONAL,2013,imr,rate,69,DHS National,NG2013DHS,household
 Nigeria,NATIONAL,2013,nmr,rate,37,DHS National,NG2013DHS,household
 Nigeria,NATIONAL,2013,still,number,396,DHS National,NG2013DHS,household
@@ -1274,7 +1274,7 @@ Nigeria,NATIONAL,2015,anc1,percent,0.643,DHS National,NG2015MIS,household
 Nigeria,NATIONAL,2018,tfr,rate,5.3,DHS National,NG2018DHS,household
 Nigeria,NATIONAL,2018,crudebr,rate,38.3,DHS National,NG2018DHS,household
 Nigeria,NATIONAL,2018,womenrepage,survey_count,41821,DHS National,NG2018DHS,household
-Nigeria,NATIONAL,2018,fp,percent,1,DHS National,NG2018DHS,household
+Nigeria,NATIONAL,2018,fp,percent,0.12,DHS National,NG2018DHS,household
 Nigeria,NATIONAL,2018,imr,rate,67,DHS National,NG2018DHS,household
 Nigeria,NATIONAL,2018,nmr,rate,39,DHS National,NG2018DHS,household
 Nigeria,NATIONAL,2018,still,number,605,DHS National,NG2018DHS,household
@@ -5557,6 +5557,12 @@ Mali,Kidal,2021,anc4,percent,0.055,DHS Sub-national,ML2021MIS,household
 Mali,Gao,2021,anc4,percent,0.24,DHS Sub-national,ML2021MIS,household
 Mali,Tombouctou,2021,anc4,percent,0.31,DHS Sub-national,ML2021MIS,household
 Mali,Bamako,2021,anc4,percent,0.814,DHS Sub-national,ML2021MIS,household
+Nigeria,NATIONAL,2023,tfr,rate,4.8,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,crudebr,rate,33,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,womenrepage,survey_count,39050,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,anc1,percent,0.625,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,anc1_old,percent,,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,anc4,percent,0.524,DHS National,NG2023MIS,household
 Nigeria,Northeast - 1990,1990,anc1,percent,0.394,DHS Sub-national,NG1990DHS,household
 Nigeria,Northwest - 1990,1990,anc1,percent,0.455,DHS Sub-national,NG1990DHS,household
 Nigeria,Southeast - 1990,1990,anc1,percent,0.691,DHS Sub-national,NG1990DHS,household
@@ -6137,12 +6143,6 @@ Nigeria,Ondo,2021,anc4,percent,0.58,DHS Sub-national,NG2021MIS,household
 Nigeria,Osun,2021,anc4,percent,0.73,DHS Sub-national,NG2021MIS,household
 Nigeria,Oyo,2021,anc4,percent,0.5,DHS Sub-national,NG2021MIS,household
 Nigeria,South South,2021,anc4,percent,0.559,DHS Sub-national,NG2021MIS,household
-Nigeria,Akwa Ibom,2021,anc4,percent,0.52,DHS Sub-national,NG2021MIS,household
-Nigeria,Bayelsa,2021,anc4,percent,0.386,DHS Sub-national,NG2021MIS,household
-Nigeria,Cross River,2021,anc4,percent,0.538,DHS Sub-national,NG2021MIS,household
-Nigeria,Delta,2021,anc4,percent,0.492,DHS Sub-national,NG2021MIS,household
-Nigeria,Edo,2021,anc4,percent,0.738,DHS Sub-national,NG2021MIS,household
-Nigeria,Rivers,2021,anc4,percent,0.659,DHS Sub-national,NG2021MIS,household
 Senegal,Nord et Est,1986,anc1,percent,0.192,DHS Sub-national,SN1986DHS,household
 Senegal,Ouest,1986,anc1,percent,0.437,DHS Sub-national,SN1986DHS,household
 Senegal,Centre,1986,anc1,percent,0.19,DHS Sub-national,SN1986DHS,household
@@ -8527,6 +8527,12 @@ Mali,NATIONAL,2010,delivery,percent,0.555,MICS,Multiple Indicator Cluster Survey
 Mali,NATIONAL,2013,delivery,percent,0.55,MICS,Demographic and Health Survey 2012-2013,household
 Mali,NATIONAL,2015,delivery,percent,0.645,MICS,Multiple Indicator Cluster Survey 2015,household
 Mali,NATIONAL,2018,delivery,percent,0.668,MICS,Demographic and Health Survey 2018,household
+Nigeria,Akwa Ibom,2021,anc4,percent,0.52,DHS Sub-national,NG2021MIS,household
+Nigeria,Bayelsa,2021,anc4,percent,0.386,DHS Sub-national,NG2021MIS,household
+Nigeria,Cross River,2021,anc4,percent,0.538,DHS Sub-national,NG2021MIS,household
+Nigeria,Delta,2021,anc4,percent,0.492,DHS Sub-national,NG2021MIS,household
+Nigeria,Edo,2021,anc4,percent,0.738,DHS Sub-national,NG2021MIS,household
+Nigeria,Rivers,2021,anc4,percent,0.659,DHS Sub-national,NG2021MIS,household
 Nigeria,NATIONAL,2010,bcg,percent,0.62,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Nigeria,NATIONAL,2011,bcg,percent,0.57,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Nigeria,NATIONAL,2012,bcg,percent,0.51,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
@@ -8578,12 +8584,6 @@ Nigeria,NATIONAL,2011,anc4,percent,0.566,MICS,Multiple Indicator Cluster Survey 
 Nigeria,NATIONAL,2013,anc4,percent,0.511,MICS,Demographic and Health Survey 2013,household
 Nigeria,NATIONAL,2017,anc4,percent,0.491,MICS,Multiple Indicator Cluster Survey 2016-2017,household
 Nigeria,NATIONAL,2018,anc4,percent,0.568,MICS,Demographic and Health Survey 2018,household
-Nigeria,NATIONAL,2021,anc4,percent,0.604,MICS,Multiple Indicator Cluster Survey 2021,household
-Nigeria,NATIONAL,2011,delivery,percent,0.451,MICS,Multiple Indicator Cluster Survey 2011,household
-Nigeria,NATIONAL,2013,delivery,percent,0.358,MICS,Demographic and Health Survey 2013,household
-Nigeria,NATIONAL,2017,delivery,percent,0.375,MICS,Multiple Indicator Cluster Survey 2016-2017,household
-Nigeria,NATIONAL,2018,delivery,percent,0.394,MICS,Demographic and Health Survey 2018,household
-Nigeria,NATIONAL,2021,delivery,percent,0.49,MICS,Multiple Indicator Cluster Survey 2021,household
 Moldova,NATIONAL,2010,bcg,percent,0.98,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Moldova,NATIONAL,2011,bcg,percent,0.98,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Moldova,NATIONAL,2012,bcg,percent,0.99,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
@@ -9250,6 +9250,12 @@ Moldova,NATIONAL,2024,imr,rate,9.84463,UNWPP,World Population Prospects,modeled
 Moldova,NATIONAL,2025,imr,rate,10.94788,UNWPP,World Population Prospects,modeled
 Moldova,NATIONAL,2025,imr,rate,8.13984,UNWPP,World Population Prospects,modeled
 Moldova,NATIONAL,2025,imr,rate,9.58633,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2021,anc4,percent,0.604,MICS,Multiple Indicator Cluster Survey 2021,household
+Nigeria,NATIONAL,2011,delivery,percent,0.451,MICS,Multiple Indicator Cluster Survey 2011,household
+Nigeria,NATIONAL,2013,delivery,percent,0.358,MICS,Demographic and Health Survey 2013,household
+Nigeria,NATIONAL,2017,delivery,percent,0.375,MICS,Multiple Indicator Cluster Survey 2016-2017,household
+Nigeria,NATIONAL,2018,delivery,percent,0.394,MICS,Demographic and Health Survey 2018,household
+Nigeria,NATIONAL,2021,delivery,percent,0.49,MICS,Multiple Indicator Cluster Survey 2021,household
 Nigeria,NATIONAL,2020,imr,rate,80.17159,UNWPP,World Population Prospects,modeled
 Nigeria,NATIONAL,2020,imr,rate,69.11377,UNWPP,World Population Prospects,modeled
 Nigeria,NATIONAL,2020,imr,rate,74.69896,UNWPP,World Population Prospects,modeled
@@ -9262,12 +9268,6 @@ Nigeria,NATIONAL,2022,imr,rate,71.23166,UNWPP,World Population Prospects,modeled
 Nigeria,NATIONAL,2023,imr,rate,74.76366,UNWPP,World Population Prospects,modeled
 Nigeria,NATIONAL,2023,imr,rate,64.05374,UNWPP,World Population Prospects,modeled
 Nigeria,NATIONAL,2023,imr,rate,69.46855,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2024,imr,rate,73.84706,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2024,imr,rate,62.949,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2024,imr,rate,68.46108,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2025,imr,rate,73.1492,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2025,imr,rate,62.18718,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2025,imr,rate,67.73292,UNWPP,World Population Prospects,modeled
 Senegal,NATIONAL,2020,imr,rate,30.25659,UNWPP,World Population Prospects,modeled
 Senegal,NATIONAL,2020,imr,rate,23.75121,UNWPP,World Population Prospects,modeled
 Senegal,NATIONAL,2020,imr,rate,27.05893,UNWPP,World Population Prospects,modeled
@@ -9478,12 +9478,12 @@ Moldova,NATIONAL,2022,crudebr,rate,10.545,UNWPP,World Population Prospects,model
 Moldova,NATIONAL,2023,crudebr,rate,10.755,UNWPP,World Population Prospects,modeled
 Moldova,NATIONAL,2024,crudebr,rate,10.59,UNWPP,World Population Prospects,modeled
 Moldova,NATIONAL,2025,crudebr,rate,10.35,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2020,crudebr,rate,33.732,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2021,crudebr,rate,33.546,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2022,crudebr,rate,33.192,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2023,crudebr,rate,32.954,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2024,crudebr,rate,32.493,UNWPP,World Population Prospects,modeled
-Nigeria,NATIONAL,2025,crudebr,rate,32.167,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2024,imr,rate,73.84706,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2024,imr,rate,62.949,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2024,imr,rate,68.46108,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2025,imr,rate,73.1492,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2025,imr,rate,62.18718,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2025,imr,rate,67.73292,UNWPP,World Population Prospects,modeled
 Senegal,NATIONAL,2020,crudebr,rate,29.931,UNWPP,World Population Prospects,modeled
 Senegal,NATIONAL,2021,crudebr,rate,29.71,UNWPP,World Population Prospects,modeled
 Senegal,NATIONAL,2022,crudebr,rate,29.46,UNWPP,World Population Prospects,modeled
@@ -9520,3 +9520,17 @@ Zambia,NATIONAL,2022,crudebr,rate,33.542,UNWPP,World Population Prospects,modele
 Zambia,NATIONAL,2023,crudebr,rate,33.081,UNWPP,World Population Prospects,modeled
 Zambia,NATIONAL,2024,crudebr,rate,32.724,UNWPP,World Population Prospects,modeled
 Zambia,NATIONAL,2025,crudebr,rate,32.351,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2020,crudebr,rate,33.732,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2021,crudebr,rate,33.546,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2022,crudebr,rate,33.192,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2023,crudebr,rate,32.954,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2024,crudebr,rate,32.493,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2025,crudebr,rate,32.167,UNWPP,World Population Prospects,modeled
+Nigeria,NATIONAL,2023,fp,percent,0.15,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,imr,rate,63,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,nmr,rate,41,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,delivery,percent,0.46,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,bcg,percent,0.67,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,penta1,percent,0.629,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,penta3,percent,0.534,DHS National,NG2023MIS,household
+Nigeria,NATIONAL,2023,still,number,230,DHS National,NG2023MIS,household
