@@ -4,7 +4,7 @@ MADS <- 10                           # Number of MADs
 GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1", "opd")
 
-PROJECT_DATA_HMIS <- "guinea_data_updated.csv"
+PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT

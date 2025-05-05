@@ -1,10 +1,10 @@
 EXCLUDED_FROM_ADJUSTMENT <- c("indicator_a", "indicator_b", "indicator_c")
 
-PROJECT_DATA_HMIS <- "guinea_data_updated.csv"
+PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
-# Last edit: 2025 Apr 7
+# Last edit: 2025 May 5
 
 # This script dynamically adjusts raw data for:
 #   1. Outliers: Replaces flagged outliers with 12-month rolling averages (excluding outliers).

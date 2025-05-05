@@ -21,10 +21,10 @@ RUN_DISTRICT_MODEL <- FALSE          # Set to TRUE to run regressions at the low
 
 
 
-PROJECT_DATA_HMIS <- "guinea_data_updated.csv"
+PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Apr 7
+# Last edit: 2025 May 5
 # Module: SERVICE UTILIZATION
 
 
@@ -133,84 +133,103 @@ print("Running robust control chart analysis for each panel...")
 
 # Function control chart
 robust_control_chart <- function(panel_data, selected_count) {
-  panel_data <- panel_data %>% mutate(month_factor = factor(month(date)))
+  panel_data <- panel_data %>%
+    mutate(month_factor = factor(month(date)))
   
-  if (sum(!is.na(panel_data[[selected_count]])) >= 12) {
-    mod <- rlm(as.formula(paste(selected_count, "~ month_factor + as.numeric(date)")), data = panel_data, maxit = 100)
-    panel_data <- panel_data %>% mutate(count_predict = predict(mod, newdata = panel_data))
+  # Count non-missing obs and unique dates
+  n_obs <- sum(!is.na(panel_data[[selected_count]]))
+  n_dates <- length(unique(panel_data$date[!is.na(panel_data[[selected_count]])]))
+  
+  # Model fallback logic
+  if (n_obs >= 12 && n_dates > 12) {
+    # Safe to use full model
+    mod <- tryCatch({
+      rlm(as.formula(paste(selected_count, "~ month_factor + as.numeric(date)")),
+          data = panel_data, maxit = 100)
+    }, error = function(e) {
+      warning(paste("Full model failed, fallback to trend-only. Error:", e$message))
+      NULL
+    })
+  } else if (n_obs >= 12) {
+    # Use simpler model (trend only)
+    mod <- tryCatch({
+      rlm(as.formula(paste(selected_count, "~ as.numeric(date)")),
+          data = panel_data, maxit = 100)
+    }, error = function(e) {
+      warning(paste("Trend-only model failed. Error:", e$message))
+      NULL
+    })
   } else {
-    panel_data <- panel_data %>% mutate(count_predict = median(panel_data[[selected_count]], na.rm = TRUE))
+    mod <- NULL
   }
   
+  # Predict or fallback to median
+  panel_data <- panel_data %>%
+    mutate(count_predict = if (!is.null(mod)) {
+      predict(mod, newdata = panel_data)
+    } else {
+      median(panel_data[[selected_count]], na.rm = TRUE)
+    })
+  
+  # Smoothing
   panel_data <- panel_data %>%
     arrange(date) %>%
-    mutate(count_smooth = zoo::rollmedian(count_predict, k = SMOOTH_K, fill = NA, align = "center"),
-           count_smooth = ifelse(is.na(count_smooth), count_predict, count_smooth))
-  
-  # Compare against raw counts
-  panel_data <- panel_data %>%
-    mutate(residual = count_original - count_smooth)
-  
-  mad_resid <- mad(panel_data$residual, constant = 1, na.rm = TRUE)
-  panel_data <- panel_data %>% mutate(robust_control = residual / (mad_resid + 1e-6))
-  
-  panel_data <- panel_data %>%
-    mutate(tag_sharp = ifelse(!is.na(robust_control) & abs(robust_control) >= THRESHOLD, 1, 0))
-  
-  panel_data <- panel_data %>%
     mutate(
-      mild_flag = ifelse(!is.na(robust_control) & abs(robust_control) >= 1 & abs(robust_control) < THRESHOLD, 1, 0),
-      mild_cumulative = zoo::rollapply(mild_flag, width = 3, align = "right", fill = NA, FUN = sum, na.rm = TRUE),
-      tag_sustained = ifelse(mild_cumulative >= 3 & abs(robust_control) >= 1.5, 1, 0)
+      count_smooth = zoo::rollmedian(count_predict, k = SMOOTH_K, fill = NA, align = "center"),
+      count_smooth = ifelse(is.na(count_smooth), count_predict, count_smooth)
     )
   
-  # Tag "dips" in the data
+  # Residuals and MAD-based control limits
   panel_data <- panel_data %>%
-    mutate(dip_flag = ifelse(is.na(count_original) | count_original < DIP_THRESHOLD * count_smooth, 1, 0))   # Updated line with parameterized threshold
+    mutate(
+      residual = count_original - count_smooth,
+      robust_control = residual / (mad(residual, constant = 1, na.rm = TRUE) + 1e-6),
+      tag_sharp = ifelse(!is.na(robust_control) & abs(robust_control) >= THRESHOLD, 1, 0),
+      mild_flag = ifelse(!is.na(robust_control) & abs(robust_control) >= 1 & abs(robust_control) < THRESHOLD, 1, 0),
+      mild_cumulative = zoo::rollapply(mild_flag, width = 3, align = "right", fill = NA, FUN = sum, na.rm = TRUE),
+      tag_sustained = ifelse(mild_cumulative >= 3 & abs(robust_control) >= 1.5, 1, 0),
+      dip_flag = ifelse(is.na(count_original) | count_original < DIP_THRESHOLD * count_smooth, 1, 0)
+    )
   
+  # Dips
   dip_rle <- rle(panel_data$dip_flag)
-  dip_tag <- inverse.rle(with(dip_rle, list(lengths = lengths, values = ifelse(values == 1 & lengths >= 3, 1, 0))))
-  panel_data$tag_sustained_dip <- dip_tag
+  panel_data$tag_sustained_dip <- inverse.rle(with(dip_rle, list(
+    lengths = lengths,
+    values = ifelse(values == 1 & lengths >= 3, 1, 0)
+  )))
   
+  # Missing and rise tagging
   panel_data <- panel_data %>%
     mutate(
       is_missing = is.na(count_original) | count_original == 0,
       missing_roll = zoo::rollapply(is_missing, width = 3, align = "right", fill = NA, FUN = sum, na.rm = TRUE),
-      tag_missing = ifelse(missing_roll >= 2, 1, 0)
+      tag_missing = ifelse(missing_roll >= 2, 1, 0),
+      rise_flag = ifelse(!is.na(count_original) & count_original > RISE_THRESHOLD * count_smooth, 1, 0)
     )
   
-  # Tag "rises" in the data
-  panel_data <- panel_data %>%
-    mutate(rise_flag = ifelse(!is.na(count_original) & count_original > RISE_THRESHOLD * count_smooth, 1, 0))
-  
   rise_rle <- rle(panel_data$rise_flag)
-  rise_tag <- inverse.rle(with(rise_rle, list(lengths = lengths, values = ifelse(values == 1 & lengths >= 3, 1, 0))))
-  panel_data$tag_sustained_rise <- rise_tag
-  
-  
+  panel_data$tag_sustained_rise <- inverse.rle(with(rise_rle, list(
+    lengths = lengths,
+    values = ifelse(values == 1 & lengths >= 3, 1, 0)
+  )))
   
   # Final tagging
-  
   panel_data <- panel_data %>%
-    mutate(tagged = case_when(
-      tag_sharp == 1 |
-        tag_sustained == 1 |
-        tag_sustained_dip == 1 |
-        tag_sustained_rise == 1 |
-        tag_missing == 1 ~ 1,
-      TRUE ~ 0
-    ))
-  
-  # NAs in 'tagged' are replaced with 0
-  panel_data$tagged[is.na(panel_data$tagged)] <- 0
-  
-  
-  # Add tagging logic for the last 6 months
-  panel_data <- panel_data %>%
+    mutate(
+      tagged = case_when(
+        tag_sharp == 1 |
+          tag_sustained == 1 |
+          tag_sustained_dip == 1 |
+          tag_sustained_rise == 1 |
+          tag_missing == 1 ~ 1,
+        TRUE ~ 0
+      ),
+      tagged = replace_na(tagged, 0)
+    ) %>%
     group_by(admin_area_2) %>%
     mutate(
-      last_6_months = ifelse(date >= max(date) - months(6), 1, 0),  # Tag last 6 months
-      tagged = ifelse(last_6_months == 1, 1, tagged)  # Set tagged to 1 for the last 6 months
+      last_6_months = ifelse(date >= max(date) - months(6), 1, 0),
+      tagged = ifelse(last_6_months == 1, 1, tagged)
     ) %>%
     ungroup()
   
