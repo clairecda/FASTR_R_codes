@@ -2,13 +2,13 @@ OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detectio
 MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
 MADS <- 10                           # Number of MADs
 GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
-DQA_INDICATORS <- c("penta1", "anc1", "opd")
+DQA_INDICATORS <- c("penta1", "anc1")
 
-PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
+PROJECT_DATA_HMIS <- "data_nigeria_full.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 Apr 30
+# Last edit: 2025 May 5
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to evaluate the reliability of HMIS data by
@@ -34,7 +34,7 @@ consistency_params <- list(
   consistency_pairs = list(
     pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
     pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
-    pair_anc = c("anc1", "anc4")          # ANC1 / ANC4
+    pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
     #,pair_malaria = c("rdt_positive_plus_micro", "confirmed_malaria_treated_with_act")  # Placeholder: (rdt_positive + micro_positive) = confirmed_treated
     
   ),
