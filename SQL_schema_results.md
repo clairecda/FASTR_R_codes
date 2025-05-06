@@ -26,7 +26,7 @@ CREATE TABLE ro_m1_consistency_geo_csv (
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
   ratio_type TEXT NOT NULL,
-  sconsistency INTEGER NOT NULL
+  sconsistency INTEGER
 );
 ```
 
