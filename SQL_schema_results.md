@@ -224,7 +224,6 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
 CREATE TABLE ro_m4_coverage_combined_national_csv (
   indicator_common_id TEXT NOT NULL,
   year INTEGER NOT NULL,
-  denominator TEXT NOT NULL,
   coverage_original_estimate NUMERIC,
   coverage_avgsurveyprojection NUMERIC,
   coverage_cov NUMERIC
@@ -240,11 +239,10 @@ For each **indicator** and **year**, this result object is presented as a **hist
 - **Stratifier:** Coverage can be calculated using several denominator definitions, so the plot could be **faceted by `denominator`** to compare results across different estimation methods.
 
 ``` js
-CREATE TABLE ro_combined_coverage_province_csv (
+CREATE TABLE ro_m4_combined_coverage_province_csv (
   admin_area_2 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   year INTEGER NOT NULL,
-  denominator TEXT NOT NULL,
   coverage_cov NUMERIC
 );
 ```
