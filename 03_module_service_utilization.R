@@ -24,7 +24,7 @@ RUN_DISTRICT_MODEL <- FALSE          # Set to TRUE to run regressions at the low
 PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 5
+# Last edit: 2025 May 6
 # Module: SERVICE UTILIZATION
 
 
@@ -566,7 +566,8 @@ summary_disruption_admin1 <- data_disruption %>%
     diff_percent       = 100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
       mean(expect_admin_area_1, na.rm = TRUE),
     diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
-    count_expect_diff_sum = ifelse(
+    #count_expected_if_above_diff_threshold
+    count_expected_if_above_diff_threshold = ifelse(
       abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
       count_expect_sum, count_sum),
     count_expect_diff = ifelse(
@@ -591,7 +592,9 @@ summary_disruption_admin2 <- data_disruption %>%
     diff_percent       = 100 * (mean(expect_admin_area_2, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
       mean(expect_admin_area_2, na.rm = TRUE),
     diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
-    count_expect_diff_sum = ifelse(
+    #count_expected_if_above_diff_threshold
+    #count_expect_diff_sum
+    count_expected_if_above_diff_threshold = ifelse(
       abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
       count_expect_sum, count_sum),
     count_expect_diff = ifelse(
@@ -618,7 +621,9 @@ if (RUN_DISTRICT_MODEL) {
       diff_percent       = 100 * (mean(expect_admin_area_3, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
         mean(expect_admin_area_3, na.rm = TRUE),
       diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
-      count_expect_diff_sum = ifelse(
+      #count_expect_diff_sum
+      #count_expected_if_above_diff_threshold
+      count_expected_if_above_diff_threshold = ifelse(
         abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
         count_expect_sum, count_sum),
       count_expect_diff = ifelse(
@@ -654,7 +659,7 @@ summary_disruption_admin1_export <- summary_disruption_admin1 %>%
     quarter = ((period_id %% 100 - 1) %/% 3) + 1,
     quarter_id = sprintf("%d%02d", year, quarter)
   ) %>%
-  select(admin_area_1, indicator_common_id, period_id, quarter_id, year, count_sum, count_expect_sum)
+  select(admin_area_1, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
 
 write.csv(summary_disruption_admin1_export, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE)
 
@@ -664,7 +669,7 @@ summary_disruption_admin2_export <- summary_disruption_admin2 %>%
     quarter = ((period_id %% 100 - 1) %/% 3) + 1,
     quarter_id = sprintf("%d%02d", year, quarter)
   ) %>%
-  select(admin_area_2, indicator_common_id, period_id, quarter_id, year, count_sum, count_expect_sum)
+  select(admin_area_2, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
 
 write.csv(summary_disruption_admin2_export, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE)
 
@@ -676,7 +681,7 @@ if (RUN_DISTRICT_MODEL) {
       quarter = ((period_id %% 100 - 1) %/% 3) + 1,
       quarter_id = sprintf("%d%02d", year, quarter)
     ) %>%
-    select(admin_area_3, indicator_common_id, period_id, quarter_id, year, count_sum, count_expect_sum)
+    select(admin_area_3, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
   
   write.csv(summary_disruption_admin3_export, "M3_disruptions_analysis_admin_area_3.csv", row.names = FALSE)
 }

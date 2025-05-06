@@ -177,7 +177,7 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_1_csv (
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
   count_sum NUMERIC,
-  count_expect_sum NUMERIC
+  count_expected_if_above_diff_threshold NUMERIC
 );
 ```
 
@@ -191,7 +191,7 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_2_csv (
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
   count_sum NUMERIC,
-  count_expect_sum NUMERIC
+  count_expected_if_above_diff_threshold NUMERIC
 );
 ```
 
@@ -207,7 +207,7 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
   quarter_id INTEGER NOT NULL,
   year INTEGER NOT NULL,
   count_sum NUMERIC,
-  count_expect_sum NUMERIC
+  count_expected_if_above_diff_threshold NUMERIC
 );
 ```
 

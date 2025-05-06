@@ -354,7 +354,7 @@ clean_dhs_subnational <- function(df) {
 # ----------------------------------------
 clean_mics <- function(df) {
   df %>%
-    filter(SEX != "M") %>%
+    filter(SEX %in% c("_T", NA)) %>%  # "T" = total across sexes
     mutate(
       year = as.integer(TIME_PERIOD),
       value = if_else(UNIT_MULTIPLIER == "3", as.numeric(OBS_VALUE) * 1000, as.numeric(OBS_VALUE)),
@@ -383,7 +383,8 @@ clean_mics <- function(df) {
       )
     ) %>%
     filter(!is.na(survey_value), !is.na(indicator_common_id)) %>%
-    select(admin_area_1, year, indicator_id, indicator_common_id, survey_value, source, source_detail, survey_type)
+    select(admin_area_1, year, indicator_id, indicator_common_id,
+           survey_value, source, source_detail, survey_type)
 }
 
 # ----------------------------------------
