@@ -392,37 +392,101 @@ clean_mics <- function(df) {
 #
 # ----------------------------------------
 clean_unwpp <- function(df) {
-  df %>%
-    filter(!is.na(value), variant == "Median") %>%
-    mutate(
-      indicator_id = indicatorDisplayName,
-      indicator_common_id = case_when(
-        indicator_id == "Crude birth rate (births per 1,000 population)" ~ "crudebr",
-        indicator_id == "Total number of live births by sex" ~ "livebirth",
-        indicator_id == "Annual population by 5-year age groups and by sex" ~ "totu5pop",
-        indicator_id == "Annual population by 1-year age groups and by sex" ~ "totu1pop",
-        indicator_id == "Total population by sex" ~ "poptot",
-        indicator_id == "Infant mortality rate (IMR)" ~ "imr",
-        indicator_id == "Under-five mortality rate (U5MR)" ~ "u5mr",
-        indicator_id == "Female population of reproductive age (15-49 years)" ~ "womenrepage",
-        indicator_id == "CP Modern" ~ "mcpr",
-        TRUE ~ NA_character_
-      ),
-      value_type = "number"  # optional: tag value type if useful
+  base <- df %>%
+    filter(
+      variant == "Median",
+      !is.na(value)
+    )
+  
+  # Crude birth rate
+  crudebr <- base %>%
+    filter(indicatorDisplayName == "Crude birth rate (births per 1,000 population)") %>%
+    mutate(indicator_id = indicatorDisplayName, indicator_common_id = "crudebr")
+  
+  # Total number of live births
+  livebirth <- base %>%
+    filter(indicatorDisplayName == "Total number of live births by sex") %>%
+    mutate(indicator_id = indicatorDisplayName, indicator_common_id = "livebirth")
+  
+  # Total population (all ages)
+  poptot <- base %>%
+    filter(indicatorDisplayName == "Total population by sex",
+           sex == "Both sexes"
     ) %>%
-    filter(!is.na(indicator_common_id)) %>%
-    rename(source_detail = source) %>%  # ← rename original source column
+    mutate(indicator_id = indicatorDisplayName, indicator_common_id = "poptot")
+  
+  # Infant mortality rate
+  imr <- base %>%
+    filter(indicatorDisplayName == "Infant mortality rate (IMR)",
+           sex == "Both sexes"
+    ) %>%
+    mutate(indicator_id = indicatorDisplayName, indicator_common_id = "imr")
+  
+  # Under-five mortality rate
+  u5mr <- base %>%
+    filter(
+      indicatorDisplayName == "Under-five mortality rate (U5MR)",
+      sex == "Both sexes"
+    ) %>%
+    # group_by(country, iso3, timeLabel) %>%
+    # summarise(
+    #   value = mean(value, na.rm = TRUE),  # or use first(value) if values are identical
+    #   .groups = "drop"
+    # ) %>%
     mutate(
-      admin_area_1 = countrycode(iso3, origin = "iso3c", destination = "country.name"),
+      indicator_id = "Under-five mortality rate (U5MR)",
+      indicator_common_id = "u5mr"
+    )
+  
+  
+  # Female population 15–49
+  womenrepage <- base %>%
+    filter(indicatorDisplayName == "Female population of reproductive age (15-49 years)",
+           sex %in% c("Female", NA),
+           ageLabel == "15-49") %>%
+    mutate(indicator_id = indicatorDisplayName, indicator_common_id = "womenrepage")
+  
+  # mCPR (modern contraceptive prevalence)
+  mcpr <- base %>%
+    filter(indicatorDisplayName == "CP Modern",
+           category == "All women") %>%
+    mutate(indicator_id = indicatorDisplayName, indicator_common_id = "mcpr")
+  
+  # U1: age = 0
+  totu1pop <- base %>%
+    filter(indicatorDisplayName == "Annual population by 1-year age groups and by sex",
+           ageLabel == "0",
+           sex == "Both sexes") %>%
+    group_by(country, iso3, timeLabel) %>%
+    summarise(value = sum(value), .groups = "drop") %>%
+    mutate(indicator_id = "Annual population age 0", indicator_common_id = "totu1pop")
+  
+  # U5: ages 0–4
+  totu5pop <- base %>%
+    filter(indicatorDisplayName == "Annual population by 1-year age groups and by sex",
+           ageLabel %in% as.character(0:4),
+           sex == "Both sexes") %>%
+    group_by(country, iso3, timeLabel) %>%
+    summarise(value = sum(value), .groups = "drop") %>%
+    mutate(indicator_id = "Annual population age 0-4", indicator_common_id = "totu5pop")
+  
+  # Combine all
+  bind_rows(crudebr, livebirth, poptot, imr, u5mr, womenrepage, mcpr, totu1pop, totu5pop) %>%
+    mutate(
+      admin_area_1 = countrycode(iso3, "iso3c", "country.name"),
       admin_area_2 = "NATIONAL",
       year = as.integer(timeLabel),
-      source = "UNWPP",  # ← overwrite with standard label
+      value_type = "number",
+      source = "UNWPP",
+      source_detail = "UNWPP",
       survey_type = "modeled"
     ) %>%
-    select(admin_area_1, admin_area_2, year,
-           indicator_id, indicator_common_id,
-           survey_value = value, value_type,
-           source, source_detail, survey_type)
+    select(
+      admin_area_1, admin_area_2, year,
+      indicator_id, indicator_common_id,
+      survey_value = value, value_type,
+      source, source_detail, survey_type
+    )
 }
 
 # ----------------------------------------
@@ -512,9 +576,30 @@ all_data_labeled <- all_data %>%
   filter(!is.na(indicator_type)) %>%
   select(
     admin_area_1, admin_area_2, year,
-    indicator_common_id, indicator_type,
+    indicator_id, indicator_common_id,
+    indicator_type,
     survey_value, source, source_detail, survey_type
   )
+
+# 
+# all_data_labeled <- all_data %>%
+#   mutate(
+#     indicator_type = case_when(
+#       indicator_common_id %in% percent_indicators ~ "percent",
+#       indicator_common_id %in% number_indicators ~ "number",
+#       indicator_common_id %in% rate_indicators ~ "rate",
+#       indicator_common_id == "womenrepage" & source == "DHS National" ~ "survey_count",
+#       indicator_common_id %in% population_estimate_indicators ~ "population_estimate",
+#       TRUE ~ NA_character_
+#     ),
+#     survey_value = if_else(indicator_type == "percent", survey_value / 100, survey_value)
+#   ) %>%
+#   filter(!is.na(indicator_type)) %>%
+#   select(
+#     admin_area_1, admin_area_2, year,
+#     indicator_common_id, indicator_type,
+#     survey_value, source, source_detail, survey_type
+#   )
 
 # ----------------------------------------
 # Separate outputs
@@ -532,5 +617,5 @@ survey_data_only <- all_data_labeled %>%
 # Write outputs (with fwrite for efficiency)
 # ----------------------------------------
 
-fwrite(survey_data_only, "survey_data_unified.csv")
+#fwrite(survey_data_only, "survey_data_unified.csv")
 fwrite(population_estimates_only, "population_estimates_only.csv")
