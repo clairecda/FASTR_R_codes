@@ -796,6 +796,7 @@ main_export <- combined_national %>%
   ungroup()
 
 
+
 early_survey <- combined_national %>%
   filter(is.na(coverage_cov) & !is.na(coverage_original_estimate)) %>%
   select(admin_area_1, indicator_common_id, year, coverage_original_estimate) %>%
@@ -805,7 +806,7 @@ early_survey <- combined_national %>%
     coverage_avgsurveyprojection = NA_real_,
     coverage_cov = NA_real_
   ) %>%
-  select(admin_area_1, indicator_common_id, year, denominator,
+  select(indicator_common_id, year,
          coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
 
 
