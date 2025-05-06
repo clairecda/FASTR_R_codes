@@ -15,12 +15,16 @@ INFANT_MORTALITY_RATE <- 0.05
 PROJECT_DATA_COVERAGE <-"survey_data_unified.csv"
 PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 
-
+#-------------------------------------------------------------------------------------------------------------
+# CB - R code FASTR PROJECT
+# Last edit: 2025 May 6
+# Module: COVERAGE ESTIMATES
+#
 # ------------------------------ Load Required Libraries -------------------------
-library(dplyr)       # For `mutate()`, `group_by()`, `summarise()`, `filter()`, `arrange()`
-library(tidyr)       # For `pivot_longer()`, `pivot_wider()`, `complete()`
-library(zoo)         # For `na.locf()` in `carry_forward_survey_data()`
-library(stringr)     # For `str_subset()` to detect `geo_cols`
+library(dplyr)
+library(tidyr)       
+library(zoo)       
+library(stringr)     
 library(purrr)
 
 
@@ -395,8 +399,10 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
   }
   
   if (!has_admin_area_2) {
-    data <- data %>% mutate(nummonth = if_else(is.na(nummonth) | nummonth == 0, 12, nummonth)) %>%
+    data <- data %>%
       mutate(
+        nummonth = if_else(is.na(nummonth) | nummonth == 0, 12, nummonth),
+        
         dwpp_pregnancy = if_else(!is.na(crudebr_unwpp) & !is.na(poptot_unwpp),
                                  (crudebr_unwpp / 1000) * poptot_unwpp / (1 + TWIN_RATE), NA_real_),
         dwpp_livebirth = if_else(!is.na(crudebr_unwpp) & !is.na(poptot_unwpp),
@@ -405,22 +411,15 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
         dwpp_measles1 = if_else(!is.na(totu1pop_unwpp) & !is.na(nmrcarry),
                                 totu1pop_unwpp * (1 - (nmrcarry / 100)), NA_real_),
         dwpp_measles2 = if_else(!is.na(totu1pop_unwpp) & !is.na(nmrcarry) & !is.na(postnmr),
-                                totu1pop_unwpp * (1 - (nmrcarry / 100)) * (1 - (2 * postnmr / 100)), NA_real_),
-        across(starts_with("dwpp"), ~ if_else(!is.na(.x), .x * (nummonth / 12), NA_real_))
-      )
-  }
-  
-  if ("nummonth" %in% available_vars) {
-    group_keys <- if (has_admin_area_2) c("admin_area_1", "admin_area_2", "year") else c("admin_area_1", "year")
-    
-    data <- data %>%
-      group_by(across(all_of(group_keys))) %>%
-      mutate(
-        coverage_adjustment = if_else(is.na(nummonth) | nummonth == 0, 1, nummonth / 12),
-        across(where(is.numeric) & starts_with("d"), ~ if_else(!is.na(.x), .x * coverage_adjustment, NA_real_))
+                                totu1pop_unwpp * (1 - (nmrcarry / 100)) * (1 - (2 * postnmr / 100)), NA_real_)
       ) %>%
-      ungroup() %>%
-      select(-coverage_adjustment)
+      mutate(
+        dwpp_pregnancy = if_else(nummonth < 12, dwpp_pregnancy * (nummonth / 12), dwpp_pregnancy),
+        dwpp_livebirth = if_else(nummonth < 12, dwpp_livebirth * (nummonth / 12), dwpp_livebirth),
+        dwpp_dpt       = if_else(nummonth < 12, dwpp_dpt * (nummonth / 12), dwpp_dpt),
+        dwpp_measles1  = if_else(nummonth < 12, dwpp_measles1 * (nummonth / 12), dwpp_measles1),
+        dwpp_measles2  = if_else(nummonth < 12, dwpp_measles2 * (nummonth / 12), dwpp_measles2)
+      )
   }
   
   return(data)
@@ -795,7 +794,7 @@ combined_province <- prepare_combined_coverage_from_projected(
 
 # Filter to keep only best independent coverage estimates and exclude 2025
 combined_national_export <- combined_national %>%
-  filter(source_type == "independent", year < 2025) %>%
+  filter(source_type == "independent") %>%
   group_by(admin_area_1, indicator_common_id, year) %>%
   filter(rank == min(rank, na.rm = TRUE)) %>%
   ungroup() %>%
@@ -803,7 +802,7 @@ combined_national_export <- combined_national %>%
          coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
 
 combined_province_export <- combined_province %>%
-  filter(source_type == "independent", year < 2025) %>%
+  filter(source_type == "independent") %>%
   group_by(admin_area_1, admin_area_2, indicator_common_id, year) %>%
   filter(rank == min(rank, na.rm = TRUE)) %>%
   ungroup() %>%
