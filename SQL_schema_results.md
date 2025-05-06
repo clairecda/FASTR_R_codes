@@ -222,7 +222,6 @@ CREATE TABLE ro_m3_disruptions_analysis_admin_area_3_csv (
 
 ``` js
 CREATE TABLE ro_m4_coverage_combined_national_csv (
-  admin_area_1 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   year INTEGER NOT NULL,
   denominator TEXT NOT NULL,
@@ -242,7 +241,6 @@ For each **indicator** and **year**, this result object is presented as a **hist
 
 ``` js
 CREATE TABLE ro_combined_coverage_province_csv (
-  admin_area_1 TEXT NOT NULL,
   admin_area_2 TEXT NOT NULL,
   indicator_common_id TEXT NOT NULL,
   year INTEGER NOT NULL,

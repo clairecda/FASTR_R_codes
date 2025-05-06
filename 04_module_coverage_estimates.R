@@ -3,12 +3,12 @@ SELECTED_COUNT_VARIABLE <- "count_final_both"  # Options: "count_final_none", "c
 CURRENT_YEAR <- as.numeric(format(Sys.Date(), "%Y"))  # Dynamically get current year
 MIN_YEAR <- 2000  # Set a fixed minimum year for filtering
 
-PREGNANCY_LOSS_RATE <- 0.03
+PREGNANCY_LOSS_RATE <- 0.03 #0.03
 TWIN_RATE <- 0.015       
 STILLBIRTH_RATE <- 0.02
-NEONATAL_MORTALITY_RATE <- 0.03
-POSTNEONATAL_MORTALITY_RATE <- 0.02
-INFANT_MORTALITY_RATE <- 0.05   
+P1_NMR <- 0.039
+P2_PNMR <- 0.028
+INFANT_MORTALITY_RATE <- 0.067   
 
 
 
@@ -352,9 +352,9 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
       dlivebirths_pregnancy   = safe_calc(dlivebirths_livebirth * (1 - 0.5 * TWIN_RATE) / ((1 - STILLBIRTH_RATE) * (1 - PREGNANCY_LOSS_RATE))),
       dlivebirths_delivery    = safe_calc(dlivebirths_pregnancy * (1 - PREGNANCY_LOSS_RATE)),
       dlivebirths_birth       = safe_calc(dlivebirths_livebirth / (1 - STILLBIRTH_RATE)),
-      dlivebirths_dpt         = safe_calc(dlivebirths_livebirth * (1 - NEONATAL_MORTALITY_RATE)),
-      dlivebirths_measles1    = safe_calc(dlivebirths_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
-      dlivebirths_measles2    = safe_calc(dlivebirths_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+      dlivebirths_dpt         = safe_calc(dlivebirths_livebirth * (1 - P1_NMR)),
+      dlivebirths_measles1    = safe_calc(dlivebirths_dpt * (1 - P2_PNMR)),
+      dlivebirths_measles2    = safe_calc(dlivebirths_dpt * (1 - 2 * P2_PNMR))
     )
   }
   
@@ -364,9 +364,9 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
       danc1_delivery          = safe_calc(danc1_pregnancy * (1 - PREGNANCY_LOSS_RATE)),
       danc1_birth             = safe_calc(danc1_delivery / (1 - 0.5 * TWIN_RATE)),
       danc1_livebirth         = safe_calc(danc1_birth * (1 - STILLBIRTH_RATE)),
-      danc1_dpt               = safe_calc(danc1_livebirth * (1 - NEONATAL_MORTALITY_RATE)),
-      danc1_measles1          = safe_calc(danc1_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
-      danc1_measles2          = safe_calc(danc1_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+      danc1_dpt               = safe_calc(danc1_livebirth * (1 - P1_NMR)),
+      danc1_measles1          = safe_calc(danc1_dpt * (1 - P2_PNMR)),
+      danc1_measles2          = safe_calc(danc1_dpt * (1 - 2 * P2_PNMR))
     )
   }
   
@@ -375,17 +375,17 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
       ddelivery_livebirth     = safe_mutate("delivery", countdelivery / deliverycarry),
       ddelivery_birth         = safe_calc(ddelivery_livebirth / (1 - STILLBIRTH_RATE)),
       ddelivery_pregnancy     = safe_calc(ddelivery_birth * (1 - 0.5 * TWIN_RATE) / (1 - PREGNANCY_LOSS_RATE)),
-      ddelivery_dpt           = safe_calc(ddelivery_livebirth * (1 - NEONATAL_MORTALITY_RATE)),
-      ddelivery_measles1      = safe_calc(ddelivery_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
-      ddelivery_measles2      = safe_calc(ddelivery_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+      ddelivery_dpt           = safe_calc(ddelivery_livebirth * (1 - P1_NMR)),
+      ddelivery_measles1      = safe_calc(ddelivery_dpt * (1 - P2_PNMR)),
+      ddelivery_measles2      = safe_calc(ddelivery_dpt * (1 - 2 * P2_PNMR))
     )
   }
   
   if (all(indicator_vars$penta1 %in% available_vars)) {
     data <- data %>% mutate(
       dpenta1_dpt             = safe_mutate("penta1", countpenta1 / penta1carry),
-      dpenta1_measles1        = safe_calc(dpenta1_dpt * (1 - POSTNEONATAL_MORTALITY_RATE)),
-      dpenta1_measles2        = safe_calc(dpenta1_dpt * (1 - 2 * POSTNEONATAL_MORTALITY_RATE))
+      dpenta1_measles1        = safe_calc(dpenta1_dpt * (1 - P2_PNMR)),
+      dpenta1_measles2        = safe_calc(dpenta1_dpt * (1 - 2 * P2_PNMR))
     )
   }
   
@@ -393,8 +393,8 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
     data <- data %>% mutate(
       dbcg_pregnancy = safe_mutate("bcg", (countbcg / bcgcarry) / (1 - PREGNANCY_LOSS_RATE) / (1 + TWIN_RATE) / (1 - STILLBIRTH_RATE)),
       dbcg_livebirth = safe_mutate("bcg", countbcg / bcgcarry),
-      dbcg_dpt = safe_mutate("bcg", (countbcg / bcgcarry) * (1 - NEONATAL_MORTALITY_RATE)),
-      dbcg_mcv = safe_mutate("bcg", (countbcg / bcgcarry) * (1 - NEONATAL_MORTALITY_RATE) * (1 - POSTNEONATAL_MORTALITY_RATE))
+      dbcg_dpt = safe_mutate("bcg", (countbcg / bcgcarry) * (1 - P1_NMR)),
+      dbcg_mcv = safe_mutate("bcg", (countbcg / bcgcarry) * (1 - P1_NMR) * (1 - P2_PNMR))
     )
   }
   
@@ -639,7 +639,11 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     filter(map2_lgl(indicator_common_id, suffix, ~ .x %in% valid_suffix_map[[.y]])) %>%
     select(-suffix)
   
-
+  # full_years <- seq(MIN_YEAR, max_year)
+  # 
+  # expansion_grid <- valid_denominator_map %>%
+  #   crossing(year = full_years)
+  
   expansion_grid <- min_years %>%
     inner_join(valid_denominator_map, by = setdiff(join_keys, "year")) %>%
     rowwise() %>%
@@ -783,30 +787,50 @@ combined_province <- prepare_combined_coverage_from_projected(
   raw_survey_wide = survey_processed_province$raw
 )
 
-# # Prepare final outputs for visualization (drop unused columns)
-# combined_national_export <- combined_national %>%
-#   select(admin_area_1, indicator_common_id, year, denominator,
-#          coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
-# 
-# combined_province_export <- combined_province %>%
-#   select(admin_area_1, admin_area_2, indicator_common_id, year, denominator, coverage_cov)
 
-
-# Filter to keep only best independent coverage estimates and exclude 2025
-combined_national_export <- combined_national %>%
+# Fix issue with filtering on denominators (drop early years)
+main_export <- combined_national %>%
   filter(source_type == "independent") %>%
   group_by(admin_area_1, indicator_common_id, year) %>%
   filter(rank == min(rank, na.rm = TRUE)) %>%
-  ungroup() %>%
+  ungroup()
+
+
+early_survey <- combined_national %>%
+  filter(is.na(coverage_cov) & !is.na(coverage_original_estimate)) %>%
+  select(admin_area_1, indicator_common_id, year, coverage_original_estimate) %>%
+  distinct() %>%
+  mutate(
+    denominator = NA_character_,
+    coverage_avgsurveyprojection = NA_real_,
+    coverage_cov = NA_real_
+  ) %>%
   select(admin_area_1, indicator_common_id, year, denominator,
          coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
+
+
+combined_national_export <- bind_rows(
+  main_export %>%
+    select(indicator_common_id,
+           year,
+           coverage_original_estimate, 
+           coverage_avgsurveyprojection, 
+           coverage_cov),
+  early_survey
+)
+
+
 
 combined_province_export <- combined_province %>%
   filter(source_type == "independent") %>%
   group_by(admin_area_1, admin_area_2, indicator_common_id, year) %>%
   filter(rank == min(rank, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(admin_area_1, admin_area_2, indicator_common_id, year, denominator, coverage_cov)
+  select(admin_area_2, 
+         indicator_common_id, 
+         year, 
+         coverage_cov)
+
 
 
 
