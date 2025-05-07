@@ -17,7 +17,7 @@ PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 6
+# Last edit: 2025 May 7
 # Module: COVERAGE ESTIMATES
 #
 # ------------------------------ Load Required Libraries -------------------------
@@ -458,7 +458,7 @@ evaluate_coverage_by_denominator <- function(data) {
   suffix_indicator_map <- tribble(
     ~suffix,       ~indicators,
     "pregnancy",   c("anc1", "anc4"),
-    "livebirth",   "bcg",
+    "livebirth",   c("delivery", "bcg"),
     "dpt",         c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3", "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
     "measles1",    "measles1",
     "measles2",    "measles2"
@@ -622,7 +622,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
 
   valid_suffix_map <- list(
     pregnancy  = c("anc1", "anc4"),
-    livebirth  = c("bcg"),
+    livebirth  = c("bcg", "delivery"),
     dpt        = c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3",
                    "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
     measles1   = c("measles1"),
@@ -639,10 +639,6 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     filter(map2_lgl(indicator_common_id, suffix, ~ .x %in% valid_suffix_map[[.y]])) %>%
     select(-suffix)
   
-  # full_years <- seq(MIN_YEAR, max_year)
-  # 
-  # expansion_grid <- valid_denominator_map %>%
-  #   crossing(year = full_years)
   
   expansion_grid <- min_years %>%
     inner_join(valid_denominator_map, by = setdiff(join_keys, "year")) %>%
