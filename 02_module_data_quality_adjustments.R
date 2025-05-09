@@ -1,5 +1,5 @@
 
-PROJECT_DATA_HMIS <- "data_nigeria_full.csv"
+PROJECT_DATA_HMIS <- "hmis_nigeria_20250506.csv"
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
@@ -37,7 +37,7 @@ geo_cols <- colnames(raw_data)[grepl("^admin_area_[0-9]+$", colnames(raw_data))]
 # Function to Apply Adjustments Across Scenarios ------------------------------------------------------------
 apply_adjustments <- function(raw_data, completeness_data, outlier_data,
                               adjust_outliers = FALSE, adjust_completeness = FALSE) {
-  cat("Applying dynamic adjustments...\n")
+  message("Applying dynamic adjustments...")
   
   setDT(raw_data)
   setDT(outlier_data)
@@ -63,23 +63,52 @@ apply_adjustments <- function(raw_data, completeness_data, outlier_data,
   # Initialize working count column
   data_adj[, count_working := as.numeric(count)]
   
-  # Outlier Adjustment
+  # ---------------- Outlier Adjustment ----------------
   if (adjust_outliers) {
-    cat(" -> Adjusting outliers with rolling average...\n")
+    message(" -> Adjusting outliers with rolling average + fallback...")
+    
+    # Masked version of count: NA where outliers
+    data_adj[, count_no_outlier := ifelse(outlier_flag == 1, NA, count)]
+    
+    # Rolling average: 12-month center-aligned
     data_adj[, rolling_avg_outlier := frollapply(
-      count * (outlier_flag == 0),
+      count_no_outlier,
       n = 12,
       FUN = function(x) mean(x[x > 0], na.rm = TRUE),
-      fill = NA, align = "center"
+      fill = NA,
+      align = "center"
     ), by = .(facility_id, indicator_common_id)]
     
-    data_adj[outlier_flag == 1 & !is.na(rolling_avg_outlier), count_working := rolling_avg_outlier]
+    # Fallback: median of non-outlier, non-zero counts
+    data_adj[, fallback_median_outlier := median(count[outlier_flag == 0 & count > 0], na.rm = TRUE),
+             by = .(facility_id, indicator_common_id)]
+    
+    # Track adjustment method
+    data_adj[, adj_method := NA_character_]
+    
+    # Apply rolling adjustment
+    data_adj[outlier_flag == 1 & !is.na(rolling_avg_outlier), `:=`(
+      count_working = rolling_avg_outlier,
+      adj_method = "rolling"
+    )]
+    
+    # Apply fallback median where rolling is missing
+    data_adj[outlier_flag == 1 & is.na(rolling_avg_outlier) & !is.na(fallback_median_outlier), `:=`(
+      count_working = fallback_median_outlier,
+      adj_method = "fallback"
+    )]
+    
+    # Debug summary of method usage
+    adj_debug <- data_adj[outlier_flag == 1 & !is.na(adj_method), .N, by = adj_method]
+    message("   -> Outlier adjustment method counts:")
+    print(adj_debug)
   }
   
-  # Completeness Adjustment
+  # ---------------- Completeness Adjustment ----------------
   if (adjust_completeness) {
-    cat(" -> Adjusting missing data with rolling + fallback methods...\n")
+    message(" -> Adjusting missing data with rolling + fallback methods...")
     
+    # Rolling average of count_working for completeness imputation
     data_adj[, rolling_avg_completeness := rollapplyr(
       count_working,
       width = 12,
@@ -87,12 +116,16 @@ apply_adjustments <- function(raw_data, completeness_data, outlier_data,
         valid_x <- x[!is.na(x) & x > 0]
         if (length(valid_x) >= 6) mean(valid_x, na.rm = TRUE) else NA_real_
       },
-      fill = NA, partial = TRUE, align = "center"
+      fill = NA,
+      partial = TRUE,
+      align = "center"
     ), by = .(facility_id, indicator_common_id)]
     
+    # Fallback: overall mean of non-zero count_working
     data_adj[, fallback_mean := mean(count_working[!is.na(count_working) & count_working > 0], na.rm = TRUE),
              by = .(facility_id, indicator_common_id)]
     
+    # Apply completeness adjustment
     data_adj[is.na(count_working) & !is.na(rolling_avg_completeness), count_working := rolling_avg_completeness]
     data_adj[is.na(count_working) & !is.na(fallback_mean), count_working := fallback_mean]
   }
