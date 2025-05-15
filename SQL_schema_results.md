@@ -246,3 +246,12 @@ CREATE TABLE ro_m4_combined_coverage_province_csv (
   coverage_cov NUMERIC
 );
 ```
+
+
+``` js
+CREATE TABLE ro_m4_selected_denominator_per_indicator_csv ( 
+  indicator_common_id TEXT NOT NULL,
+  denominator TEXT NOT NULL,
+
+);
+```
