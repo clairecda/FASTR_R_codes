@@ -3,12 +3,13 @@ MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
 MADS <- 10                           # Number of MADs
 GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1")
+CONSISTENCY_PAIRS_USED <- c("penta", "anc")  # current options: "penta", "anc", "delivery", "malaria"
 
-PROJECT_DATA_HMIS <- "data_nigeria_full.csv"
+PROJECT_DATA_HMIS <- "hmis_nigeria_20250506.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 5
+# Last edit: 2025 May 14
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to evaluate the reliability of HMIS data by
@@ -19,7 +20,7 @@ PROJECT_DATA_HMIS <- "data_nigeria_full.csv"
 
 
 
-# DATA: nigeria_imported_data.csv
+# DATA: data_nigeria_full.csv
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
 # Outlier Analysis Parameters
@@ -30,22 +31,26 @@ outlier_params <- list(
 
 
 # Consistency Analysis Parameters 
-consistency_params <- list(
-  consistency_pairs = list(
-    pair_delivery = c("bcg", "delivery"),   # BCG / Delivery
-    pair_penta = c("penta1", "penta3"),     # Penta1 / Penta3
-    pair_anc = c("anc1", "anc4")            # ANC1 / ANC4
-    #,pair_malaria = c("rdt_positive_plus_micro", "confirmed_malaria_treated_with_act")  # Placeholder: (rdt_positive + micro_positive) = confirmed_treated
-    
-  ),
-  consistency_ranges = list(
-    pair_delivery = c(lower = 0.7, upper = 1.3),  # BCG / Delivery within 0.7 to 1.3
-    pair_penta = c(lower = 1, upper = Inf),       # Penta1 / Penta3 > 1
-    pair_anc = c(lower = 1, upper = Inf)          # ANC1 / ANC4 > 1
-    #,pair_malaria = c(lower = 0.9, upper = 1.1)  # Placeholder range: values should be close
-    
-  )
+all_consistency_pairs <- list(
+  pair_penta    = c("penta1", "penta3"),
+  pair_anc      = c("anc1", "anc4"),
+  pair_delivery = c("bcg", "delivery"),
+  pair_malaria  = c("rdt_positive_plus_micro", "confirmed_malaria_treated_with_act")
 )
+
+all_consistency_ranges <- list(
+  pair_penta    = c(lower = 1, upper = Inf),
+  pair_anc      = c(lower = 1, upper = Inf),
+  pair_delivery = c(lower = 0.7, upper = 1.3),
+  pair_malaria  = c(lower = 0.9, upper = 1.1)
+)
+
+# Dynamically select only specified pairs
+consistency_params <- list(
+  consistency_pairs  = all_consistency_pairs[names(all_consistency_pairs) %in% paste0("pair_", CONSISTENCY_PAIRS_USED)],
+  consistency_ranges = all_consistency_ranges[names(all_consistency_ranges) %in% paste0("pair_", CONSISTENCY_PAIRS_USED)]
+)
+
 
 # DQA Rules
 default_dqa_ind <- DQA_INDICATORS
@@ -191,7 +196,6 @@ outlier_analysis <- function(data, geo_cols, outlier_params) {
   
   return(outlier_data)
 }
-
 
 # PART 2-A Consistency Analysis - Geo Level -----------------------------------------------------------------
 geo_consistency_analysis <- function(data, geo_cols, geo_level, consistency_params) {
