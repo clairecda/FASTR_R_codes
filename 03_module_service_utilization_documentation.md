@@ -28,18 +28,50 @@ The Service Utilization module is designed to evaluate trends in health service 
 
 2.  **Disruption analysis**
 
-### Control chart analysis
+### Control Chart Analysis
 
-The control chart analysis aggregates service volume data at the province level to monitor trends, filling in missing months to create a continuous time series. A regression model estimates expected values based on historical trends and seasonality, while smoothing techniques such as rolling averages and interpolation reduce noise.
+Service volumes are aggregated at the province level. The pipeline removes outliers (`outlier_flag == 1`), fills in missing months, and filters low-volume months (\<50% of global mean volume).
 
-Anomalies (disruptions) are flagged when actual service volumes significantly deviate from expected values based on the control variable (`control`). The `control` variable is calculated as the standardized residual, defined as the difference between actual service volume and the smoothed predicted value (`count_smooth`), divided by the standard deviation of residuals (`sd_residual`). This normalization ensures that deviations are measured relative to typical variations, making it easier to identify significant disruptions. If the absolute value of `control` is greater than or equal to 2, the point is flagged as an anomaly (`tag = 1`).\
-Forward and backward tagging ensures systemic disruptions are captured, rather than isolated events, by propagating flagged anomalies in both directions.
+A robust regression model estimates expected service volumes per indicator × province (`panelvar`). A 6-month centered rolling median is applied to smooth the predicted values. Residuals (actual - smoothed) are standardized using MAD. Disruptions are identified using a rule-based tagging system. Each rule is controlled by user-defined parameters, allowing customization of the sensitivity and behavior of the detection logic:
 
-Once anomalies are flagged, they are merged with a disruption database that contains information on known events such as pandemics (e.g., COVID-19), conflicts, coups, and policy changes. If a flagged anomaly falls within a known disruption period, the `tagged` variable is updated to ensure these disruptions are explicitly marked in the dataset.
+-   **Sharp Disruptions**\
+    Flags a single month when the standardized residual (residual divided by MAD) exceeds a threshold:\
+    $$
+    \left| \frac{\text{residual}}{\text{MAD}} \right| \geq \text{THRESHOLD}
+    $$
+    -   **Parameter:** `THRESHOLD` (default: `1.5`)
+    -   Lower values make the detection more sensitive to sudden spikes or dips.
+-   **Sustained Drops**\
+    Flags a sustained drop if:
+    -   Three consecutive months show mild deviations (standardized residual ≥ 1), and
+    -   The final month also exceeds the `THRESHOLD`.\
+        This captures slower, compounding declines.
+-   **Sustained Dips**\
+    Flags periods where the actual volume falls consistently below a defined proportion of expected volume (smoothed prediction):\
+    $$
+    \text{count\_original} < \text{DIP\_THRESHOLD} \times \text{count\_smooth}
+    $$
+    -   **Parameter:** `DIP_THRESHOLD` (default: `0.90`)
+    -   Users can adjust this to detect deeper or shallower dips (e.g., `0.80` for a 20% drop).
+-   **Sustained Rises**\
+    Symmetric to dips, flags periods of consistent overperformance:\
+    $$
+    \text{count\_original} > \text{RISE\_THRESHOLD} \times \text{count\_smooth}
+    $$
+    -   **Parameter:** `RISE_THRESHOLD` (default: `1 / DIP_THRESHOLD`, e.g., `1.11`)
+    -   Users can adjust this to detect upward surges in volume.
+-   **Missing Data**\
+    Flags when 2 or more of the past 3 months have missing or zero service volume.
+    -   **Fixed rule**.
+-   **Recent Tail Override**\
+    Automatically flags all months in the last 6 months of data to ensure recent changes are not missed due to lack of trend data.
+    -   **Fixed rule**.
 
-The results of the control chart analysis are saved in `M3_chartout.csv`, which serves as an input for the disruption analysis.
+These parameters can be adjusted to make the detection stricter or more lenient depending on the use case.
 
-### Disruption analysis
+A final `tagged` flag is assigned where any of the above conditions are met. Results are saved to `M3_chartout.csv`.
+
+### Disruption Analysis
 
 Once anomalies are identified and saved in `M3_chartout.csv`, the disruption analysis quantifies their impact using regression models. These models estimate how much service utilization changed during the flagged disruption periods by adjusting for long-term trends and seasonal variations.
 
@@ -60,121 +92,128 @@ The coefficient on $`\text{tagged}`$ ($`\beta_2`$) measures the relative change 
 
 ##### **PART 1 - Control Chart Analysis**
 
-**Step 1: Prepare the data (note here for Claire to review - should we read form module 2? if yes: create new output = remove outliers do not adjust the data and aggregate to province)**
+#### Step 1: Prepare the Data
 
--   Read service utilization data and remove flagged outliers.
+-   Load raw HMIS service utilization data.
 
--   Create a `date` column combining `year` and `month`.
+-   Merge in outlier flags (`outlier_flag`) by facility × indicator × month.
 
--   Generates a panel variable (`panelvar`) that groups data by `indicator_common_id` and `admin_area_2` (province level).
+-   Remove rows flagged as outliers (`outlier_flag == 1`).
 
--   Aggregates data at the province level while keeping country-level identifiers (`admin_area_1`).
+-   Create a `date` variable from `period_id` and extract `year` and `month`.
 
--   Expands missing months within each province group to ensure continuity in the time series.
+-   Create a unique `panelvar` for each province-indicator (`admin_area_2 × indicator_common_id`).
 
--   Fills missing values in `indicator_common_id`, `admin_area_1`, and `admin_area_2` using forward and backward filling.
+-   Aggregate data to province level by summing `count_model` (based on `SELECTEDCOUNT`) by date.
 
-**Step 2: Filter out low-volume data**
+-   Fill in missing months within each panel to ensure continuity.
 
--   Compute the global mean of service volumes for each group (`panelvar`).
+-   Fill missing metadata (`indicator_common_id`, `admin_area_2`) using forward and backward fill.
 
--   Drop months where service volumes are less than 50% of the global mean.
+#### Step 2: Filter Out Low-Volume Months
 
-**Step 3: Apply regression and smoothing**
+-   Compute the global mean service volume for each `panelvar`.
 
--   Run a linear regression for each province group to estimate expected service volumes
+-   If `count_original` is \<50% of the global mean, drop the value by setting it to `NA`.
 
-    $`Y_{it} = \beta_0 + \sum_{m=1}^{12} \gamma_m \cdot \text{month}_m + \beta_1 \cdot \text{date} + \epsilon_{it}`$
+#### Step 3: Apply Regression and Smoothing
 
-Where:
+Estimate expected service volume using robust regression, then smooth the predicted trend.
 
-$Y_{it}$ is the observed service volume,
+-   **Model fitting:**
 
-$\text{month}_m$ controls for seasonality,
+    -   If ≥12 observations and \>12 unique dates:\
+        `Y_it = β₀ + Σ γₘ · month_m + β₁ · date + ε_it`
 
-$\text{date}$ captures time trends,
+    -   If only ≥12 observations:\
+        `Y_it = β₀ + β₁ · date + ε_it`
 
-$\epsilon_{it}$ is the error term.
+    -   If insufficient data: use the median of observed values.
 
--   If sufficient data (≥12 months) is available, predicted values are generated; otherwise, the median is used.
+-   Fit robust regression (`rlm`) for each panel.
 
-**Step 4: Smoothing and residual calculation**
+-   **Apply rolling median smoothing** to predictions:
 
--   Applies lead-lag smoothing as described below.
+    ```         
+    count_smooth_it = Median(count_predict_{t-k}, ..., count_predict_t, ..., count_predict_{t+k})
+    ```
 
-*Lead-lag smoothing* is a technique used to remove noise from a dataset by averaging observed values across past and future periods. The process works as follows:
+    -   **Parameter:** `SMOOTH_K` (default: 7, must be odd)
 
-1.  For each data point, the algorithm considers a window of past (lagged) and future (leading) values within a specified number of months.
+    -   Larger `SMOOTH_K` smooths more; smaller retains more variation.
 
-2.  Averages these values, creating a smoothed estimate that reduces short-term fluctuations and better represents the underlying trend.
+-   If smoothing is not possible (e.g., at series edges), fallback to model predictions.
 
-3.  Interpolates missing values using linear interpolation, which estimates the missing values by assuming a straight-line relationship between the known data points before and after the gap.
+-   **Calculate residuals:**\
+    `residual_it = count_original_it - count_smooth_it`
 
-4.  Replaces each observed value with the computed smoothed value.
+-   **Standardize residuals using MAD:**\
+    `robust_control_it = residual_it / MAD_i`
 
-Mathematically, lead-lag smoothing is represented as:
+This standardized control variable is used to detect anomalies in Step 4.
 
-$`{count\_smooth}_{it} = \frac{1}{2k+1} \sum_{j=-k}^{k} Y_{i,t+j}`$
+#### Step 4: Tag Disruptions
 
-where:
+Apply rule-based tagging to identify potential disruptions. Each rule is governed by user-defined parameters that can be tuned for sensitivity.
 
--   $Y_{i,t}$ is the observed service volume at time ${t}$ for province ${i}$,
+-   **Sharp Disruptions**
 
--   ${k}$ is the number of months considered for smoothing (e.g., 6 months),
+    -   Condition: `|robust_control| ≥ THRESHOLD`
 
--   ${t+j}$ represents the lead (+) and lag (-) months,
+    -   **Parameter:** `THRESHOLD` (default: 1.5)
 
--   The sum takes the average across the window of ${2k+1}$ months.
+    -   Tags the individual month.
 
--   Computes residuals: the difference between actual values and smoothed predictions `count_smooth`.
+-   **Sustained Drops**
 
-$`{residual}_{it} = Y_{it} -   {count\_smooth}_{it}`$
+    -   Condition: 3 consecutive months with mild deviations (`|robust_control| ≥ 1`), where the final month also exceeds `THRESHOLD`.
 
-where:
+    -   Only the **final month** in the sequence is tagged (`tag_sustained == 1`).
 
-${Y_{it}}$ is the observed service volume
+    -   Helps identify gradual declines that culminate in a significant deviation.
 
-${count\_smooth}$ is the smoothed expected value.
+-   **Sustained Dips**
 
--   Standardizes residuals using the standard deviation (`sd_residual`) to obtain the `control` variable.
+    -   Condition: `count_original < DIP_THRESHOLD × count_smooth` for 3 or more consecutive months
 
-The `control` variable measures how many standard deviations the observed volume deviates from the expected trend.
+    -   **Parameter:** `DIP_THRESHOLD` (default: 0.90)
 
-$`\text{control}_{it} = \frac{\text{residual}_{it}}{sd\_residual}`$
+    -   If the condition holds for 3 or more months in a row, the entire sequence is tagged.
 
-If:
+-   **Sustained Rises**
 
-$\text{control}_{it}> 2$, the observed service volume is significantly higher than expected.
+    -   Condition: `count_original > RISE_THRESHOLD × count_smooth` for 3 or more consecutive months
 
-$\text{control}_{it}< 2$, the observed service volume is significantly lower than expected.
+    -   **Parameter:** `RISE_THRESHOLD` (default: 1 / DIP_THRESHOLD, e.g., 1.11)
 
-Values between -2 and 2 are considered within the normal range of variability.
+    -   If the condition holds for 3 or more months in a row, the entire sequence is tagged.
 
-**Step 5: Tagging disruptions**
+-   **Missing Data**
 
-Once the `control` variable is computed, disruptions are identified and tagged:
+    -   Condition: 2 or more of the past 3 months are missing (`NA`) or zero
 
-**Initial Tagging:**
+    -   Tags the final month in the flagged sequence.
 
--   If `abs(control) >= 2`, the time point is flagged as an anomaly (`tag = 1`).
+-   **Recent Tail Override**
 
--   If the deviation is small (`abs(control) <= 0.5`), it is considered within normal fluctuations and assigned `tag = 0`.
+    -   Automatically tags **all months in the last 6 months** of data to ensure recent trends are reviewed, even if model-based tagging is not conclusive.
 
-If the absolute difference between `Y_{it}` and `count_smooth` is less than 5% of `count_smooth`, it is also assigned `tag = 0`.
+-   **Final Flag:**\
+    A month is assigned `tagged = 1` if **any** of the following conditions are met:
 
-$`\text{tag}_{it} =
-\begin{cases}
-1, & \text{if } |\text{control}_{it}| \geq 2 \\
-0, & \text{if } |Y_{it} - \text{count\_smooth}_{it} | \text{count\_smooth}_{it} < 0.05 \\
-0, & \text{if } |\text{control}_{it}| \leq 0.5 \\
-\text{NA}, & \text{otherwise}
-\end{cases}`$
+    -   `tag_sharp == 1`
 
-**Step 6: Crossing with the disruption database**
+    -   `tag_sustained == 1`
 
--   The flagged anomalies from the control chart analysis are merged with the disruption database, which contains known events such as pandemics (e.g., COVID-19), conflicts, coups, and policy changes.
--   If a flagged anomaly falls within a known disruption period (i.e., the date of service disruption is within the start and end dates of a documented event), the `tagged` variable is updated to explicitly mark it as a disruption.
--   The results are saved in `M3_chartout.csv`, which serves as the input for Part 2: Disruption Regression Analysis.
+    -   `tag_sustained_dip == 1`
+
+    -   `tag_sustained_rise == 1`
+
+    -   `tag_missing == 1`
+
+    -   It falls within the most recent 6 months (`last_6_months == 1`)
+
+Tagged records are saved in `M3_chartout.csv` and passed to the disruption analysis.
 
 ##### PART 2. Disruption Analysis
 
@@ -273,30 +312,49 @@ $\epsilon_{it}$ = error term
 
 The district-level regression is implemented using the `feols()` function in R: `model_district <- tryCatch( feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged | admin_area_3")), data = district_data, cluster = as.formula(paste0("~", lowest_geo_level))), error = function(e) { print(paste("Regression failed for:", indicator, "in", district, "Error:", e$message)) return(NULL) } )`
 
-Step 5: Prepare outputs for visualization
+Note on outputs:
 
-Each regression model (country-wide, province-level, and district-level) produces the following key outputs:
+Each regression level produces the following outputs:
 
--   Expected values (`expect_admin_area_*`): The predicted service volume based on the regression model, adjusted for seasonality and time trends.
+-   **Expected values (`expect_admin_area_*`)**: Predicted service volume adjusted for seasonality and trends.
+-   **Disruption effect (`b_admin_area_*`)**: Estimated relative change during disruptions:
 
--   Disruption effect (`b_admin_area_*`): The estimated relative change in service utilization during the disruption period, computed as:
+$$b_{\text{admin_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}$$
 
-    $`b_{\text{admin\_area_*}} = -\frac{\text{diff mean}}{\text{predict mean}}`$
+-   **Trend coefficient (`b_trend_admin_area_*`)**: Reflects long-term trend.
+    -   Positive = increasing service use
+    -   Negative = declining service use
+    -   Near zero = stable trend
+-   **P-value (`p_admin_area_*`)**: Measures statistical significance of the disruption effect.
+    -   Lower values = stronger evidence of true disruption
 
-    This measures the impact of the disruption relative to expected values.
+**Step 5: Prepare Outputs for Visualization**
 
--   Trend coefficient (`b_trend_admin_area_*`): The estimated underlying time trend in service volume, capturing long-term changes unrelated to disruptions. This coefficient is calculated separately at three levels, since trends might look different at different geographic scales. It shows whether service volumes are naturally increasing or decreasing over time, independent of disruptions.
+Once expected values have been calculated for each level (country, province, district), the pipeline compares predicted and actual values to assess the magnitude of disruption.
 
-    -   If the trend coefficient is positive, it means service volumes were gradually increasing before, during, and after disruptions.
+For each month and indicator, the pipeline calculates:
 
-    -   If the trend coefficient is negative, it means service volumes were gradually declining over time.
+-   **Absolute and percentage difference** between predicted and actual values:
 
-    -   If the coefficient is close to zero, it means there was no strong long-term trend—service levels were fairly stable.
+    $\text{diff_percent} = 100 \times \frac{\text{predicted} - \text{actual}}{\text{predicted}}$
 
--   Statistical significance (p-value) (`p_admin_area_*`): The probability that the disruption effect (`b_admin_area_*`) is due to random variation rather than an actual disruption. Lower values indicate stronger evidence of a true effect.
+-   A configurable threshold parameter `DIFFPERCENT` (default: `10`) is used to determine when a disruption is significant.
 
-(ADD BELOW : HOW IS THE DATA PREPARED FOR VISUALIZATION / Line graphs and Maps as per Guinea Slide deck)
+    If the percentage difference exceeds ±10%, the expected (predicted) value is retained and used for plotting and summary statistics. Otherwise, the actual observed value is used.
+
+    This ensures that minor fluctuations do not lead to artificial disruptions in the visualization, while meaningful deviations are preserved.
+
+-   The final adjusted value for plotting is stored in a field such as `count_expected_if_above_diff_threshold`.
+
+    This value reflects either:
+
+    -   The predicted count (if deviation \> threshold), or
+    -   The actual count (if within acceptable range).
+
+This logic is applied consistently across admin level 1 (national), admin level 2 (province), and admin level 3 (district).
+
+These adjusted values are then exported as part of the final output files for each level.
 
 ------------------------------------------------------------------------
 
-last edit March 19
+last edit May 18
