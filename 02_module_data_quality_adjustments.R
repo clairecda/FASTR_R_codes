@@ -24,6 +24,7 @@ library(data.table)  # For fast data processing & merging
 library(zoo)         # For rolling averages
 library(stringr)     # For `str_subset()`
 library(dplyr)
+library(lubridate)
 
 EXCLUDED_FROM_ADJUSTMENT <- c("u5_deaths", "maternal_deaths")
 
@@ -43,63 +44,91 @@ apply_adjustments <- function(raw_data, completeness_data, outlier_data,
   setDT(outlier_data)
   setDT(completeness_data)
   
-  
-  # Merge completeness + outlier flags
+  # Merge
   data_adj <- merge(completeness_data,
                     outlier_data[, .(facility_id, indicator_common_id, period_id, outlier_flag)],
                     by = c("facility_id", "indicator_common_id", "period_id"),
                     all.x = TRUE)
   data_adj[, outlier_flag := fifelse(is.na(outlier_flag), 0, outlier_flag)]
   
-  # Merge raw counts
   data_adj <- merge(data_adj,
                     raw_data[, .(facility_id, indicator_common_id, period_id, count)],
                     by = c("facility_id", "indicator_common_id", "period_id"),
                     all.x = TRUE)
   
-  # Initial working count = original count
   data_adj[, count_working := as.numeric(count)]
   
   # ---------------- Outlier Adjustment ----------------
   if (adjust_outliers) {
-    message(" -> Adjusting outliers with 6-month rolling average + lag/lead fallback...")
+    message(" -> Adjusting outliers using enhanced logic with fallback to same month last year...")
     
-    # Mask outliers
-    data_adj[, count_no_outlier := fifelse(outlier_flag == 1, NA_real_, count)]
+    data_adj[, date := as.Date(paste0(substr(period_id, 1, 4), "-", substr(period_id, 6, 7), "-01"))]
+    setorder(data_adj, facility_id, indicator_common_id, date)
     
-    # Rolling means
-    data_adj[, rolling_avg_center := frollapply(count_no_outlier, n = 6,
-                                                FUN = function(x) mean(x[x > 0], na.rm = TRUE),
-                                                fill = NA, align = "center"),
-             by = .(facility_id, indicator_common_id)]
-    data_adj[, rolling_avg_lag := frollapply(count_no_outlier, n = 6,
-                                             FUN = function(x) mean(x[x > 0], na.rm = TRUE),
-                                             fill = NA, align = "right"),
-             by = .(facility_id, indicator_common_id)]
-    data_adj[, rolling_avg_lead := frollapply(count_no_outlier, n = 6,
-                                              FUN = function(x) mean(x[x > 0], na.rm = TRUE),
-                                              fill = NA, align = "left"),
-             by = .(facility_id, indicator_common_id)]
-    
-    # Apply fallback logic
+    data_adj[, count_working := as.numeric(count)]
     data_adj[, adj_method := NA_character_]
-    data_adj[outlier_flag == 1 & !is.na(rolling_avg_center), `:=`(
-      count_working = rolling_avg_center,
-      adj_method = "rolling6_center"
-    )]
-    data_adj[outlier_flag == 1 & is.na(rolling_avg_center) & !is.na(rolling_avg_lag), `:=`(
-      count_working = rolling_avg_lag,
-      adj_method = "rolling6_lag"
-    )]
-    data_adj[outlier_flag == 1 & is.na(rolling_avg_center) & is.na(rolling_avg_lag) & !is.na(rolling_avg_lead), `:=`(
-      count_working = rolling_avg_lead,
-      adj_method = "rolling6_lead"
-    )]
-    data_adj[outlier_flag == 1 & is.na(rolling_avg_center) & is.na(rolling_avg_lag) & is.na(rolling_avg_lead), `:=`(
-      adj_method = "unadjusted"
-    )]
+    data_adj[, adjust_note := NA_character_]
     
-    # Debug summary
+    data_adj <- data_adj[, {
+      result <- copy(.SD)
+      n <- .N
+      for (i in seq_len(n)) {
+        if (outlier_flag[i] != 1) next
+        current_date <- date[i]
+        
+        # Identify valid (non-outlier, >0) values
+        valid_idx <- which(outlier_flag == 0 & count > 0)
+        
+        if (i <= 6) {
+          # First 6 months: forward average
+          fwd_idx <- valid_idx[valid_idx > i & date[valid_idx] <= current_date %m+% months(12)]
+          vals <- count[fwd_idx][1:6]
+          if (length(vals) == 6) {
+            result$count_working[i] <- mean(vals)
+            result$adj_method[i] <- "roll6_forward"
+            next
+          }
+        } else if (i >= n - 5) {
+          # Last 6 months: backward average
+          back_idx <- valid_idx[valid_idx < i & date[valid_idx] >= current_date %m-% months(12)]
+          vals <- rev(count[back_idx])[1:6]
+          if (length(vals) == 6) {
+            result$count_working[i] <- mean(vals)
+            result$adj_method[i] <- "roll6_backward"
+            next
+          }
+        } else {
+          # Middle: centered average
+          before_idx <- valid_idx[valid_idx < i & date[valid_idx] >= current_date %m-% months(12)]
+          after_idx  <- valid_idx[valid_idx > i & date[valid_idx] <= current_date %m+% months(12)]
+          vals <- c(tail(count[before_idx], 3), head(count[after_idx], 3))
+          if (length(vals) == 6) {
+            result$count_working[i] <- mean(vals)
+            result$adj_method[i] <- "roll6_center"
+            next
+          }
+        }
+        
+        # Fallback: same month last year
+        last_year_date <- current_date %m-% months(12)
+        fallback_row <- which(date == last_year_date)
+        if (length(fallback_row) == 1 &&
+            isTRUE(outlier_flag[fallback_row] == 0) &&
+            isTRUE(count[fallback_row] > 0)) {
+          result$count_working[i] <- count[fallback_row]
+          result$adj_method[i] <- "same_month_last_year"
+          result$adjust_note[i] <- paste("used", format(last_year_date, "%b-%Y"))
+          next
+        }
+        
+        
+        # Final fallback: unadjusted
+        result$adj_method[i] <- "unadjusted"
+        result$adjust_note[i] <- "no valid replacement"
+      }
+      result
+    }, by = .(facility_id, indicator_common_id)]
+    
     adj_debug <- data_adj[outlier_flag == 1, .N, by = adj_method][order(adj_method)]
     message("   -> Outlier adjustment method counts:")
     print(adj_debug)
@@ -107,13 +136,13 @@ apply_adjustments <- function(raw_data, completeness_data, outlier_data,
   
   # ---------------- Completeness Adjustment ----------------
   if (adjust_completeness) {
-    message(" -> Adjusting missing data with 12-month rolling average + fallback mean...")
+    message(" -> Adjusting missing data with 12-month rolling average (min 6 valid) + fallback mean...")
     
     data_adj[, rolling_avg_completeness := rollapplyr(
-      count_working, width = 12,
+      count_working, 12,
       FUN = function(x) {
         valid <- x[!is.na(x) & x > 0]
-        if (length(valid) >= 6) mean(valid, na.rm = TRUE) else NA_real_
+        if (length(valid) >= 6) mean(valid) else NA_real_
       },
       fill = NA, partial = TRUE, align = "center"
     ), by = .(facility_id, indicator_common_id)]
@@ -122,12 +151,11 @@ apply_adjustments <- function(raw_data, completeness_data, outlier_data,
              by = .(facility_id, indicator_common_id)]
     
     data_adj[is.na(count_working) & !is.na(rolling_avg_completeness), count_working := rolling_avg_completeness]
-    data_adj[is.na(count_working) & !is.na(fallback_mean), count_working := fallback_mean]
+    data_adj[is.na(count_working) & is.na(rolling_avg_completeness) & !is.na(fallback_mean), count_working := fallback_mean]
   }
   
   return(data_adj)
 }
-
 
 
 # Function to Apply Adjustments Across Scenarios ------------------------------------------------------------
