@@ -1,4 +1,5 @@
 SELECTEDCOUNT <- "count_final_completeness"  #use count_final_none or count_final_completeness
+VISUALIZATIONCOUNT <- "count_final_outliers" 
 
 SMOOTH_K <- 7                        # Window size (in months) for rolling median smoothing of predicted counts.
                                      # Used in the control chart to reduce noise in trend estimation. MUST BE ODD
@@ -21,7 +22,7 @@ RUN_DISTRICT_MODEL <- FALSE          # Set to TRUE to run regressions at the low
 
 
 
-PROJECT_DATA_HMIS <- "nigeria_hmis_for_claire.csv"
+PROJECT_DATA_HMIS <- "hmis_ghana.csv"
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
 # Last edit: 2025 May 6
@@ -556,14 +557,14 @@ data_disruption <- data_disruption %>%
 summary_disruption_admin1 <- data_disruption %>%
   group_by(admin_area_1, period_id, indicator_common_id) %>%
   summarise(
-    count_original     = mean(!!sym(SELECTEDCOUNT), na.rm = TRUE),
+    count_original     = mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE),
     count_expect       = mean(expect_admin_area_1, na.rm = TRUE),
     b                  = mean(b_admin_area_1, na.rm = TRUE),
     p                  = mean(p_admin_area_1, na.rm = TRUE),
     num_obs            = n(),
     count_expect_sum   = sum(expect_admin_area_1, na.rm = TRUE),
-    count_sum          = sum(!!sym(SELECTEDCOUNT), na.rm = TRUE),
-    diff_percent       = 100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
+    count_sum          = sum(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE),
+    diff_percent       = 100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)) /
       mean(expect_admin_area_1, na.rm = TRUE),
     diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
     #count_expected_if_above_diff_threshold
@@ -571,9 +572,9 @@ summary_disruption_admin1 <- data_disruption %>%
       abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
       count_expect_sum, count_sum),
     count_expect_diff = ifelse(
-      abs(100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
+      abs(100 * (mean(expect_admin_area_1, na.rm = TRUE) - mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)) /
             mean(expect_admin_area_1, na.rm = TRUE)) > DIFFPERCENT,
-      mean(expect_admin_area_1, na.rm = TRUE), mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)
+      mean(expect_admin_area_1, na.rm = TRUE), mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)
     ),
     .groups = "drop"
   )
@@ -582,14 +583,14 @@ summary_disruption_admin1 <- data_disruption %>%
 summary_disruption_admin2 <- data_disruption %>%
   group_by(admin_area_2, period_id, indicator_common_id) %>%
   summarise(
-    count_original     = mean(!!sym(SELECTEDCOUNT), na.rm = TRUE),
+    count_original     = mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE),
     count_expect       = mean(expect_admin_area_2, na.rm = TRUE),
     b                  = mean(b_admin_area_2, na.rm = TRUE),
     p                  = mean(p_admin_area_2, na.rm = TRUE),
     num_obs            = n(),
     count_expect_sum   = sum(expect_admin_area_2, na.rm = TRUE),
-    count_sum          = sum(!!sym(SELECTEDCOUNT), na.rm = TRUE),
-    diff_percent       = 100 * (mean(expect_admin_area_2, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
+    count_sum          = sum(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE),
+    diff_percent       = 100 * (mean(expect_admin_area_2, na.rm = TRUE) - mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)) /
       mean(expect_admin_area_2, na.rm = TRUE),
     diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
     #count_expected_if_above_diff_threshold
@@ -598,9 +599,9 @@ summary_disruption_admin2 <- data_disruption %>%
       abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
       count_expect_sum, count_sum),
     count_expect_diff = ifelse(
-      abs(100 * (mean(expect_admin_area_2, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
+      abs(100 * (mean(expect_admin_area_2, na.rm = TRUE) - mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)) /
             mean(expect_admin_area_2, na.rm = TRUE)) > DIFFPERCENT,
-      mean(expect_admin_area_2, na.rm = TRUE), mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)
+      mean(expect_admin_area_2, na.rm = TRUE), mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)
     ),
     .groups = "drop"
   )
@@ -611,14 +612,14 @@ if (RUN_DISTRICT_MODEL) {
   summary_disruption_admin3 <- data_disruption %>%
     group_by(admin_area_3, period_id, indicator_common_id) %>%
     summarise(
-      count_original     = mean(!!sym(SELECTEDCOUNT), na.rm = TRUE),
+      count_original     = mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE),
       count_expect       = mean(expect_admin_area_3, na.rm = TRUE),
       b                  = mean(b_admin_area_3, na.rm = TRUE),
       p                  = mean(p_admin_area_3, na.rm = TRUE),
       num_obs            = n(),
       count_expect_sum   = sum(expect_admin_area_3, na.rm = TRUE),
-      count_sum          = sum(!!sym(SELECTEDCOUNT), na.rm = TRUE),
-      diff_percent       = 100 * (mean(expect_admin_area_3, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
+      count_sum          = sum(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE),
+      diff_percent       = 100 * (mean(expect_admin_area_3, na.rm = TRUE) - mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)) /
         mean(expect_admin_area_3, na.rm = TRUE),
       diff_percent_sum   = 100 * (count_expect_sum - count_sum) / count_expect_sum,
       #count_expect_diff_sum
@@ -627,9 +628,9 @@ if (RUN_DISTRICT_MODEL) {
         abs(100 * (count_expect_sum - count_sum) / count_expect_sum) > DIFFPERCENT,
         count_expect_sum, count_sum),
       count_expect_diff = ifelse(
-        abs(100 * (mean(expect_admin_area_3, na.rm = TRUE) - mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)) /
+        abs(100 * (mean(expect_admin_area_3, na.rm = TRUE) - mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)) /
               mean(expect_admin_area_3, na.rm = TRUE)) > DIFFPERCENT,
-        mean(expect_admin_area_3, na.rm = TRUE), mean(!!sym(SELECTEDCOUNT), na.rm = TRUE)
+        mean(expect_admin_area_3, na.rm = TRUE), mean(!!sym(VISUALIZATIONCOUNT), na.rm = TRUE)
       ),
       .groups = "drop"
     )
@@ -646,7 +647,7 @@ M3_chartout_export <- M3_chartout_selected %>%
     quarter = as.integer((as.integer(format(date, "%m")) - 1) %/% 3 + 1),
     quarter_id = sprintf("%d%02d", year, quarter)
   ) %>%
-  select(admin_area_2, indicator_common_id, period_id, quarter_id, year, tagged)
+  dplyr::select(admin_area_2, indicator_common_id, period_id, quarter_id, year, tagged)
 
 
 write.csv(M3_chartout_export, "M3_chartout.csv", row.names = FALSE)
@@ -659,7 +660,7 @@ summary_disruption_admin1_export <- summary_disruption_admin1 %>%
     quarter = ((period_id %% 100 - 1) %/% 3) + 1,
     quarter_id = sprintf("%d%02d", year, quarter)
   ) %>%
-  select(admin_area_1, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
+  dplyr::select(admin_area_1, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
 
 write.csv(summary_disruption_admin1_export, "M3_disruptions_analysis_admin_area_1.csv", row.names = FALSE)
 
@@ -669,7 +670,7 @@ summary_disruption_admin2_export <- summary_disruption_admin2 %>%
     quarter = ((period_id %% 100 - 1) %/% 3) + 1,
     quarter_id = sprintf("%d%02d", year, quarter)
   ) %>%
-  select(admin_area_2, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
+  dplyr::select(admin_area_2, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
 
 write.csv(summary_disruption_admin2_export, "M3_disruptions_analysis_admin_area_2.csv", row.names = FALSE)
 
@@ -681,7 +682,7 @@ if (RUN_DISTRICT_MODEL) {
       quarter = ((period_id %% 100 - 1) %/% 3) + 1,
       quarter_id = sprintf("%d%02d", year, quarter)
     ) %>%
-    select(admin_area_3, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
+    dplyr::select(admin_area_3, indicator_common_id, period_id, quarter_id, year, count_sum, count_expected_if_above_diff_threshold)
   
   write.csv(summary_disruption_admin3_export, "M3_disruptions_analysis_admin_area_3.csv", row.names = FALSE)
 }
