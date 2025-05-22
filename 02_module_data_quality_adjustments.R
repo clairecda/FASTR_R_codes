@@ -1,5 +1,5 @@
 
-PROJECT_DATA_HMIS <- "hmis_nigeria_20250506.csv"
+PROJECT_DATA_HMIS <- "hmis_ghana.csv"
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT

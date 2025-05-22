@@ -20,7 +20,7 @@ PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 # Last edit: 2025 May 22
 # Module: COVERAGE ESTIMATES
 #
-# ------------------------------ Load Required Libraries -------------------------
+# ------------------------------ Load Required Libraries -----------------------------------------------------
 library(dplyr)
 library(tidyr)       
 library(zoo)       
@@ -87,14 +87,6 @@ province_name_replacements <- c(
   "IRS Labé" = "Labé",
   "IRS Nzérékoré" = "N'Zérékoré"
   
-  #Ghana
-  #"North East" = "Northeast",
-  #"Northern" = "Northern (pre 2022)",
-  #"Northern" = "Northern(post 2022)",
-  #"Volta" = "Volta (post 2022)",
-  #"Volta" = "Volta (pre 2022)",
-  #"Western" = "Western (pre 2022)",
-  #"Western" = "Western (post 2022)"
   
 )
 
@@ -173,6 +165,15 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
                   "opv1", "opv2", "opv3", "nmr", "imr")
   
   is_national <- all(unique(survey_data$admin_area_2) == "NATIONAL")
+  
+  # Rename polio indicators to OPV before doing anything else
+  survey_data <- survey_data %>%
+    mutate(indicator_common_id = recode(indicator_common_id,
+                                        "polio1" = "opv1",
+                                        "polio2" = "opv2",
+                                        "polio3" = "opv3"
+    ))
+  
   
   survey_data <- survey_data %>%
     mutate(admin_area_1 = dplyr::recode(admin_area_1, !!!name_replacements)) %>%
@@ -299,13 +300,7 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     raw_survey_values <- raw_survey_values %>% mutate(admin_area_2 = "NATIONAL")
   }
   
-  survey_carried <- survey_carried %>%
-    rename_with(~ str_replace_all(., c(
-      "polio1" = "opv1",
-      "polio2" = "opv2",
-      "polio3" = "opv3"
-    )), everything())
-  
+
   
   return(list(
     carried = survey_carried %>%
@@ -485,11 +480,11 @@ evaluate_coverage_by_denominator <- function(data) {
     "pregnancy",   c("anc1", "anc4"),
     "livebirth",   c("delivery", "bcg"),
     "dpt",         c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3", "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
-    "measles1",    "measles1",
-    "measles2",    "measles2"
+    "measles1",    c("measles1"),
+    "measles2",    c("measles2")
   )
   
-  # Denominators
+  #Denominators
   denominator_long <- data %>%
     select(all_of(geo_keys), matches(denom_pattern)) %>%
     pivot_longer(
@@ -507,9 +502,8 @@ evaluate_coverage_by_denominator <- function(data) {
     unnest_longer(indicator_common_id) %>%
     filter(!is.na(indicator_common_id)) %>%
     distinct()
-  
-  
-  
+
+
   numerator_long <- distinct(numerator_long)
   denominator_long <- distinct(denominator_long)
   
@@ -522,6 +516,7 @@ evaluate_coverage_by_denominator <- function(data) {
     mutate(coverage = numerator / denominator_value) %>%
     drop_na(coverage)
   
+
   # Reference values
   carry_cols <- grep("carry$", names(data), value = TRUE)
   carry_values <- data %>%
@@ -535,6 +530,9 @@ evaluate_coverage_by_denominator <- function(data) {
     drop_na(reference_value) %>%
     group_by(across(all_of(c(geo_keys, "indicator_common_id")))) %>%
     summarise(reference_value = mean(reference_value, na.rm = TRUE), .groups = "drop")
+  
+  
+  print(unique(carry_values$indicator_common_id))
   
   # Calculate error
   coverage_with_error <- left_join(

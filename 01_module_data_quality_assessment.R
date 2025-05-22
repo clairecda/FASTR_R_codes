@@ -5,7 +5,7 @@ GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to co
 DQA_INDICATORS <- c("penta1", "anc1")
 CONSISTENCY_PAIRS_USED <- c("penta", "anc")  # current options: "penta", "anc", "delivery", "malaria"
 
-PROJECT_DATA_HMIS <- "hmis_nigeria_20250506.csv"
+PROJECT_DATA_HMIS <- "hmis_ghana.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
