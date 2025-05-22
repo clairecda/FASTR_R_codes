@@ -85,24 +85,19 @@ province_name_replacements <- c(
   "IRS Mamou" = "Mamou",
   "IRS Boké" = "Boké",
   "IRS Labé" = "Labé",
-  "IRS Nzérékoré" = "N'Zérékoré",
+  "IRS Nzérékoré" = "N'Zérékoré"
   
   #Ghana
-  "North East" = "Northeast",
-  "Northern" = "Northern (pre 2022)",
-  "Northern" = "Northern(post 2022)",
-  "Volta" = "Volta (post 2022)",
-  "Volta" = "Volta (pre 2022)",
-  "Western" = "Western (pre 2022)",
-  "Western" = "Western (post 2022)"
+  #"North East" = "Northeast",
+  #"Northern" = "Northern (pre 2022)",
+  #"Northern" = "Northern(post 2022)",
+  #"Volta" = "Volta (post 2022)",
+  #"Volta" = "Volta (pre 2022)",
+  #"Western" = "Western (pre 2022)",
+  #"Western" = "Western (post 2022)"
   
 )
 
-
-province_name_replacements_inverted <- setNames(
-  names(province_name_replacements),
-  province_name_replacements
-)
 
 # ------------------------------ Define Functions --------------------------------
 #Part 1 - prepare hmis data
