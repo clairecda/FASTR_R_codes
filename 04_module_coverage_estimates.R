@@ -6,9 +6,9 @@ MIN_YEAR <- 2000  # Set a fixed minimum year for filtering
 PREGNANCY_LOSS_RATE <- 0.03 #0.03
 TWIN_RATE <- 0.015       
 STILLBIRTH_RATE <- 0.02
-P1_NMR <- 0.039
-P2_PNMR <- 0.028
-INFANT_MORTALITY_RATE <- 0.067   
+P1_NMR <- 0.03
+P2_PNMR <- 0.02
+INFANT_MORTALITY_RATE <- 0.05   
 
 
 
@@ -17,7 +17,7 @@ PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 7
+# Last edit: 2025 May 22
 # Module: COVERAGE ESTIMATES
 #
 # ------------------------------ Load Required Libraries -------------------------
@@ -41,7 +41,7 @@ coverage_params <- list(
   indicators = c(
     "anc1", "anc4", "delivery",
     "bcg", "penta1", "penta3",
-    "measles1", "measles2", "rota1", "rota2", "polio1", "polio2", "polio3",
+    "measles1", "measles2", "rota1", "rota2", "opv1", "opv2", "opv3",
     "nmr", "imr"
   )
 )
@@ -52,7 +52,7 @@ survey_vars <- c(
   "avgsurvey_bcg", "avgsurvey_penta1", "avgsurvey_penta3",
   "avgsurvey_measles1", "avgsurvey_measles2",
   "avgsurvey_rota1", "avgsurvey_rota2",
-  "avgsurvey_polio1", "avgsurvey_polio2", "avgsurvey_polio3",
+  "avgsurvey_opv1", "avgsurvey_opv2", "avgsurvey_opv3",
   "postnmr", "avgsurvey_imr", "avgsurvey_nmr"
 )
 
@@ -85,25 +85,40 @@ province_name_replacements <- c(
   "IRS Mamou" = "Mamou",
   "IRS Boké" = "Boké",
   "IRS Labé" = "Labé",
-  "IRS Nzérékoré" = "N'Zérékoré"
+  "IRS Nzérékoré" = "N'Zérékoré",
+  
+  #Ghana
+  "North East" = "Northeast",
+  "Northern" = "Northern (pre 2022)",
+  "Northern" = "Northern(post 2022)",
+  "Volta" = "Volta (post 2022)",
+  "Volta" = "Volta (pre 2022)",
+  "Western" = "Western (pre 2022)",
+  "Western" = "Western (post 2022)"
+  
+)
+
+
+province_name_replacements_inverted <- setNames(
+  names(province_name_replacements),
+  province_name_replacements
 )
 
 # ------------------------------ Define Functions --------------------------------
 #Part 1 - prepare hmis data
-process_hmis_adjusted_volume <- function(adjusted_volume_data, count_col = SELECTED_COUNT_VARIABLE, province_name_replacements = NULL) {
+process_hmis_adjusted_volume <- function(adjusted_volume_data, count_col = SELECTED_COUNT_VARIABLE, province_name_replacements_inverted = NULL) {
   expected_indicators <- c(
     "anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr",
-    "measles1", "measles2", "rota1", "rota2", "polio1", "polio2", "polio3"
+    "measles1", "measles2", "rota1", "rota2", "opv1", "opv2", "opv3"
   )
   
   message("Loading and mapping adjusted HMIS volume...")
   
   has_admin2 <- "admin_area_2" %in% names(adjusted_volume_data)
   
-  # Apply province name replacements if admin_area_2 is present and replacements are provided
   if (has_admin2 && !is.null(province_name_replacements)) {
     adjusted_volume_data <- adjusted_volume_data %>%
-      mutate(admin_area_2 = recode(admin_area_2, !!!province_name_replacements))
+      mutate(admin_area_2 = recode(admin_area_2, !!!province_name_replacements_inverted))
   }
   
   # Ensure year and month exist
@@ -160,7 +175,7 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
                                 min_year = MIN_YEAR, max_year = CURRENT_YEAR) {
   indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3",
                   "measles1", "measles2", "rota1", "rota2",
-                  "polio1", "polio2", "polio3", "nmr", "imr")
+                  "opv1", "opv2", "opv3", "nmr", "imr")
   
   is_national <- all(unique(survey_data$admin_area_2) == "NATIONAL")
   
@@ -289,6 +304,14 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     raw_survey_values <- raw_survey_values %>% mutate(admin_area_2 = "NATIONAL")
   }
   
+  survey_carried <- survey_carried %>%
+    rename_with(~ str_replace_all(., c(
+      "polio1" = "opv1",
+      "polio2" = "opv2",
+      "polio3" = "opv3"
+    )), everything())
+  
+  
   return(list(
     carried = survey_carried %>%
       arrange(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2", "year")))),
@@ -328,12 +351,19 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
   }
   
   indicator_vars <- list(
-    anc1 = c("countanc1", "anc1carry"),
-    delivery = c("countdelivery", "deliverycarry"),
-    penta1 = c("countpenta1", "penta1carry"),
+    anc1      = c("countanc1", "anc1carry"),
+    delivery  = c("countdelivery", "deliverycarry"),
+    penta1    = c("countpenta1", "penta1carry"),
+    opv1 = c("countopv1", "opv1carry"),
+    opv2 = c("countopv2", "opv2carry"),
+    opv3 = c("countopv3", "opv3carry"),
+    
     livebirth = c("countlivebirth"),
-    bcg = c("countbcg", "bcgcarry")
+    bcg       = c("countbcg", "bcgcarry"),
+    measles1  = c("countmeasles1", "measles1carry"),
+    measles2  = c("countmeasles2", "measles2carry")
   )
+  
   
   available_vars <- names(data)
   
@@ -598,7 +628,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     c("admin_area_1", "year", "indicator_common_id")
   }
   
-
+  
   raw_survey_long <- raw_survey_wide %>%
     pivot_longer(
       cols = starts_with("rawsurvey_"),
@@ -610,7 +640,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     select(all_of(join_keys), coverage_original_estimate) %>%
     distinct()
   
-
+  
   min_years <- raw_survey_long %>%
     filter(!is.na(year)) %>%
     group_by(across(setdiff(join_keys, "year"))) %>%
@@ -619,7 +649,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
   
   max_year <- max(projected_data$year, na.rm = TRUE)
   
-
+  
   valid_suffix_map <- list(
     pregnancy  = c("anc1", "anc4"),
     livebirth  = c("bcg", "delivery"),
@@ -628,7 +658,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     measles1   = c("measles1"),
     measles2   = c("measles2")
   )
-
+  
   valid_denominator_map <- projected_data %>%
     select(admin_area_1, admin_area_2 = if (has_admin_area_2) "admin_area_2" else NULL,
            indicator_common_id, denominator) %>%
@@ -660,10 +690,10 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
     by = c(join_keys, "denominator")
   )
   
-
+  
   is_national <- all(is.na(combined$admin_area_2)) || all(combined$admin_area_2 == "NATIONAL")
   
-
+  
   combined <- combined %>%
     mutate(
       coverage_original_estimate = ifelse(is.nan(coverage_original_estimate), NA_real_, coverage_original_estimate),
@@ -720,7 +750,6 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
   
   return(combined)
 }
-
 # ------------------------------ Main Execution -----------------------------------
 # 1 - prepare the hmis data
 hmis_processed <- process_hmis_adjusted_volume(adjusted_volume_data)
@@ -767,6 +796,7 @@ denominators_province <- calculate_denominators(
 national_coverage_eval <- evaluate_coverage_by_denominator(denominators_national)
 subnational_coverage_eval <- evaluate_coverage_by_denominator(denominators_province)
 
+
 # 5 - project survey coverage forward using HMIS deltas
 national_coverage_projected <- project_coverage_from_all(national_coverage_eval$full_ranking)
 subnational_coverage_projected <- project_coverage_from_all(subnational_coverage_eval$full_ranking)
@@ -784,13 +814,33 @@ combined_province <- prepare_combined_coverage_from_projected(
 )
 
 
-# Fix issue with filtering on denominators (drop early years)
-main_export <- combined_national %>%
+
+# detect the best single denominator per indicator
+best_denom_per_indicator <- national_coverage_eval$full_ranking %>%
   filter(source_type == "independent") %>%
-  group_by(admin_area_1, indicator_common_id, year) %>%
-  filter(rank == min(rank, na.rm = TRUE)) %>%
+  group_by(admin_area_1, indicator_common_id, denominator) %>%
+  summarise(total_error = sum(squared_error, na.rm = TRUE), .groups = "drop") %>%
+  group_by(admin_area_1, indicator_common_id) %>%
+  slice_min(order_by = total_error, n = 1) %>%
   ungroup()
 
+# Clean print to console
+message("Selected denominator per indicator:")
+best_denom_per_indicator %>%
+  arrange(indicator_common_id) %>%
+  distinct(indicator_common_id, denominator) %>%
+  mutate(msg = sprintf("  - %s → %s", indicator_common_id, denominator)) %>%
+  pull(msg) %>%
+  walk(message)
+
+
+main_export <- combined_national %>%
+  inner_join(
+    best_denom_per_indicator,
+    by = c("admin_area_1", "indicator_common_id", "denominator")
+  ) %>%
+  select(admin_area_1, indicator_common_id, year, denominator,
+         coverage_original_estimate, coverage_avgsurveyprojection, coverage_cov)
 
 
 early_survey <- combined_national %>%
@@ -816,7 +866,39 @@ combined_national_export <- bind_rows(
   early_survey
 )
 
-
+combined_national_export_fixed <- combined_national_export %>%
+  arrange(indicator_common_id, year) %>%
+  group_by(indicator_common_id) %>%
+  mutate(
+    cov_lag = lag(coverage_cov),
+    delta = coverage_cov - cov_lag,
+    anchor_year = suppressWarnings(max(year[!is.na(coverage_original_estimate)], na.rm = TRUE)),
+    anchor_value = coverage_original_estimate[year == anchor_year][1]
+  ) %>%
+  group_modify(~ {
+    df <- .x
+    df$avgsurveyprojection <- NA_real_
+    
+    anchor_idx <- which(df$year == df$anchor_year[1])
+    
+    # Project forward only
+    if (length(anchor_idx) == 1 && !is.na(df$anchor_value[1])) {
+      df$avgsurveyprojection[anchor_idx] <- df$anchor_value[1]
+      for (i in (anchor_idx + 1):nrow(df)) {
+        prev <- i - 1
+        if (!is.na(df$avgsurveyprojection[prev]) && !is.na(df$delta[i])) {
+          df$avgsurveyprojection[i] <- df$avgsurveyprojection[prev] + df$delta[i]
+        }
+      }
+    }
+    
+    return(df)
+  }) %>%
+  ungroup() %>%
+  select(indicator_common_id, year,
+         coverage_original_estimate,
+         coverage_avgsurveyprojection = avgsurveyprojection,
+         coverage_cov)
 
 combined_province_export <- combined_province %>%
   filter(source_type == "independent") %>%
@@ -828,10 +910,11 @@ combined_province_export <- combined_province %>%
          year, 
          coverage_cov)
 
-
-
+best_denom_summary <- best_denom_per_indicator %>%
+  distinct(indicator_common_id, denominator) %>%
+  arrange(indicator_common_id)
 
 # Write cleaned CSVs
-write.csv(combined_national_export, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
+write.csv(combined_national_export_fixed, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
 write.csv(combined_province_export, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
-
+write.csv(best_denom_summary, "M4_selected_denominator_per_indicator.csv", row.names = FALSE)
