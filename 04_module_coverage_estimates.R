@@ -40,8 +40,12 @@ population_estimates_only <- read.csv(PROJECT_DATA_POPULATION, fileEncoding = "U
 coverage_params <- list(
   indicators = c(
     "anc1", "anc4", "delivery",
-    "bcg", "penta1", "penta3",
-    "measles1", "measles2", "rota1", "rota2", "opv1", "opv2", "opv3",
+    "bcg",
+    "penta1", "penta3",
+    "measles1", "measles2",
+    "rota1", "rota2",
+    "opv1", "opv2", "opv3",
+    "pnc1_mother",
     "nmr", "imr"
   )
 )
@@ -49,10 +53,12 @@ coverage_params <- list(
 # List of survey variables to carry forward (for forward-fill and projections)
 survey_vars <- c(
   "avgsurvey_anc1", "avgsurvey_anc4", "avgsurvey_delivery",
-  "avgsurvey_bcg", "avgsurvey_penta1", "avgsurvey_penta3",
+  "avgsurvey_bcg",
+  "avgsurvey_penta1", "avgsurvey_penta3",
   "avgsurvey_measles1", "avgsurvey_measles2",
   "avgsurvey_rota1", "avgsurvey_rota2",
   "avgsurvey_opv1", "avgsurvey_opv2", "avgsurvey_opv3",
+  "avgsurvey_pnc1_mother",
   "postnmr", "avgsurvey_imr", "avgsurvey_nmr"
 )
 
@@ -86,8 +92,7 @@ province_name_replacements <- c(
   "IRS Boké" = "Boké",
   "IRS Labé" = "Labé",
   "IRS Nzérékoré" = "N'Zérékoré"
-  
-  
+
 )
 
 
@@ -96,7 +101,7 @@ province_name_replacements <- c(
 process_hmis_adjusted_volume <- function(adjusted_volume_data, count_col = SELECTED_COUNT_VARIABLE, province_name_replacements_inverted = NULL) {
   expected_indicators <- c(
     "anc1", "anc4", "delivery", "bcg", "penta1", "penta3", "nmr", "imr",
-    "measles1", "measles2", "rota1", "rota2", "opv1", "opv2", "opv3"
+    "measles1", "measles2", "rota1", "rota2", "opv1", "opv2", "opv3", "pnc1_mother"
   )
   
   message("Loading and mapping adjusted HMIS volume...")
@@ -162,7 +167,7 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
                                 min_year = MIN_YEAR, max_year = CURRENT_YEAR) {
   indicators <- c("anc1", "anc4", "delivery", "bcg", "penta1", "penta3",
                   "measles1", "measles2", "rota1", "rota2",
-                  "opv1", "opv2", "opv3", "nmr", "imr")
+                  "opv1", "opv2", "opv3", "pnc1_mother", "nmr", "imr")
   
   is_national <- all(unique(survey_data$admin_area_2) == "NATIONAL")
   
@@ -171,7 +176,8 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
     mutate(indicator_common_id = recode(indicator_common_id,
                                         "polio1" = "opv1",
                                         "polio2" = "opv2",
-                                        "polio3" = "opv3"
+                                        "polio3" = "opv3",
+                                        "pnc1" = "pnc1_mother"
     ))
   
   
@@ -348,7 +354,9 @@ calculate_denominators <- function(hmis_data, survey_data, population_data = NUL
     opv2 = c("countopv2", "opv2carry"),
     opv3 = c("countopv3", "opv3carry"),
     
-    livebirth = c("countlivebirth"),
+    pnc1_mother = c("countpnc1_mother", "pnc1_mothercarry"),
+    
+    livebirth = c("countlivebirth", "livebirthcarry"),
     bcg       = c("countbcg", "bcgcarry"),
     measles1  = c("countmeasles1", "measles1carry"),
     measles2  = c("countmeasles2", "measles2carry")
@@ -478,7 +486,7 @@ evaluate_coverage_by_denominator <- function(data) {
   suffix_indicator_map <- tribble(
     ~suffix,       ~indicators,
     "pregnancy",   c("anc1", "anc4"),
-    "livebirth",   c("delivery", "bcg"),
+    "livebirth",   c("delivery", "bcg", "pnc1_mother"),
     "dpt",         c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3", "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
     "measles1",    c("measles1"),
     "measles2",    c("measles2")
@@ -645,7 +653,7 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
   
   valid_suffix_map <- list(
     pregnancy  = c("anc1", "anc4"),
-    livebirth  = c("bcg", "delivery"),
+    livebirth  = c("bcg", "delivery", "pnc1_mother"),
     dpt        = c("penta1", "penta2", "penta3", "opv1", "opv2", "opv3",
                    "pcv1", "pcv2", "pcv3", "rota1", "rota2", "ipv1", "ipv2"),
     measles1   = c("measles1"),
