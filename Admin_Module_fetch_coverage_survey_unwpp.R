@@ -33,6 +33,7 @@ dhs_indicators_base <- c(
   "RH_ANCN_W_N01",  # Exactly 1 ANC visit
   "RH_ANCN_W_N4P",  # ANC4+
   "RH_DELP_C_DHF",  # Institutional delivery
+  "RH_PCMN_W_MOT",  # PNC_mother
   
   "FP_SRCM_W_TOT",  # mCPR
   
@@ -80,7 +81,7 @@ dhs_national_list <- lapply(dhs_countries, function(iso) {
     ) %>%
       mutate(LevelRank = as.character(LevelRank))
   }, error = function(e) {
-    message("❗ No NATIONAL DHS data for ", iso, 
+    message("No NATIONAL DHS data for ", iso, 
             " [Indicators: ", paste(dhs_indicators_base, collapse = ", "), "] → Skipping...")
     NULL
   })
@@ -281,6 +282,7 @@ clean_dhs_national <- function(df) {
         indicator_id == "rh_ancn_w_n4p"  ~ "anc4",
         indicator_id == "rh_ancn_w_n01"  ~ "anc1_old",
         indicator_id == "rh_ancp_w_skp"  ~ "anc1",
+        indicator_id == "rh_pcmn_w_mot"  ~ "pnc1",
         indicator_id == "fp_srcm_w_tot"  ~ "fp",
         indicator_id == "cm_pnmr_c_nsb"  ~ "still",
         indicator_id == "cm_ecmt_c_imr"  ~ "imr",
@@ -321,6 +323,7 @@ clean_dhs_subnational <- function(df) {
         indicator_id == "rh_ancn_w_n4p"  ~ "anc4",
         indicator_id == "rh_ancn_w_n01"  ~ "anc1_old",
         indicator_id == "rh_ancp_w_skp"  ~ "anc1",
+        indicator_id == "rh_pcmn_w_mot"  ~ "pnc1",
         indicator_id == "fp_srcm_w_tot"  ~ "fp",
         indicator_id == "cm_pnmr_c_nsb"  ~ "still",
         indicator_id == "cm_ecmt_c_imr"  ~ "imr",
@@ -354,7 +357,7 @@ clean_dhs_subnational <- function(df) {
 # ----------------------------------------
 clean_mics <- function(df) {
   df %>%
-    filter(SEX %in% c("_T", NA)) %>%  # "T" = total across sexes
+    filter(SEX %in% c("_T", NA)) %>%  # Keep totals (correct for all indicators)
     mutate(
       year = as.integer(TIME_PERIOD),
       value = if_else(UNIT_MULTIPLIER == "3", as.numeric(OBS_VALUE) * 1000, as.numeric(OBS_VALUE)),
@@ -511,26 +514,6 @@ mics_tidy <- clean_mics(mics_data) %>%
 unwpp_tidy <- clean_unwpp(unwpp_raw) %>%
   standardize_admin_area_1()
 
-# # Clean World Bank WPP data
-# wpp_pop_total <- clean_wpp(wb_data_list[["SP.POP.TOTL"]], "SP.POP.TOTL", "poptot")
-# wpp_cbr <- clean_wpp(wb_data_list[["SP.DYN.CBRT.IN"]], "SP.DYN.CBRT.IN", "crudebr")
-
-
-# # ----------------------------------------
-# # Final bind and selection
-# # ----------------------------------------
-# all_survey <- bind_rows(
-#   dhs_national_tidy,
-#   dhs_subnational_tidy,
-#   mics_tidy
-# ) %>%
-#   select(
-#     admin_area_1, admin_area_2, year,
-#     indicator_common_id, survey_value,
-#     source, source_detail, survey_type
-#   )
-
-
 
 # ----------------------------------------
 # Final: Unified dataset with indicator_type
@@ -549,7 +532,7 @@ all_data <- bind_rows(
 # Indicator classification
 percent_indicators <- c(
   "anc1", "anc4", "delivery", "anc1_old", "fp",
-  "penta1", "penta3", "bcg", "polio1", "polio2", "polio3",
+  "penta1", "penta3", "bcg", "polio1", "polio2", "polio3", "pnc1",
   "measles1", "measles2", "rota1", "rota2"
 )
 
@@ -582,25 +565,6 @@ all_data_labeled <- all_data %>%
     survey_value, source, source_detail, survey_type
   )
 
-# 
-# all_data_labeled <- all_data %>%
-#   mutate(
-#     indicator_type = case_when(
-#       indicator_common_id %in% percent_indicators ~ "percent",
-#       indicator_common_id %in% number_indicators ~ "number",
-#       indicator_common_id %in% rate_indicators ~ "rate",
-#       indicator_common_id == "womenrepage" & source == "DHS National" ~ "survey_count",
-#       indicator_common_id %in% population_estimate_indicators ~ "population_estimate",
-#       TRUE ~ NA_character_
-#     ),
-#     survey_value = if_else(indicator_type == "percent", survey_value / 100, survey_value)
-#   ) %>%
-#   filter(!is.na(indicator_type)) %>%
-#   select(
-#     admin_area_1, admin_area_2, year,
-#     indicator_common_id, indicator_type,
-#     survey_value, source, source_detail, survey_type
-#   )
 
 # ----------------------------------------
 # Separate outputs
@@ -617,6 +581,28 @@ survey_data_only <- all_data_labeled %>%
 # ----------------------------------------
 # Write outputs (with fwrite for efficiency)
 # ----------------------------------------
+# Step 1: Read your manually updated Nigeria backup
+nigeria_only <- read.csv("survey_data_nigeria_backup.csv")
 
-#fwrite(survey_data_only, "survey_data_unified.csv")
+missing_nigeria <- anti_join(nigeria_only, survey_data_only,
+                             by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id"))
+if (nrow(missing_nigeria) > 0) {
+  survey_data_only <- bind_rows(survey_data_only, missing_nigeria)
+}
+
+
+ghana_only <- read.csv("survey_data_ghana_backup.csv")
+
+missing_ghana <- anti_join(ghana_only, survey_data_only,
+                           by = c("admin_area_1", "admin_area_2", "year", "indicator_common_id"))
+
+if (nrow(missing_ghana) > 0) {
+  survey_data_only <- bind_rows(survey_data_only, missing_ghana)
+}
+
+
+
+
+# Write the outputs...
+fwrite(survey_data_only, "survey_data_unified.csv")
 fwrite(population_estimates_only, "population_estimates_only.csv")
