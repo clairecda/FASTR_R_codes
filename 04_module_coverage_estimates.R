@@ -17,7 +17,7 @@ PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 22
+# Last edit: 2025 June 4
 # Module: COVERAGE ESTIMATES
 #
 # ------------------------------ Load Required Libraries -----------------------------------------------------
@@ -869,22 +869,45 @@ combined_national_export <- bind_rows(
 
 combined_national_export_fixed <- combined_national_export %>%
   arrange(indicator_common_id, year) %>%
-  group_by(indicator_common_id) %>%
-  mutate(
-    cov_lag = lag(coverage_cov),
-    delta = coverage_cov - cov_lag,
-    anchor_year = suppressWarnings(max(year[!is.na(coverage_original_estimate)], na.rm = TRUE)),
-    anchor_value = coverage_original_estimate[year == anchor_year][1]
+  group_by(indicator_common_id, year) %>%
+  summarise(
+    coverage_original_estimate = first(coverage_original_estimate),
+    coverage_cov = first(coverage_cov),
+    .groups = "drop"
   ) %>%
+  group_by(indicator_common_id) %>%
   group_modify(~ {
     df <- .x
-    df$avgsurveyprojection <- NA_real_
+    df <- df %>% arrange(year)
     
-    anchor_idx <- which(df$year == df$anchor_year[1])
+    # Anchor year: latest year with a non-missing original estimate
+    anchor_year <- max(df$year[!is.na(df$coverage_original_estimate)], na.rm = TRUE)
+    anchor_idx <- which(df$year == anchor_year)[1]
     
-    # Project forward only
-    if (length(anchor_idx) == 1 && !is.na(df$anchor_value[1])) {
-      df$avgsurveyprojection[anchor_idx] <- df$anchor_value[1]
+    # Patch: fill in coverage_cov at anchor if missing
+    if (is.na(df$coverage_cov[anchor_idx])) {
+      next_cov_idx <- which(!is.na(df$coverage_cov) & df$year > anchor_year)
+      if (length(next_cov_idx) > 0) {
+        df$coverage_cov[anchor_idx] <- df$coverage_cov[next_cov_idx[1]]
+      }
+    }
+    
+    # Recalculate delta
+    df <- df %>%
+      mutate(
+        cov_lag = lag(coverage_cov),
+        delta = coverage_cov - cov_lag
+      )
+    
+    # Initialize projection
+    df$avgsurveyprojection <- df$coverage_original_estimate
+    
+    if (is.na(df$avgsurveyprojection[anchor_idx]) && !is.na(df$coverage_cov[anchor_idx])) {
+      df$avgsurveyprojection[anchor_idx] <- df$coverage_cov[anchor_idx]
+    }
+    
+    # Project forward
+    if (!is.na(df$avgsurveyprojection[anchor_idx])) {
       for (i in (anchor_idx + 1):nrow(df)) {
         prev <- i - 1
         if (!is.na(df$avgsurveyprojection[prev]) && !is.na(df$delta[i])) {
@@ -896,10 +919,14 @@ combined_national_export_fixed <- combined_national_export %>%
     return(df)
   }) %>%
   ungroup() %>%
-  select(indicator_common_id, year,
-         coverage_original_estimate,
-         coverage_avgsurveyprojection = avgsurveyprojection,
-         coverage_cov)
+  select(
+    indicator_common_id,
+    year,
+    coverage_original_estimate,
+    coverage_avgsurveyprojection = avgsurveyprojection,
+    coverage_cov
+  )
+
 
 combined_province_export <- combined_province %>%
   filter(source_type == "independent") %>%
