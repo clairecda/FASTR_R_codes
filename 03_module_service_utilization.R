@@ -22,10 +22,10 @@ RUN_DISTRICT_MODEL <- FALSE          # Set to TRUE to run regressions at the low
 
 
 
-PROJECT_DATA_HMIS <- "hmis_ghana.csv"
+PROJECT_DATA_HMIS <- "somalia_hmis_data.csv"
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 6
+# Last edit: 2025 June 4
 # Module: SERVICE UTILIZATION
 
 
@@ -295,10 +295,19 @@ for (indicator in indicators) {
     next
   }
   
+  n_clusters <- indicator_data %>%
+    distinct(admin_area_3) %>%
+    nrow()
+  
   model <- tryCatch(
-    feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")), 
-          data = indicator_data, 
-          cluster = ~admin_area_3),
+    if (n_clusters > 1) {
+      feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
+            data = indicator_data,
+            cluster = ~admin_area_3)
+    } else {
+      feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
+            data = indicator_data)
+    },
     error = function(e) {
       print(paste("Regression failed for:", indicator, "Error:", e$message))
       return(NULL)
@@ -306,22 +315,13 @@ for (indicator in indicators) {
   )
   
   if (!is.null(model) && !anyNA(coef(model))) {
-    indicator_data <- indicator_data %>%
-      mutate(expect_admin_area_1 = predict(model, newdata = indicator_data))
-    
-    
-    
-    
     disruption_effect <- coef(model)["tagged"]
-    
     
     indicator_data <- indicator_data %>%
       mutate(expect_admin_area_1 = predict(model, newdata = indicator_data),
              expect_admin_area_1 = ifelse(tagged == 1,
                                           expect_admin_area_1 - disruption_effect,
                                           expect_admin_area_1))
-    
-    
     
     indicator_data <- indicator_data %>%
       group_by(date) %>%
@@ -334,19 +334,20 @@ for (indicator in indicators) {
       ) %>%
       ungroup()
     
-    # compute p-value for "tagged" effect
+    # Compute p-value if clustering applied or fallback to regular SE
     if ("tagged" %in% names(coef(model))) {
-      p_val_1 <- 2 * pt(abs(coef(model)["tagged"] / sqrt(diag(vcov(model)))["tagged"]),
-                        df.residual(model), lower.tail = FALSE)
+      tagged_se <- sqrt(diag(vcov(model)))["tagged"]
+      p_val_1 <- 2 * pt(abs(disruption_effect / tagged_se), df.residual(model), lower.tail = FALSE)
+      
       indicator_data <- indicator_data %>%
         mutate(p_admin_area_1 = p_val_1)
     }
     
-    # Store processed data in list
+    # Save output
     indicator_results_list[[indicator]] <- indicator_data
   }
-  
 }
+
 
 # Combine all indicator-level results
 indicator_results_long <- dplyr::bind_rows(indicator_results_list)
@@ -372,6 +373,8 @@ print("Running regressions at the province level...")
 
 province_results_list <- list()  # Initialize list for storing results
 
+province_results_list <- list()
+
 for (indicator in indicators) {
   for (province in provinces) {
     print(paste("Processing:", indicator, "in province:", province))
@@ -385,11 +388,19 @@ for (indicator in indicators) {
       next
     }
     
-    # Run province-level regression dynamically
+    # Determine whether clustering is valid
+    n_clusters <- province_data %>% pull(admin_area_3) %>% n_distinct(na.rm = TRUE)
+    
+    # Build regression formula
+    reg_formula <- as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged"))
+    
+    # Fit model: clustered if >1 cluster, unclustered otherwise
     model_province <- tryCatch(
-      feols(as.formula(paste(SELECTEDCOUNT, "~ date + factor(month) + tagged")),
-            data = province_data,
-            cluster = ~admin_area_3),
+      if (n_clusters > 1) {
+        feols(reg_formula, data = province_data, cluster = ~admin_area_3)
+      } else {
+        feols(reg_formula, data = province_data)
+      },
       error = function(e) {
         print(paste("Regression failed for:", indicator, "in", province, "Error:", e$message))
         return(NULL)
@@ -400,10 +411,11 @@ for (indicator in indicators) {
       province_data <- province_data %>%
         mutate(expect_admin_area_2 = predict(model_province, newdata = province_data))
       
-      for (pmonth in unique(province_data$date[province_data$tagged == 1])) {
+      if ("tagged" %in% names(coef(model_province)) &&
+          any(province_data$tagged == 1, na.rm = TRUE)) {
         coeff <- coef(model_province)["tagged"]
         province_data <- province_data %>%
-          mutate(expect_admin_area_2 = ifelse(date == pmonth, expect_admin_area_2 - coeff, expect_admin_area_2))
+          mutate(expect_admin_area_2 = ifelse(tagged == 1, expect_admin_area_2 - coeff, expect_admin_area_2))
       }
       
       province_data <- province_data %>%
@@ -417,23 +429,23 @@ for (indicator in indicators) {
         ungroup()
       
       if ("tagged" %in% names(coef(model_province))) {
-        p_val <- 2 * pt(abs(coef(model_province)["tagged"] / sqrt(diag(vcov(model_province)))["tagged"]), 
+        p_val <- 2 * pt(abs(coef(model_province)["tagged"] /
+                              sqrt(diag(vcov(model_province)))["tagged"]),
                         df.residual(model_province), lower.tail = FALSE)
         province_data <- province_data %>%
           mutate(p_admin_area_2 = p_val)
       }
-
-            if ("date" %in% names(coef(model_province))) {
+      
+      if ("date" %in% names(coef(model_province))) {
         province_data <- province_data %>%
           mutate(b_trend_admin_area_2 = coef(model_province)["date"])
       }
       
-      # Store results
       province_results_list[[paste(indicator, province, sep = "_")]] <- province_data
-    
     }
   }
 }
+
 
 # Combine all province-level results into one dataframe
 province_results_long <- dplyr::bind_rows(province_results_list)
