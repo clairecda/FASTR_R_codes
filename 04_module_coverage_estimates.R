@@ -859,15 +859,19 @@ early_survey <- combined_national %>%
 
 combined_national_export <- bind_rows(
   main_export %>%
+    mutate(coverage_cov = if_else(abs(coverage_cov) < 1e-8, NA_real_, coverage_cov)) %>%
     select(indicator_common_id,
            year,
            coverage_original_estimate, 
            coverage_avgsurveyprojection, 
            coverage_cov),
-  early_survey
+  early_survey %>%
+    mutate(coverage_cov = if_else(abs(coverage_cov) < 1e-8, NA_real_, coverage_cov))
 )
 
+
 combined_national_export_fixed <- combined_national_export %>%
+  
   arrange(indicator_common_id, year) %>%
   group_by(indicator_common_id, year) %>%
   summarise(
