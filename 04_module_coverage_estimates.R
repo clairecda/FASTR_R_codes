@@ -17,7 +17,7 @@ PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 June 4
+# Last edit: 2025 June 5
 # Module: COVERAGE ESTIMATES
 #
 # ------------------------------ Load Required Libraries -----------------------------------------------------
@@ -65,7 +65,8 @@ survey_vars <- c(
 name_replacements <- c(
   "Guinea" = "Guinée",
   "Sierra Leone" = "SierraLeone",
-  "Nigeria" = "ng Federal Government"
+  "Nigeria" = "ng Federal Government",
+  "Somalia" = "Federal Govt of Somalia"
 )
 
 province_name_replacements <- c(
@@ -216,14 +217,24 @@ process_survey_data <- function(survey_data, name_replacements, hmis_countries,
   
   full_years <- seq(min_year, max_year)
   
+  # Define grouping keys depending on national vs subnational
+  group_keys <- if (is_national) {
+    c("admin_area_1", "indicator_common_id", "source")
+  } else {
+    c("admin_area_1", "admin_area_2", "indicator_common_id", "source")
+  }
+  
+  # Safely complete years per group and carry forward survey values
   survey_extended <- survey_filtered %>%
     filter(year %in% full_years) %>%
-    group_by(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2"))),
-             indicator_common_id, source) %>%
-    tidyr::complete(year = full_years) %>%
-    arrange(across(any_of(c("admin_area_1", if (!is_national) "admin_area_2"))),
-            indicator_common_id, source, year) %>%
-    mutate(survey_value_carry = zoo::na.locf(survey_value, na.rm = FALSE)) %>%
+    group_by(across(all_of(group_keys)), .drop = FALSE) %>%
+    group_modify(~ {
+      if (nrow(.x) == 0) return(tibble())  # skip empty groups
+      .x %>%
+        tidyr::complete(year = full_years) %>%
+        arrange(year) %>%
+        mutate(survey_value_carry = zoo::na.locf(survey_value, na.rm = FALSE))
+    }) %>%
     ungroup()
   
   
@@ -335,6 +346,11 @@ process_national_population_data <- function(population_data,
 
 #Part 3 - calculate denominators
 calculate_denominators <- function(hmis_data, survey_data, population_data = NULL) {
+  if (!"nmrcarry" %in% names(survey_data)) {
+    message("`nmrcarry` not found in survey data – filling with default from P1_NMR = ", P1_NMR)
+    survey_data$nmrcarry <- P1_NMR
+  }
+  
   has_admin_area_2 <- "admin_area_2" %in% names(hmis_data)
   
   if (has_admin_area_2) {
@@ -754,11 +770,6 @@ prepare_combined_coverage_from_projected <- function(projected_data, raw_survey_
 # ------------------------------ Main Execution -----------------------------------
 # 1 - prepare the hmis data
 hmis_processed <- process_hmis_adjusted_volume(adjusted_volume_data)
-hmis_processed_subnational <- process_hmis_adjusted_volume(
-  adjusted_volume_data_subnational,
-  count_col = SELECTED_COUNT_VARIABLE,
-  province_name_replacements = province_name_replacements
-)
 
 
 # 2 - prepare the survey data
@@ -767,13 +778,6 @@ survey_processed_national <- process_survey_data(
   name_replacements = name_replacements,
   hmis_countries = hmis_processed$hmis_countries
 )
-
-survey_processed_province <- process_survey_data(
-  survey_data = survey_data_unified %>% filter(admin_area_2 != "NATIONAL"),
-  name_replacements = name_replacements,
-  hmis_countries = hmis_processed_subnational$hmis_countries
-)
-
 
 national_population_processed <- process_national_population_data(
   population_data = population_estimates_only,
@@ -788,19 +792,12 @@ denominators_national <- calculate_denominators(
   population_data = national_population_processed
 )
 
-denominators_province <- calculate_denominators(
-  hmis_data = hmis_processed_subnational$annual_hmis,
-  survey_data = survey_processed_province$carried
-)
-
 # 4 - calculate coverage and compare the denominators
 national_coverage_eval <- evaluate_coverage_by_denominator(denominators_national)
-subnational_coverage_eval <- evaluate_coverage_by_denominator(denominators_province)
-
 
 # 5 - project survey coverage forward using HMIS deltas
 national_coverage_projected <- project_coverage_from_all(national_coverage_eval$full_ranking)
-subnational_coverage_projected <- project_coverage_from_all(subnational_coverage_eval$full_ranking)
+
 
 # 6 - prepare results and save
 combined_national <- prepare_combined_coverage_from_projected(
@@ -808,15 +805,7 @@ combined_national <- prepare_combined_coverage_from_projected(
   raw_survey_wide = survey_processed_national$raw
 )
 
-
-combined_province <- prepare_combined_coverage_from_projected(
-  projected_data = subnational_coverage_projected,
-  raw_survey_wide = survey_processed_province$raw
-)
-
-
-
-# detect the best single denominator per indicator
+# 7 - detect the best single denominator per indicator
 best_denom_per_indicator <- national_coverage_eval$full_ranking %>%
   filter(source_type == "independent") %>%
   group_by(admin_area_1, indicator_common_id, denominator) %>%
@@ -932,21 +921,74 @@ combined_national_export_fixed <- combined_national_export %>%
   )
 
 
-combined_province_export <- combined_province %>%
-  filter(source_type == "independent") %>%
-  group_by(admin_area_1, admin_area_2, indicator_common_id, year) %>%
-  filter(rank == min(rank, na.rm = TRUE)) %>%
-  ungroup() %>%
-  select(admin_area_2, 
-         indicator_common_id, 
-         year, 
-         coverage_cov)
-
 best_denom_summary <- best_denom_per_indicator %>%
   distinct(indicator_common_id, denominator) %>%
   arrange(indicator_common_id)
 
+
+#--- Sub National Execution -----
+
+# Check if subnational survey data exists for this country
+has_subnational_survey <- survey_data_unified %>%
+  filter(admin_area_1 %in% hmis_processed$hmis_countries, admin_area_2 != "NATIONAL") %>%
+  nrow() > 0
+
+if (has_subnational_survey) {
+  message("Subnational survey data found. Running province-level pipeline...")
+  
+  hmis_processed_subnational <- process_hmis_adjusted_volume(
+    adjusted_volume_data = adjusted_volume_data_subnational,
+    count_col = SELECTED_COUNT_VARIABLE,
+    province_name_replacements = province_name_replacements
+  )
+  
+  survey_processed_province <- process_survey_data(
+    survey_data = survey_data_unified %>%
+      filter(admin_area_1 %in% hmis_processed_subnational$hmis_countries,
+             admin_area_2 != "NATIONAL"),
+    name_replacements = name_replacements,
+    hmis_countries = hmis_processed_subnational$hmis_countries
+  )
+  
+  denominators_province <- calculate_denominators(
+    hmis_data = hmis_processed_subnational$annual_hmis,
+    survey_data = survey_processed_province$carried
+  )
+  
+  subnational_coverage_eval <- evaluate_coverage_by_denominator(denominators_province)
+  
+  subnational_coverage_projected <- project_coverage_from_all(
+    ranked_coverage = subnational_coverage_eval$full_ranking,
+    raw_survey_wide = survey_processed_province$raw
+  )
+  
+  combined_province <- prepare_combined_coverage_from_projected(
+    projected_data = subnational_coverage_projected,
+    raw_survey_wide = survey_processed_province$raw
+  )
+  
+  combined_province_export <- combined_province %>%
+    filter(source_type == "independent") %>%
+    group_by(admin_area_1, admin_area_2, indicator_common_id, year) %>%
+    filter(rank == min(rank, na.rm = TRUE)) %>%
+    ungroup() %>%
+    select(admin_area_2, indicator_common_id, year, coverage_cov)
+  
+  write_csv(combined_province_export, "coverage_combined_province.csv")
+  
+} else {
+  message("No subnational survey data found for this country. Skipping province-level pipeline.")
+}
+
+
+
+
 # Write cleaned CSVs
 write.csv(combined_national_export_fixed, "M4_coverage_estimation.csv", row.names = FALSE, fileEncoding = "UTF-8")
-write.csv(combined_province_export, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
+if (exists("combined_province_export") && nrow(combined_province_export) > 0) {
+  write.csv(combined_province_export, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
+} else {
+  message("Skipping export: `combined_province_export` does not exist or is empty.")
+}
+
 write.csv(best_denom_summary, "M4_selected_denominator_per_indicator.csv", row.names = FALSE)
