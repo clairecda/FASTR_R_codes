@@ -5,7 +5,7 @@ GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to co
 DQA_INDICATORS <- c("penta1", "anc1")
 CONSISTENCY_PAIRS_USED <- c("penta", "anc")  # current options: "penta", "anc", "delivery", "malaria"
 
-PROJECT_DATA_HMIS <- "somalia_hmis_data.csv"
+PROJECT_DATA_HMIS <- "guinea_hmis_data_AA4.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
@@ -672,6 +672,7 @@ if (!is.null(facility_consistency_results)) {
 
 # -------------------------------- SAVE DATA OUTPUTS ------------------------------------------------------------
 print("Preparing and saving results from outlier analysis...")
+
 outlier_data_export <- outlier_data_main %>%
   select(
     facility_id,
@@ -708,7 +709,8 @@ if (length(consistency_params$consistency_pairs) > 0) {
   facility_consistency_export <- facility_consistency_results %>%
     select(
       facility_id,
-      all_of(geo_columns_export),
+      admin_area_3,
+      admin_area_2,
       period_id,
       quarter_id,
       year,
@@ -804,7 +806,7 @@ dqa_cols <- c(
 
 consistency_fac_cols <- c(
   "facility_id TEXT NOT NULL",
-  geo_cols_sql,
+  geo_fixed_geo_cols,
   "period_id INTEGER NOT NULL",
   "quarter_id INTEGER NOT NULL",
   "year INTEGER NOT NULL",
