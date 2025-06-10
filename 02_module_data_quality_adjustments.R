@@ -1,5 +1,5 @@
 
-PROJECT_DATA_HMIS <- "hmis_ghana.csv"
+PROJECT_DATA_HMIS <- "ethiopia_hmis_data.csv"
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
@@ -219,38 +219,40 @@ apply_adjustments_scenarios <- function(raw_data, completeness_data, outlier_dat
 }
 
 # ------------------- Main Execution ------------------------------------------------------------------------
+
 print("Running adjustments analysis...")
 
-# Step 1: Apply adjustment scenarios
+# Apply adjustment scenarios
 adjusted_data_final <- apply_adjustments_scenarios(
   raw_data = raw_data,
   completeness_data = completeness_data,
   outlier_data = outlier_data
 )
 
-# Step 2: Metadata lookups
+# Create metadata lookups
 geo_lookup <- raw_data %>%
-  dplyr::distinct(facility_id, admin_area_1, admin_area_2, admin_area_3)
+  dplyr::select(facility_id, dplyr::starts_with("admin_area_")) %>%
+  dplyr::distinct()
 
-period_lookup <- raw_data %>%
+period_lookup <- completeness_data %>%
   dplyr::distinct(period_id, quarter_id, year)
 
-# Step 3: Facility-level output (with metadata)
+# Merge metadata into facility-level adjusted data
 adjusted_data_export <- adjusted_data_final %>%
   as.data.frame() %>%
   dplyr::left_join(geo_lookup, by = "facility_id") %>%
-  dplyr::left_join(period_lookup, by = "period_id") %>%
-  dplyr::select(
-    facility_id, admin_area_3, admin_area_2, admin_area_1,
-    period_id, quarter_id, year, indicator_common_id,
-    dplyr::everything()
-  )
+  dplyr::left_join(period_lookup, by = "period_id")
 
-# Step 4: Admin area (level 2 and 3) output
+# Detect admin area columns
 geo_cols <- grep("^admin_area_[0-9]+$", names(adjusted_data_export), value = TRUE)
+geo_admin_area_sub <- setdiff(geo_cols, "admin_area_1")
 
+message("Detected admin area columns: ", paste(geo_cols, collapse = ", "))
+message("Using for subnational aggregation: ", paste(geo_admin_area_sub, collapse = ", "))
+
+# Subnational admin area output
 adjusted_data_admin_area_final <- adjusted_data_export %>%
-  dplyr::group_by(dplyr::across(dplyr::all_of(geo_cols)), indicator_common_id, period_id) %>%
+  dplyr::group_by(dplyr::across(dplyr::all_of(geo_admin_area_sub)), indicator_common_id, period_id) %>%
   dplyr::summarise(
     count_final_none = sum(count_final_none, na.rm = TRUE),
     count_final_outliers = sum(count_final_outliers, na.rm = TRUE),
@@ -260,12 +262,12 @@ adjusted_data_admin_area_final <- adjusted_data_export %>%
   ) %>%
   dplyr::left_join(period_lookup, by = "period_id") %>%
   dplyr::select(
-    dplyr::all_of(geo_cols),
+    dplyr::all_of(geo_admin_area_sub),
     period_id, quarter_id, year, indicator_common_id,
     dplyr::everything()
   )
 
-# Step 5: National-level output (admin_area_1 only)
+# National-level output (admin_area_1 only)
 adjusted_data_national_final <- adjusted_data_export %>%
   dplyr::group_by(admin_area_1, indicator_common_id, period_id) %>%
   dplyr::summarise(
@@ -281,15 +283,80 @@ adjusted_data_national_final <- adjusted_data_export %>%
     dplyr::everything()
   )
 
-# Step 6: Remove admin_area_1 before saving facility-level output
+# Clean facility-level output before saving (drop admin_area_1 to match schema expectations)
 adjusted_data_export_clean <- adjusted_data_export %>%
   dplyr::select(-admin_area_1)
 
-# Step 7: Save outputs
-write.csv(adjusted_data_export_clean,        "M2_adjusted_data.csv",              row.names = FALSE)
-write.csv(adjusted_data_admin_area_final,    "M2_adjusted_data_admin_area.csv",   row.names = FALSE)
-write.csv(adjusted_data_national_final,      "M2_adjusted_data_national.csv",     row.names = FALSE)
+# Save all outputs
+write.csv(adjusted_data_export_clean,      "M2_adjusted_data.csv",              row.names = FALSE)
+write.csv(adjusted_data_admin_area_final,  "M2_adjusted_data_admin_area.csv",   row.names = FALSE)
+write.csv(adjusted_data_national_final,    "M2_adjusted_data_national.csv",     row.names = FALSE)
 
-print("Adjustments completed and saved.")
+print("Adjustments completed and all outputs saved.")
 
+# ------------------- Generate SQL CREATE TABLE Statements for M2 Outputs ------------------------
 
+# Function to generate CREATE TABLE SQL
+generate_sql_schema <- function(table_name, columns) {
+  sql_lines <- paste0("  ", columns)
+  sql <- c(
+    paste0("CREATE TABLE ", table_name, " ("),
+    paste(sql_lines, collapse = ",\n"),
+    ");\n"
+  )
+  return(paste(sql, collapse = "\n"))
+}
+
+# Get SQL-ready admin area columns
+geo_columns_export_sql <- paste0(geo_admin_area_sub, " TEXT NOT NULL")
+geo_columns_national_sql <- "admin_area_1 TEXT NOT NULL"
+
+# Facility-level SQL columns
+adjusted_facility_sql_cols <- c(
+  "facility_id TEXT NOT NULL",
+  geo_columns_export_sql,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "indicator_common_id TEXT NOT NULL",
+  "count_final_none NUMERIC",
+  "count_final_outliers NUMERIC",
+  "count_final_completeness NUMERIC",
+  "count_final_both NUMERIC"
+)
+
+# Subnational-level SQL columns
+adjusted_admin_sql_cols <- c(
+  geo_columns_export_sql,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "indicator_common_id TEXT NOT NULL",
+  "count_final_none NUMERIC",
+  "count_final_outliers NUMERIC",
+  "count_final_completeness NUMERIC",
+  "count_final_both NUMERIC"
+)
+
+# National-level SQL columns
+adjusted_national_sql_cols <- c(
+  geo_columns_national_sql,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "indicator_common_id TEXT NOT NULL",
+  "count_final_none NUMERIC",
+  "count_final_outliers NUMERIC",
+  "count_final_completeness NUMERIC",
+  "count_final_both NUMERIC"
+)
+
+# Build SQL schema
+sql_output <- c(
+  generate_sql_schema("m2_adjusted_data", adjusted_facility_sql_cols),
+  generate_sql_schema("m2_adjusted_data_admin_area", adjusted_admin_sql_cols),
+  generate_sql_schema("m2_adjusted_data_national", adjusted_national_sql_cols)
+)
+
+# Write SQL schema to file
+writeLines(sql_output, "M2_sql_schema_output.txt")
