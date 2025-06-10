@@ -512,92 +512,92 @@ DRC,NATIONAL,2013,ch_vac1_c_op1,polio1,percent,0.883,DHS National,CD2013DHS,hous
 DRC,NATIONAL,2013,ch_vac1_c_op2,polio2,percent,0.798,DHS National,CD2013DHS,household
 DRC,NATIONAL,2013,ch_vac1_c_op3,polio3,percent,0.611,DHS National,CD2013DHS,household
 DRC,NATIONAL,2013,ch_vac1_c_msl,measles1,percent,0.355,DHS National,CD2013DHS,household
-Ethiopia,NATIONAL,2000,fe_frtr_w_tfr,tfr,rate,5.5,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,fe_frtr_w_cbr,crudebr,rate,39,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,fe_frty_w_npg,womenrepage,survey_count,15367,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,fp_srcm_w_tot,fp,percent,1,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,cm_ecmt_c_imr,imr,rate,97,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,cm_ecmr_c_nnr,nmr,rate,49,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,rh_ancn_w_n01,anc1_old,percent,0.064,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,rh_ancn_w_n4p,anc4,percent,0.092,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,rh_delp_c_dhf,delivery,percent,0.049,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_bcg,bcg,percent,0.44,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_dp1,penta1,percent,0.413,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_dp3,penta3,percent,0.222,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_op1,polio1,percent,0.755,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_op2,polio2,percent,0.642,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_op3,polio3,percent,0.423,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2000,ch_vac1_c_msl,measles1,percent,0.126,DHS National,ET2000DHS,household
-Ethiopia,NATIONAL,2005,fe_frtr_w_tfr,tfr,rate,5.4,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,fe_frtr_w_cbr,crudebr,rate,35.7,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,fe_frty_w_npg,womenrepage,survey_count,14070,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,fp_srcm_w_tot,fp,percent,1,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,cm_ecmt_c_imr,imr,rate,77,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,cm_ecmr_c_nnr,nmr,rate,39,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,cm_pnmr_c_nsb,still,number,118,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,rh_ancn_w_n01,anc1_old,percent,0.056,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,rh_ancn_w_n4p,anc4,percent,0.12,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,rh_delp_c_dhf,delivery,percent,0.064,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_bcg,bcg,percent,0.496,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_dp1,penta1,percent,0.432,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_dp3,penta3,percent,0.232,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_op1,polio1,percent,0.635,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_op2,polio2,percent,0.56,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_op3,polio3,percent,0.412,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2005,ch_vac1_c_msl,measles1,percent,0.134,DHS National,ET2005DHS,household
-Ethiopia,NATIONAL,2011,fe_frtr_w_tfr,tfr,rate,4.8,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,fe_frtr_w_cbr,crudebr,rate,34.5,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,fe_frty_w_npg,womenrepage,survey_count,16515,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,fp_srcm_w_tot,fp,percent,1,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,cm_ecmt_c_imr,imr,rate,59,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,cm_ecmr_c_nnr,nmr,rate,37,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,cm_pnmr_c_nsb,still,number,204,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,rh_ancp_w_skp,anc1,percent,0.432,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,rh_ancn_w_n01,anc1_old,percent,0.057,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,rh_ancn_w_n4p,anc4,percent,0.173,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,rh_delp_c_dhf,delivery,percent,0.116,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_bcg,bcg,percent,0.642,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_dp1,penta1,percent,0.581,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_dp3,penta3,percent,0.334,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_op1,polio1,percent,0.808,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_op2,polio2,percent,0.725,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_op3,polio3,percent,0.526,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2011,ch_vac1_c_msl,measles1,percent,0.242,DHS National,ET2011DHS,household
-Ethiopia,NATIONAL,2016,fe_frtr_w_tfr,tfr,rate,4.6,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,fe_frtr_w_cbr,crudebr,rate,31.8,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,fe_frty_w_npg,womenrepage,survey_count,15683,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,fp_srcm_w_tot,fp,percent,1,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,cm_ecmt_c_imr,imr,rate,48,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,cm_ecmr_c_nnr,nmr,rate,29,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,cm_pnmr_c_nsb,still,number,130,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,rh_ancp_w_skp,anc1,percent,0.643,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,rh_ancn_w_n01,anc1_old,percent,0.047,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,rh_ancn_w_n4p,anc4,percent,0.333,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,rh_delp_c_dhf,delivery,percent,0.365,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_bcg,bcg,percent,0.657,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_dp1,penta1,percent,0.676,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_dp3,penta3,percent,0.459,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_op1,polio1,percent,0.763,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_op2,polio2,percent,0.677,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_op3,polio3,percent,0.508,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2016,ch_vac1_c_msl,measles1,percent,0.447,DHS National,ET2016DHS,household
-Ethiopia,NATIONAL,2019,fe_frtr_w_tfr,tfr,rate,4.1,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,fe_frtr_w_cbr,crudebr,rate,28.6,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,fe_frty_w_npg,womenrepage,survey_count,8885,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,fp_srcm_w_tot,fp,percent,1,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,cm_ecmt_c_imr,imr,rate,47,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,cm_ecmr_c_nnr,nmr,rate,33,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,rh_ancp_w_skp,anc1,percent,0.732,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,rh_ancn_w_n01,anc1_old,percent,0.037,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,rh_ancn_w_n4p,anc4,percent,0.44,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,rh_delp_c_dhf,delivery,percent,0.539,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_bcg,bcg,percent,0.665,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_dp1,penta1,percent,0.692,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_dp3,penta3,percent,0.547,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_op1,polio1,percent,0.721,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_op2,polio2,percent,0.658,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_op3,polio3,percent,0.538,DHS National,ET2019DHS,household
-Ethiopia,NATIONAL,2019,ch_vac1_c_msl,measles1,percent,0.524,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,1992,fe_frtr_w_tfr,tfr,rate,5.5,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,fe_frtr_w_cbr,crudebr,rate,39,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,fe_frty_w_npg,womenrepage,survey_count,15367,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,fp_srcm_w_tot,fp,percent,1,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,cm_ecmt_c_imr,imr,rate,97,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,cm_ecmr_c_nnr,nmr,rate,49,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,rh_ancn_w_n01,anc1_old,percent,0.064,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,rh_ancn_w_n4p,anc4,percent,0.092,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,rh_delp_c_dhf,delivery,percent,0.049,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_bcg,bcg,percent,0.44,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_dp1,penta1,percent,0.413,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_dp3,penta3,percent,0.222,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_op1,polio1,percent,0.755,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_op2,polio2,percent,0.642,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_op3,polio3,percent,0.423,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1992,ch_vac1_c_msl,measles1,percent,0.126,DHS National,ET2000DHS,household
+Ethiopia,NATIONAL,1997,fe_frtr_w_tfr,tfr,rate,5.4,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,fe_frtr_w_cbr,crudebr,rate,35.7,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,fe_frty_w_npg,womenrepage,survey_count,14070,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,fp_srcm_w_tot,fp,percent,1,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,cm_ecmt_c_imr,imr,rate,77,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,cm_ecmr_c_nnr,nmr,rate,39,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,cm_pnmr_c_nsb,still,number,118,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,rh_ancn_w_n01,anc1_old,percent,0.056,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,rh_ancn_w_n4p,anc4,percent,0.12,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,rh_delp_c_dhf,delivery,percent,0.064,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_bcg,bcg,percent,0.496,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_dp1,penta1,percent,0.432,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_dp3,penta3,percent,0.232,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_op1,polio1,percent,0.635,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_op2,polio2,percent,0.56,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_op3,polio3,percent,0.412,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,1997,ch_vac1_c_msl,measles1,percent,0.134,DHS National,ET2005DHS,household
+Ethiopia,NATIONAL,2003,fe_frtr_w_tfr,tfr,rate,4.8,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,fe_frtr_w_cbr,crudebr,rate,34.5,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,fe_frty_w_npg,womenrepage,survey_count,16515,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,fp_srcm_w_tot,fp,percent,1,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,cm_ecmt_c_imr,imr,rate,59,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,cm_ecmr_c_nnr,nmr,rate,37,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,cm_pnmr_c_nsb,still,number,204,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,rh_ancp_w_skp,anc1,percent,0.432,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,rh_ancn_w_n01,anc1_old,percent,0.057,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,rh_ancn_w_n4p,anc4,percent,0.173,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,rh_delp_c_dhf,delivery,percent,0.116,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_bcg,bcg,percent,0.642,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_dp1,penta1,percent,0.581,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_dp3,penta3,percent,0.334,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_op1,polio1,percent,0.808,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_op2,polio2,percent,0.725,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_op3,polio3,percent,0.526,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2003,ch_vac1_c_msl,measles1,percent,0.242,DHS National,ET2011DHS,household
+Ethiopia,NATIONAL,2008,fe_frtr_w_tfr,tfr,rate,4.6,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,fe_frtr_w_cbr,crudebr,rate,31.8,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,fe_frty_w_npg,womenrepage,survey_count,15683,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,fp_srcm_w_tot,fp,percent,1,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,cm_ecmt_c_imr,imr,rate,48,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,cm_ecmr_c_nnr,nmr,rate,29,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,cm_pnmr_c_nsb,still,number,130,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,rh_ancp_w_skp,anc1,percent,0.643,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,rh_ancn_w_n01,anc1_old,percent,0.047,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,rh_ancn_w_n4p,anc4,percent,0.333,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,rh_delp_c_dhf,delivery,percent,0.365,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_bcg,bcg,percent,0.657,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_dp1,penta1,percent,0.676,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_dp3,penta3,percent,0.459,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_op1,polio1,percent,0.763,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_op2,polio2,percent,0.677,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_op3,polio3,percent,0.508,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2008,ch_vac1_c_msl,measles1,percent,0.447,DHS National,ET2016DHS,household
+Ethiopia,NATIONAL,2011,fe_frtr_w_tfr,tfr,rate,4.1,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,fe_frtr_w_cbr,crudebr,rate,28.6,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,fe_frty_w_npg,womenrepage,survey_count,8885,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,fp_srcm_w_tot,fp,percent,1,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,cm_ecmt_c_imr,imr,rate,47,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,cm_ecmr_c_nnr,nmr,rate,33,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,rh_ancp_w_skp,anc1,percent,0.732,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,rh_ancn_w_n01,anc1_old,percent,0.037,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,rh_ancn_w_n4p,anc4,percent,0.44,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,rh_delp_c_dhf,delivery,percent,0.539,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_bcg,bcg,percent,0.665,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_dp1,penta1,percent,0.692,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_dp3,penta3,percent,0.547,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_op1,polio1,percent,0.721,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_op2,polio2,percent,0.658,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_op3,polio3,percent,0.538,DHS National,ET2019DHS,household
+Ethiopia,NATIONAL,2011,ch_vac1_c_msl,measles1,percent,0.524,DHS National,ET2019DHS,household
 Guinea,NATIONAL,1999,fe_frtr_w_tfr,tfr,rate,5.5,DHS National,GN1999DHS,household
 Guinea,NATIONAL,1999,fe_frtr_w_cbr,crudebr,rate,37.3,DHS National,GN1999DHS,household
 Guinea,NATIONAL,1999,fe_frty_w_npg,womenrepage,survey_count,6753,DHS National,GN1999DHS,household
@@ -3451,204 +3451,204 @@ DRC,Sankuru,2013,rh_delp_c_dhf,delivery,percent,0.443,DHS Sub-national,CD2013DHS
 DRC,Kasaï Occident,2013,rh_delp_c_dhf,delivery,percent,0.85,DHS Sub-national,CD2013DHS,household
 DRC,Kasai,2013,rh_delp_c_dhf,delivery,percent,0.818,DHS Sub-national,CD2013DHS,household
 DRC,Kasai-Central,2013,rh_delp_c_dhf,delivery,percent,0.875,DHS Sub-national,CD2013DHS,household
-Ethiopia,Tigray Region,2000,rh_ancn_w_n01,anc1_old,percent,0.099,DHS Sub-national,ET2000DHS,household
-Ethiopia,Afar Region,2000,rh_ancn_w_n01,anc1_old,percent,0.096,DHS Sub-national,ET2000DHS,household
-Ethiopia,Amhara Region,2000,rh_ancn_w_n01,anc1_old,percent,0.055,DHS Sub-national,ET2000DHS,household
-Ethiopia,Oromia Region,2000,rh_ancn_w_n01,anc1_old,percent,0.061,DHS Sub-national,ET2000DHS,household
-Ethiopia,Somali Region,2000,rh_ancn_w_n01,anc1_old,percent,0.042,DHS Sub-national,ET2000DHS,household
-Ethiopia,Benishangul Gumuz Region,2000,rh_ancn_w_n01,anc1_old,percent,0.058,DHS Sub-national,ET2000DHS,household
-Ethiopia,SNNPR,2000,rh_ancn_w_n01,anc1_old,percent,0.07,DHS Sub-national,ET2000DHS,household
-Ethiopia,Gambella Region,2000,rh_ancn_w_n01,anc1_old,percent,0.061,DHS Sub-national,ET2000DHS,household
-Ethiopia,Harari Region,2000,rh_ancn_w_n01,anc1_old,percent,0.112,DHS Sub-national,ET2000DHS,household
-Ethiopia,Addis Ababa City Administration,2000,rh_ancn_w_n01,anc1_old,percent,0.048,DHS Sub-national,ET2000DHS,household
-Ethiopia,Dire Dawa City Administration,2000,rh_ancn_w_n01,anc1_old,percent,0.107,DHS Sub-national,ET2000DHS,household
-Ethiopia,Tigray Region,2000,rh_ancn_w_n4p,anc4,percent,0.11,DHS Sub-national,ET2000DHS,household
-Ethiopia,Afar Region,2000,rh_ancn_w_n4p,anc4,percent,0.062,DHS Sub-national,ET2000DHS,household
-Ethiopia,Amhara Region,2000,rh_ancn_w_n4p,anc4,percent,0.032,DHS Sub-national,ET2000DHS,household
-Ethiopia,Oromia Region,2000,rh_ancn_w_n4p,anc4,percent,0.103,DHS Sub-national,ET2000DHS,household
-Ethiopia,Somali Region,2000,rh_ancn_w_n4p,anc4,percent,0.035,DHS Sub-national,ET2000DHS,household
-Ethiopia,Benishangul Gumuz Region,2000,rh_ancn_w_n4p,anc4,percent,0.098,DHS Sub-national,ET2000DHS,household
-Ethiopia,SNNPR,2000,rh_ancn_w_n4p,anc4,percent,0.089,DHS Sub-national,ET2000DHS,household
-Ethiopia,Gambella Region,2000,rh_ancn_w_n4p,anc4,percent,0.273,DHS Sub-national,ET2000DHS,household
-Ethiopia,Harari Region,2000,rh_ancn_w_n4p,anc4,percent,0.202,DHS Sub-national,ET2000DHS,household
-Ethiopia,Addis Ababa City Administration,2000,rh_ancn_w_n4p,anc4,percent,0.713,DHS Sub-national,ET2000DHS,household
-Ethiopia,Dire Dawa City Administration,2000,rh_ancn_w_n4p,anc4,percent,0.315,DHS Sub-national,ET2000DHS,household
-Ethiopia,Tigray Region,2000,rh_delp_c_dhf,delivery,percent,0.036,DHS Sub-national,ET2000DHS,household
-Ethiopia,Afar Region,2000,rh_delp_c_dhf,delivery,percent,0.041,DHS Sub-national,ET2000DHS,household
-Ethiopia,Amhara Region,2000,rh_delp_c_dhf,delivery,percent,0.028,DHS Sub-national,ET2000DHS,household
-Ethiopia,Oromia Region,2000,rh_delp_c_dhf,delivery,percent,0.04,DHS Sub-national,ET2000DHS,household
-Ethiopia,Somali Region,2000,rh_delp_c_dhf,delivery,percent,0.087,DHS Sub-national,ET2000DHS,household
-Ethiopia,Benishangul Gumuz Region,2000,rh_delp_c_dhf,delivery,percent,0.057,DHS Sub-national,ET2000DHS,household
-Ethiopia,SNNPR,2000,rh_delp_c_dhf,delivery,percent,0.037,DHS Sub-national,ET2000DHS,household
-Ethiopia,Gambella Region,2000,rh_delp_c_dhf,delivery,percent,0.286,DHS Sub-national,ET2000DHS,household
-Ethiopia,Harari Region,2000,rh_delp_c_dhf,delivery,percent,0.234,DHS Sub-national,ET2000DHS,household
-Ethiopia,Addis Ababa City Administration,2000,rh_delp_c_dhf,delivery,percent,0.722,DHS Sub-national,ET2000DHS,household
-Ethiopia,Dire Dawa City Administration,2000,rh_delp_c_dhf,delivery,percent,0.338,DHS Sub-national,ET2000DHS,household
-Ethiopia,Tigray Region,2005,rh_ancn_w_n01,anc1_old,percent,0.066,DHS Sub-national,ET2005DHS,household
-Ethiopia,Afar Region,2005,rh_ancn_w_n01,anc1_old,percent,0.014,DHS Sub-national,ET2005DHS,household
-Ethiopia,Amhara Region,2005,rh_ancn_w_n01,anc1_old,percent,0.108,DHS Sub-national,ET2005DHS,household
-Ethiopia,Oromia Region,2005,rh_ancn_w_n01,anc1_old,percent,0.037,DHS Sub-national,ET2005DHS,household
-Ethiopia,Somali Region,2005,rh_ancn_w_n01,anc1_old,percent,0.021,DHS Sub-national,ET2005DHS,household
-Ethiopia,Benishangul Gumuz Region,2005,rh_ancn_w_n01,anc1_old,percent,0.031,DHS Sub-national,ET2005DHS,household
-Ethiopia,SNNPR,2005,rh_ancn_w_n01,anc1_old,percent,0.042,DHS Sub-national,ET2005DHS,household
-Ethiopia,Gambella Region,2005,rh_ancn_w_n01,anc1_old,percent,0.014,DHS Sub-national,ET2005DHS,household
-Ethiopia,Harari Region,2005,rh_ancn_w_n01,anc1_old,percent,0.038,DHS Sub-national,ET2005DHS,household
-Ethiopia,Addis Ababa City Administration,2005,rh_ancn_w_n01,anc1_old,percent,0,DHS Sub-national,ET2005DHS,household
-Ethiopia,Dire Dawa City Administration,2005,rh_ancn_w_n01,anc1_old,percent,0.05,DHS Sub-national,ET2005DHS,household
-Ethiopia,Tigray Region,2005,rh_ancn_w_n4p,anc4,percent,0.163,DHS Sub-national,ET2005DHS,household
-Ethiopia,Afar Region,2005,rh_ancn_w_n4p,anc4,percent,0.071,DHS Sub-national,ET2005DHS,household
-Ethiopia,Amhara Region,2005,rh_ancn_w_n4p,anc4,percent,0.069,DHS Sub-national,ET2005DHS,household
-Ethiopia,Oromia Region,2005,rh_ancn_w_n4p,anc4,percent,0.108,DHS Sub-national,ET2005DHS,household
-Ethiopia,Somali Region,2005,rh_ancn_w_n4p,anc4,percent,0.046,DHS Sub-national,ET2005DHS,household
-Ethiopia,Benishangul Gumuz Region,2005,rh_ancn_w_n4p,anc4,percent,0.101,DHS Sub-national,ET2005DHS,household
-Ethiopia,SNNPR,2005,rh_ancn_w_n4p,anc4,percent,0.153,DHS Sub-national,ET2005DHS,household
-Ethiopia,Gambella Region,2005,rh_ancn_w_n4p,anc4,percent,0.254,DHS Sub-national,ET2005DHS,household
-Ethiopia,Harari Region,2005,rh_ancn_w_n4p,anc4,percent,0.204,DHS Sub-national,ET2005DHS,household
-Ethiopia,Addis Ababa City Administration,2005,rh_ancn_w_n4p,anc4,percent,0.797,DHS Sub-national,ET2005DHS,household
-Ethiopia,Dire Dawa City Administration,2005,rh_ancn_w_n4p,anc4,percent,0.309,DHS Sub-national,ET2005DHS,household
-Ethiopia,Tigray Region,2005,rh_delp_c_dhf,delivery,percent,0.07,DHS Sub-national,ET2005DHS,household
-Ethiopia,Afar Region,2005,rh_delp_c_dhf,delivery,percent,0.025,DHS Sub-national,ET2005DHS,household
-Ethiopia,Amhara Region,2005,rh_delp_c_dhf,delivery,percent,0.043,DHS Sub-national,ET2005DHS,household
-Ethiopia,Oromia Region,2005,rh_delp_c_dhf,delivery,percent,0.059,DHS Sub-national,ET2005DHS,household
-Ethiopia,Somali Region,2005,rh_delp_c_dhf,delivery,percent,0.066,DHS Sub-national,ET2005DHS,household
-Ethiopia,Benishangul Gumuz Region,2005,rh_delp_c_dhf,delivery,percent,0.069,DHS Sub-national,ET2005DHS,household
-Ethiopia,SNNPR,2005,rh_delp_c_dhf,delivery,percent,0.043,DHS Sub-national,ET2005DHS,household
-Ethiopia,Gambella Region,2005,rh_delp_c_dhf,delivery,percent,0.172,DHS Sub-national,ET2005DHS,household
-Ethiopia,Harari Region,2005,rh_delp_c_dhf,delivery,percent,0.33,DHS Sub-national,ET2005DHS,household
-Ethiopia,Addis Ababa City Administration,2005,rh_delp_c_dhf,delivery,percent,0.807,DHS Sub-national,ET2005DHS,household
-Ethiopia,Dire Dawa City Administration,2005,rh_delp_c_dhf,delivery,percent,0.289,DHS Sub-national,ET2005DHS,household
-Ethiopia,Tigray Region,2011,rh_ancp_w_skp,anc1,percent,0.641,DHS Sub-national,ET2011DHS,household
-Ethiopia,Afar Region,2011,rh_ancp_w_skp,anc1,percent,0.345,DHS Sub-national,ET2011DHS,household
-Ethiopia,Amhara Region,2011,rh_ancp_w_skp,anc1,percent,0.418,DHS Sub-national,ET2011DHS,household
-Ethiopia,Oromia Region,2011,rh_ancp_w_skp,anc1,percent,0.407,DHS Sub-national,ET2011DHS,household
-Ethiopia,Somali Region,2011,rh_ancp_w_skp,anc1,percent,0.282,DHS Sub-national,ET2011DHS,household
-Ethiopia,Benishangul Gumuz Region,2011,rh_ancp_w_skp,anc1,percent,0.372,DHS Sub-national,ET2011DHS,household
-Ethiopia,SNNPR,2011,rh_ancp_w_skp,anc1,percent,0.405,DHS Sub-national,ET2011DHS,household
-Ethiopia,Gambella Region,2011,rh_ancp_w_skp,anc1,percent,0.541,DHS Sub-national,ET2011DHS,household
-Ethiopia,Harari Region,2011,rh_ancp_w_skp,anc1,percent,0.572,DHS Sub-national,ET2011DHS,household
-Ethiopia,Addis Ababa City Administration,2011,rh_ancp_w_skp,anc1,percent,0.96,DHS Sub-national,ET2011DHS,household
-Ethiopia,Dire Dawa City Administration,2011,rh_ancp_w_skp,anc1,percent,0.541,DHS Sub-national,ET2011DHS,household
-Ethiopia,Tigray Region,2011,rh_ancn_w_n01,anc1_old,percent,0.078,DHS Sub-national,ET2011DHS,household
-Ethiopia,Afar Region,2011,rh_ancn_w_n01,anc1_old,percent,0.065,DHS Sub-national,ET2011DHS,household
-Ethiopia,Amhara Region,2011,rh_ancn_w_n01,anc1_old,percent,0.105,DHS Sub-national,ET2011DHS,household
-Ethiopia,Oromia Region,2011,rh_ancn_w_n01,anc1_old,percent,0.042,DHS Sub-national,ET2011DHS,household
-Ethiopia,Somali Region,2011,rh_ancn_w_n01,anc1_old,percent,0.048,DHS Sub-national,ET2011DHS,household
-Ethiopia,Benishangul Gumuz Region,2011,rh_ancn_w_n01,anc1_old,percent,0.031,DHS Sub-national,ET2011DHS,household
-Ethiopia,SNNPR,2011,rh_ancn_w_n01,anc1_old,percent,0.039,DHS Sub-national,ET2011DHS,household
-Ethiopia,Gambella Region,2011,rh_ancn_w_n01,anc1_old,percent,0.055,DHS Sub-national,ET2011DHS,household
-Ethiopia,Harari Region,2011,rh_ancn_w_n01,anc1_old,percent,0.018,DHS Sub-national,ET2011DHS,household
-Ethiopia,Addis Ababa City Administration,2011,rh_ancn_w_n01,anc1_old,percent,0.006,DHS Sub-national,ET2011DHS,household
-Ethiopia,Dire Dawa City Administration,2011,rh_ancn_w_n01,anc1_old,percent,0.049,DHS Sub-national,ET2011DHS,household
-Ethiopia,Tigray Region,2011,rh_ancn_w_n4p,anc4,percent,0.281,DHS Sub-national,ET2011DHS,household
-Ethiopia,Afar Region,2011,rh_ancn_w_n4p,anc4,percent,0.097,DHS Sub-national,ET2011DHS,household
-Ethiopia,Amhara Region,2011,rh_ancn_w_n4p,anc4,percent,0.105,DHS Sub-national,ET2011DHS,household
-Ethiopia,Oromia Region,2011,rh_ancn_w_n4p,anc4,percent,0.178,DHS Sub-national,ET2011DHS,household
-Ethiopia,Somali Region,2011,rh_ancn_w_n4p,anc4,percent,0.071,DHS Sub-national,ET2011DHS,household
-Ethiopia,Benishangul Gumuz Region,2011,rh_ancn_w_n4p,anc4,percent,0.139,DHS Sub-national,ET2011DHS,household
-Ethiopia,SNNPR,2011,rh_ancn_w_n4p,anc4,percent,0.147,DHS Sub-national,ET2011DHS,household
-Ethiopia,Gambella Region,2011,rh_ancn_w_n4p,anc4,percent,0.277,DHS Sub-national,ET2011DHS,household
-Ethiopia,Harari Region,2011,rh_ancn_w_n4p,anc4,percent,0.307,DHS Sub-national,ET2011DHS,household
-Ethiopia,Addis Ababa City Administration,2011,rh_ancn_w_n4p,anc4,percent,0.867,DHS Sub-national,ET2011DHS,household
-Ethiopia,Dire Dawa City Administration,2011,rh_ancn_w_n4p,anc4,percent,0.317,DHS Sub-national,ET2011DHS,household
-Ethiopia,Tigray Region,2011,rh_delp_c_dhf,delivery,percent,0.161,DHS Sub-national,ET2011DHS,household
-Ethiopia,Afar Region,2011,rh_delp_c_dhf,delivery,percent,0.082,DHS Sub-national,ET2011DHS,household
-Ethiopia,Amhara Region,2011,rh_delp_c_dhf,delivery,percent,0.113,DHS Sub-national,ET2011DHS,household
-Ethiopia,Oromia Region,2011,rh_delp_c_dhf,delivery,percent,0.096,DHS Sub-national,ET2011DHS,household
-Ethiopia,Somali Region,2011,rh_delp_c_dhf,delivery,percent,0.082,DHS Sub-national,ET2011DHS,household
-Ethiopia,Benishangul Gumuz Region,2011,rh_delp_c_dhf,delivery,percent,0.104,DHS Sub-national,ET2011DHS,household
-Ethiopia,SNNPR,2011,rh_delp_c_dhf,delivery,percent,0.074,DHS Sub-national,ET2011DHS,household
-Ethiopia,Gambella Region,2011,rh_delp_c_dhf,delivery,percent,0.275,DHS Sub-national,ET2011DHS,household
-Ethiopia,Harari Region,2011,rh_delp_c_dhf,delivery,percent,0.359,DHS Sub-national,ET2011DHS,household
-Ethiopia,Addis Ababa City Administration,2011,rh_delp_c_dhf,delivery,percent,0.829,DHS Sub-national,ET2011DHS,household
-Ethiopia,Dire Dawa City Administration,2011,rh_delp_c_dhf,delivery,percent,0.418,DHS Sub-national,ET2011DHS,household
-Ethiopia,Tigray Region,2016,rh_ancp_w_skp,anc1,percent,0.928,DHS Sub-national,ET2016DHS,household
-Ethiopia,Afar Region,2016,rh_ancp_w_skp,anc1,percent,0.551,DHS Sub-national,ET2016DHS,household
-Ethiopia,Amhara Region,2016,rh_ancp_w_skp,anc1,percent,0.76,DHS Sub-national,ET2016DHS,household
-Ethiopia,Oromia Region,2016,rh_ancp_w_skp,anc1,percent,0.513,DHS Sub-national,ET2016DHS,household
-Ethiopia,Somali Region,2016,rh_ancp_w_skp,anc1,percent,0.463,DHS Sub-national,ET2016DHS,household
-Ethiopia,Benishangul Gumuz Region,2016,rh_ancp_w_skp,anc1,percent,0.729,DHS Sub-national,ET2016DHS,household
-Ethiopia,SNNPR,2016,rh_ancp_w_skp,anc1,percent,0.707,DHS Sub-national,ET2016DHS,household
-Ethiopia,Gambella Region,2016,rh_ancp_w_skp,anc1,percent,0.73,DHS Sub-national,ET2016DHS,household
-Ethiopia,Harari Region,2016,rh_ancp_w_skp,anc1,percent,0.736,DHS Sub-national,ET2016DHS,household
-Ethiopia,Addis Ababa City Administration,2016,rh_ancp_w_skp,anc1,percent,0.983,DHS Sub-national,ET2016DHS,household
-Ethiopia,Dire Dawa City Administration,2016,rh_ancp_w_skp,anc1,percent,0.874,DHS Sub-national,ET2016DHS,household
-Ethiopia,Tigray Region,2016,rh_ancn_w_n01,anc1_old,percent,0.056,DHS Sub-national,ET2016DHS,household
-Ethiopia,Afar Region,2016,rh_ancn_w_n01,anc1_old,percent,0.059,DHS Sub-national,ET2016DHS,household
-Ethiopia,Amhara Region,2016,rh_ancn_w_n01,anc1_old,percent,0.061,DHS Sub-national,ET2016DHS,household
-Ethiopia,Oromia Region,2016,rh_ancn_w_n01,anc1_old,percent,0.047,DHS Sub-national,ET2016DHS,household
-Ethiopia,Somali Region,2016,rh_ancn_w_n01,anc1_old,percent,0.084,DHS Sub-national,ET2016DHS,household
-Ethiopia,Benishangul Gumuz Region,2016,rh_ancn_w_n01,anc1_old,percent,0.044,DHS Sub-national,ET2016DHS,household
-Ethiopia,SNNPR,2016,rh_ancn_w_n01,anc1_old,percent,0.03,DHS Sub-national,ET2016DHS,household
-Ethiopia,Gambella Region,2016,rh_ancn_w_n01,anc1_old,percent,0.014,DHS Sub-national,ET2016DHS,household
-Ethiopia,Harari Region,2016,rh_ancn_w_n01,anc1_old,percent,0.098,DHS Sub-national,ET2016DHS,household
-Ethiopia,Addis Ababa City Administration,2016,rh_ancn_w_n01,anc1_old,percent,0.01,DHS Sub-national,ET2016DHS,household
-Ethiopia,Dire Dawa City Administration,2016,rh_ancn_w_n01,anc1_old,percent,0.039,DHS Sub-national,ET2016DHS,household
-Ethiopia,Tigray Region,2016,rh_ancn_w_n4p,anc4,percent,0.596,DHS Sub-national,ET2016DHS,household
-Ethiopia,Afar Region,2016,rh_ancn_w_n4p,anc4,percent,0.239,DHS Sub-national,ET2016DHS,household
-Ethiopia,Amhara Region,2016,rh_ancn_w_n4p,anc4,percent,0.379,DHS Sub-national,ET2016DHS,household
-Ethiopia,Oromia Region,2016,rh_ancn_w_n4p,anc4,percent,0.222,DHS Sub-national,ET2016DHS,household
-Ethiopia,Somali Region,2016,rh_ancn_w_n4p,anc4,percent,0.125,DHS Sub-national,ET2016DHS,household
-Ethiopia,Benishangul Gumuz Region,2016,rh_ancn_w_n4p,anc4,percent,0.44,DHS Sub-national,ET2016DHS,household
-Ethiopia,SNNPR,2016,rh_ancn_w_n4p,anc4,percent,0.405,DHS Sub-national,ET2016DHS,household
-Ethiopia,Gambella Region,2016,rh_ancn_w_n4p,anc4,percent,0.417,DHS Sub-national,ET2016DHS,household
-Ethiopia,Harari Region,2016,rh_ancn_w_n4p,anc4,percent,0.31,DHS Sub-national,ET2016DHS,household
-Ethiopia,Addis Ababa City Administration,2016,rh_ancn_w_n4p,anc4,percent,0.894,DHS Sub-national,ET2016DHS,household
-Ethiopia,Dire Dawa City Administration,2016,rh_ancn_w_n4p,anc4,percent,0.679,DHS Sub-national,ET2016DHS,household
-Ethiopia,Tigray Region,2016,rh_delp_c_dhf,delivery,percent,0.715,DHS Sub-national,ET2016DHS,household
-Ethiopia,Afar Region,2016,rh_delp_c_dhf,delivery,percent,0.21,DHS Sub-national,ET2016DHS,household
-Ethiopia,Amhara Region,2016,rh_delp_c_dhf,delivery,percent,0.378,DHS Sub-national,ET2016DHS,household
-Ethiopia,Oromia Region,2016,rh_delp_c_dhf,delivery,percent,0.271,DHS Sub-national,ET2016DHS,household
-Ethiopia,Somali Region,2016,rh_delp_c_dhf,delivery,percent,0.239,DHS Sub-national,ET2016DHS,household
-Ethiopia,Benishangul Gumuz Region,2016,rh_delp_c_dhf,delivery,percent,0.34,DHS Sub-national,ET2016DHS,household
-Ethiopia,SNNPR,2016,rh_delp_c_dhf,delivery,percent,0.384,DHS Sub-national,ET2016DHS,household
-Ethiopia,Gambella Region,2016,rh_delp_c_dhf,delivery,percent,0.507,DHS Sub-national,ET2016DHS,household
-Ethiopia,Harari Region,2016,rh_delp_c_dhf,delivery,percent,0.585,DHS Sub-national,ET2016DHS,household
-Ethiopia,Addis Ababa City Administration,2016,rh_delp_c_dhf,delivery,percent,0.979,DHS Sub-national,ET2016DHS,household
-Ethiopia,Dire Dawa City Administration,2016,rh_delp_c_dhf,delivery,percent,0.639,DHS Sub-national,ET2016DHS,household
-Ethiopia,Tigray Region,2019,rh_ancp_w_skp,anc1,percent,0.931,DHS Sub-national,ET2019DHS,household
-Ethiopia,Afar Region,2019,rh_ancp_w_skp,anc1,percent,0.638,DHS Sub-national,ET2019DHS,household
-Ethiopia,Amhara Region,2019,rh_ancp_w_skp,anc1,percent,0.828,DHS Sub-national,ET2019DHS,household
-Ethiopia,Oromia Region,2019,rh_ancp_w_skp,anc1,percent,0.71,DHS Sub-national,ET2019DHS,household
-Ethiopia,Somali Region,2019,rh_ancp_w_skp,anc1,percent,0.331,DHS Sub-national,ET2019DHS,household
-Ethiopia,Benishangul Gumuz Region,2019,rh_ancp_w_skp,anc1,percent,0.856,DHS Sub-national,ET2019DHS,household
-Ethiopia,SNNPR,2019,rh_ancp_w_skp,anc1,percent,0.681,DHS Sub-national,ET2019DHS,household
-Ethiopia,Gambella Region,2019,rh_ancp_w_skp,anc1,percent,0.853,DHS Sub-national,ET2019DHS,household
-Ethiopia,Harari Region,2019,rh_ancp_w_skp,anc1,percent,0.796,DHS Sub-national,ET2019DHS,household
-Ethiopia,Addis Ababa City Administration,2019,rh_ancp_w_skp,anc1,percent,0.99,DHS Sub-national,ET2019DHS,household
-Ethiopia,Dire Dawa City Administration,2019,rh_ancp_w_skp,anc1,percent,0.867,DHS Sub-national,ET2019DHS,household
-Ethiopia,Tigray Region,2019,rh_ancn_w_n01,anc1_old,percent,0.046,DHS Sub-national,ET2019DHS,household
-Ethiopia,Afar Region,2019,rh_ancn_w_n01,anc1_old,percent,0.05,DHS Sub-national,ET2019DHS,household
-Ethiopia,Amhara Region,2019,rh_ancn_w_n01,anc1_old,percent,0.051,DHS Sub-national,ET2019DHS,household
-Ethiopia,Oromia Region,2019,rh_ancn_w_n01,anc1_old,percent,0.031,DHS Sub-national,ET2019DHS,household
-Ethiopia,Somali Region,2019,rh_ancn_w_n01,anc1_old,percent,0.053,DHS Sub-national,ET2019DHS,household
-Ethiopia,Benishangul Gumuz Region,2019,rh_ancn_w_n01,anc1_old,percent,0.019,DHS Sub-national,ET2019DHS,household
-Ethiopia,SNNPR,2019,rh_ancn_w_n01,anc1_old,percent,0.035,DHS Sub-national,ET2019DHS,household
-Ethiopia,Gambella Region,2019,rh_ancn_w_n01,anc1_old,percent,0.003,DHS Sub-national,ET2019DHS,household
-Ethiopia,Harari Region,2019,rh_ancn_w_n01,anc1_old,percent,0.023,DHS Sub-national,ET2019DHS,household
-Ethiopia,Addis Ababa City Administration,2019,rh_ancn_w_n01,anc1_old,percent,0,DHS Sub-national,ET2019DHS,household
-Ethiopia,Dire Dawa City Administration,2019,rh_ancn_w_n01,anc1_old,percent,0.028,DHS Sub-national,ET2019DHS,household
-Ethiopia,Tigray Region,2019,rh_ancn_w_n4p,anc4,percent,0.65,DHS Sub-national,ET2019DHS,household
-Ethiopia,Afar Region,2019,rh_ancn_w_n4p,anc4,percent,0.318,DHS Sub-national,ET2019DHS,household
-Ethiopia,Amhara Region,2019,rh_ancn_w_n4p,anc4,percent,0.518,DHS Sub-national,ET2019DHS,household
-Ethiopia,Oromia Region,2019,rh_ancn_w_n4p,anc4,percent,0.432,DHS Sub-national,ET2019DHS,household
-Ethiopia,Somali Region,2019,rh_ancn_w_n4p,anc4,percent,0.114,DHS Sub-national,ET2019DHS,household
-Ethiopia,Benishangul Gumuz Region,2019,rh_ancn_w_n4p,anc4,percent,0.541,DHS Sub-national,ET2019DHS,household
-Ethiopia,SNNPR,2019,rh_ancn_w_n4p,anc4,percent,0.346,DHS Sub-national,ET2019DHS,household
-Ethiopia,Gambella Region,2019,rh_ancn_w_n4p,anc4,percent,0.242,DHS Sub-national,ET2019DHS,household
-Ethiopia,Harari Region,2019,rh_ancn_w_n4p,anc4,percent,0.337,DHS Sub-national,ET2019DHS,household
-Ethiopia,Addis Ababa City Administration,2019,rh_ancn_w_n4p,anc4,percent,0.816,DHS Sub-national,ET2019DHS,household
-Ethiopia,Dire Dawa City Administration,2019,rh_ancn_w_n4p,anc4,percent,0.626,DHS Sub-national,ET2019DHS,household
-Ethiopia,Tigray Region,2019,rh_delp_c_dhf,delivery,percent,0.754,DHS Sub-national,ET2019DHS,household
-Ethiopia,Afar Region,2019,rh_delp_c_dhf,delivery,percent,0.347,DHS Sub-national,ET2019DHS,household
-Ethiopia,Amhara Region,2019,rh_delp_c_dhf,delivery,percent,0.577,DHS Sub-national,ET2019DHS,household
-Ethiopia,Oromia Region,2019,rh_delp_c_dhf,delivery,percent,0.495,DHS Sub-national,ET2019DHS,household
-Ethiopia,Somali Region,2019,rh_delp_c_dhf,delivery,percent,0.272,DHS Sub-national,ET2019DHS,household
-Ethiopia,Benishangul Gumuz Region,2019,rh_delp_c_dhf,delivery,percent,0.653,DHS Sub-national,ET2019DHS,household
-Ethiopia,SNNPR,2019,rh_delp_c_dhf,delivery,percent,0.526,DHS Sub-national,ET2019DHS,household
-Ethiopia,Gambella Region,2019,rh_delp_c_dhf,delivery,percent,0.761,DHS Sub-national,ET2019DHS,household
-Ethiopia,Harari Region,2019,rh_delp_c_dhf,delivery,percent,0.693,DHS Sub-national,ET2019DHS,household
-Ethiopia,Addis Ababa City Administration,2019,rh_delp_c_dhf,delivery,percent,0.965,DHS Sub-national,ET2019DHS,household
-Ethiopia,Dire Dawa City Administration,2019,rh_delp_c_dhf,delivery,percent,0.746,DHS Sub-national,ET2019DHS,household
+Ethiopia,Tigray Region,1992,rh_ancn_w_n01,anc1_old,percent,0.099,DHS Sub-national,ET2000DHS,household
+Ethiopia,Afar Region,1992,rh_ancn_w_n01,anc1_old,percent,0.096,DHS Sub-national,ET2000DHS,household
+Ethiopia,Amhara Region,1992,rh_ancn_w_n01,anc1_old,percent,0.055,DHS Sub-national,ET2000DHS,household
+Ethiopia,Oromia Region,1992,rh_ancn_w_n01,anc1_old,percent,0.061,DHS Sub-national,ET2000DHS,household
+Ethiopia,Somali Region,1992,rh_ancn_w_n01,anc1_old,percent,0.042,DHS Sub-national,ET2000DHS,household
+Ethiopia,Benishangul Gumuz Region,1992,rh_ancn_w_n01,anc1_old,percent,0.058,DHS Sub-national,ET2000DHS,household
+Ethiopia,SNNPR,1992,rh_ancn_w_n01,anc1_old,percent,0.07,DHS Sub-national,ET2000DHS,household
+Ethiopia,Gambella Region,1992,rh_ancn_w_n01,anc1_old,percent,0.061,DHS Sub-national,ET2000DHS,household
+Ethiopia,Harari Region,1992,rh_ancn_w_n01,anc1_old,percent,0.112,DHS Sub-national,ET2000DHS,household
+Ethiopia,Addis Ababa City Administration,1992,rh_ancn_w_n01,anc1_old,percent,0.048,DHS Sub-national,ET2000DHS,household
+Ethiopia,Dire Dawa City Administration,1992,rh_ancn_w_n01,anc1_old,percent,0.107,DHS Sub-national,ET2000DHS,household
+Ethiopia,Tigray Region,1992,rh_ancn_w_n4p,anc4,percent,0.11,DHS Sub-national,ET2000DHS,household
+Ethiopia,Afar Region,1992,rh_ancn_w_n4p,anc4,percent,0.062,DHS Sub-national,ET2000DHS,household
+Ethiopia,Amhara Region,1992,rh_ancn_w_n4p,anc4,percent,0.032,DHS Sub-national,ET2000DHS,household
+Ethiopia,Oromia Region,1992,rh_ancn_w_n4p,anc4,percent,0.103,DHS Sub-national,ET2000DHS,household
+Ethiopia,Somali Region,1992,rh_ancn_w_n4p,anc4,percent,0.035,DHS Sub-national,ET2000DHS,household
+Ethiopia,Benishangul Gumuz Region,1992,rh_ancn_w_n4p,anc4,percent,0.098,DHS Sub-national,ET2000DHS,household
+Ethiopia,SNNPR,1992,rh_ancn_w_n4p,anc4,percent,0.089,DHS Sub-national,ET2000DHS,household
+Ethiopia,Gambella Region,1992,rh_ancn_w_n4p,anc4,percent,0.273,DHS Sub-national,ET2000DHS,household
+Ethiopia,Harari Region,1992,rh_ancn_w_n4p,anc4,percent,0.202,DHS Sub-national,ET2000DHS,household
+Ethiopia,Addis Ababa City Administration,1992,rh_ancn_w_n4p,anc4,percent,0.713,DHS Sub-national,ET2000DHS,household
+Ethiopia,Dire Dawa City Administration,1992,rh_ancn_w_n4p,anc4,percent,0.315,DHS Sub-national,ET2000DHS,household
+Ethiopia,Tigray Region,1992,rh_delp_c_dhf,delivery,percent,0.036,DHS Sub-national,ET2000DHS,household
+Ethiopia,Afar Region,1992,rh_delp_c_dhf,delivery,percent,0.041,DHS Sub-national,ET2000DHS,household
+Ethiopia,Amhara Region,1992,rh_delp_c_dhf,delivery,percent,0.028,DHS Sub-national,ET2000DHS,household
+Ethiopia,Oromia Region,1992,rh_delp_c_dhf,delivery,percent,0.04,DHS Sub-national,ET2000DHS,household
+Ethiopia,Somali Region,1992,rh_delp_c_dhf,delivery,percent,0.087,DHS Sub-national,ET2000DHS,household
+Ethiopia,Benishangul Gumuz Region,1992,rh_delp_c_dhf,delivery,percent,0.057,DHS Sub-national,ET2000DHS,household
+Ethiopia,SNNPR,1992,rh_delp_c_dhf,delivery,percent,0.037,DHS Sub-national,ET2000DHS,household
+Ethiopia,Gambella Region,1992,rh_delp_c_dhf,delivery,percent,0.286,DHS Sub-national,ET2000DHS,household
+Ethiopia,Harari Region,1992,rh_delp_c_dhf,delivery,percent,0.234,DHS Sub-national,ET2000DHS,household
+Ethiopia,Addis Ababa City Administration,1992,rh_delp_c_dhf,delivery,percent,0.722,DHS Sub-national,ET2000DHS,household
+Ethiopia,Dire Dawa City Administration,1992,rh_delp_c_dhf,delivery,percent,0.338,DHS Sub-national,ET2000DHS,household
+Ethiopia,Tigray Region,1997,rh_ancn_w_n01,anc1_old,percent,0.066,DHS Sub-national,ET2005DHS,household
+Ethiopia,Afar Region,1997,rh_ancn_w_n01,anc1_old,percent,0.014,DHS Sub-national,ET2005DHS,household
+Ethiopia,Amhara Region,1997,rh_ancn_w_n01,anc1_old,percent,0.108,DHS Sub-national,ET2005DHS,household
+Ethiopia,Oromia Region,1997,rh_ancn_w_n01,anc1_old,percent,0.037,DHS Sub-national,ET2005DHS,household
+Ethiopia,Somali Region,1997,rh_ancn_w_n01,anc1_old,percent,0.021,DHS Sub-national,ET2005DHS,household
+Ethiopia,Benishangul Gumuz Region,1997,rh_ancn_w_n01,anc1_old,percent,0.031,DHS Sub-national,ET2005DHS,household
+Ethiopia,SNNPR,1997,rh_ancn_w_n01,anc1_old,percent,0.042,DHS Sub-national,ET2005DHS,household
+Ethiopia,Gambella Region,1997,rh_ancn_w_n01,anc1_old,percent,0.014,DHS Sub-national,ET2005DHS,household
+Ethiopia,Harari Region,1997,rh_ancn_w_n01,anc1_old,percent,0.038,DHS Sub-national,ET2005DHS,household
+Ethiopia,Addis Ababa City Administration,1997,rh_ancn_w_n01,anc1_old,percent,0,DHS Sub-national,ET2005DHS,household
+Ethiopia,Dire Dawa City Administration,1997,rh_ancn_w_n01,anc1_old,percent,0.05,DHS Sub-national,ET2005DHS,household
+Ethiopia,Tigray Region,1997,rh_ancn_w_n4p,anc4,percent,0.163,DHS Sub-national,ET2005DHS,household
+Ethiopia,Afar Region,1997,rh_ancn_w_n4p,anc4,percent,0.071,DHS Sub-national,ET2005DHS,household
+Ethiopia,Amhara Region,1997,rh_ancn_w_n4p,anc4,percent,0.069,DHS Sub-national,ET2005DHS,household
+Ethiopia,Oromia Region,1997,rh_ancn_w_n4p,anc4,percent,0.108,DHS Sub-national,ET2005DHS,household
+Ethiopia,Somali Region,1997,rh_ancn_w_n4p,anc4,percent,0.046,DHS Sub-national,ET2005DHS,household
+Ethiopia,Benishangul Gumuz Region,1997,rh_ancn_w_n4p,anc4,percent,0.101,DHS Sub-national,ET2005DHS,household
+Ethiopia,SNNPR,1997,rh_ancn_w_n4p,anc4,percent,0.153,DHS Sub-national,ET2005DHS,household
+Ethiopia,Gambella Region,1997,rh_ancn_w_n4p,anc4,percent,0.254,DHS Sub-national,ET2005DHS,household
+Ethiopia,Harari Region,1997,rh_ancn_w_n4p,anc4,percent,0.204,DHS Sub-national,ET2005DHS,household
+Ethiopia,Addis Ababa City Administration,1997,rh_ancn_w_n4p,anc4,percent,0.797,DHS Sub-national,ET2005DHS,household
+Ethiopia,Dire Dawa City Administration,1997,rh_ancn_w_n4p,anc4,percent,0.309,DHS Sub-national,ET2005DHS,household
+Ethiopia,Tigray Region,1997,rh_delp_c_dhf,delivery,percent,0.07,DHS Sub-national,ET2005DHS,household
+Ethiopia,Afar Region,1997,rh_delp_c_dhf,delivery,percent,0.025,DHS Sub-national,ET2005DHS,household
+Ethiopia,Amhara Region,1997,rh_delp_c_dhf,delivery,percent,0.043,DHS Sub-national,ET2005DHS,household
+Ethiopia,Oromia Region,1997,rh_delp_c_dhf,delivery,percent,0.059,DHS Sub-national,ET2005DHS,household
+Ethiopia,Somali Region,1997,rh_delp_c_dhf,delivery,percent,0.066,DHS Sub-national,ET2005DHS,household
+Ethiopia,Benishangul Gumuz Region,1997,rh_delp_c_dhf,delivery,percent,0.069,DHS Sub-national,ET2005DHS,household
+Ethiopia,SNNPR,1997,rh_delp_c_dhf,delivery,percent,0.043,DHS Sub-national,ET2005DHS,household
+Ethiopia,Gambella Region,1997,rh_delp_c_dhf,delivery,percent,0.172,DHS Sub-national,ET2005DHS,household
+Ethiopia,Harari Region,1997,rh_delp_c_dhf,delivery,percent,0.33,DHS Sub-national,ET2005DHS,household
+Ethiopia,Addis Ababa City Administration,1997,rh_delp_c_dhf,delivery,percent,0.807,DHS Sub-national,ET2005DHS,household
+Ethiopia,Dire Dawa City Administration,1997,rh_delp_c_dhf,delivery,percent,0.289,DHS Sub-national,ET2005DHS,household
+Ethiopia,Tigray Region,2003,rh_ancp_w_skp,anc1,percent,0.641,DHS Sub-national,ET2011DHS,household
+Ethiopia,Afar Region,2003,rh_ancp_w_skp,anc1,percent,0.345,DHS Sub-national,ET2011DHS,household
+Ethiopia,Amhara Region,2003,rh_ancp_w_skp,anc1,percent,0.418,DHS Sub-national,ET2011DHS,household
+Ethiopia,Oromia Region,2003,rh_ancp_w_skp,anc1,percent,0.407,DHS Sub-national,ET2011DHS,household
+Ethiopia,Somali Region,2003,rh_ancp_w_skp,anc1,percent,0.282,DHS Sub-national,ET2011DHS,household
+Ethiopia,Benishangul Gumuz Region,2003,rh_ancp_w_skp,anc1,percent,0.372,DHS Sub-national,ET2011DHS,household
+Ethiopia,SNNPR,2003,rh_ancp_w_skp,anc1,percent,0.405,DHS Sub-national,ET2011DHS,household
+Ethiopia,Gambella Region,2003,rh_ancp_w_skp,anc1,percent,0.541,DHS Sub-national,ET2011DHS,household
+Ethiopia,Harari Region,2003,rh_ancp_w_skp,anc1,percent,0.572,DHS Sub-national,ET2011DHS,household
+Ethiopia,Addis Ababa City Administration,2003,rh_ancp_w_skp,anc1,percent,0.96,DHS Sub-national,ET2011DHS,household
+Ethiopia,Dire Dawa City Administration,2003,rh_ancp_w_skp,anc1,percent,0.541,DHS Sub-national,ET2011DHS,household
+Ethiopia,Tigray Region,2003,rh_ancn_w_n01,anc1_old,percent,0.078,DHS Sub-national,ET2011DHS,household
+Ethiopia,Afar Region,2003,rh_ancn_w_n01,anc1_old,percent,0.065,DHS Sub-national,ET2011DHS,household
+Ethiopia,Amhara Region,2003,rh_ancn_w_n01,anc1_old,percent,0.105,DHS Sub-national,ET2011DHS,household
+Ethiopia,Oromia Region,2003,rh_ancn_w_n01,anc1_old,percent,0.042,DHS Sub-national,ET2011DHS,household
+Ethiopia,Somali Region,2003,rh_ancn_w_n01,anc1_old,percent,0.048,DHS Sub-national,ET2011DHS,household
+Ethiopia,Benishangul Gumuz Region,2003,rh_ancn_w_n01,anc1_old,percent,0.031,DHS Sub-national,ET2011DHS,household
+Ethiopia,SNNPR,2003,rh_ancn_w_n01,anc1_old,percent,0.039,DHS Sub-national,ET2011DHS,household
+Ethiopia,Gambella Region,2003,rh_ancn_w_n01,anc1_old,percent,0.055,DHS Sub-national,ET2011DHS,household
+Ethiopia,Harari Region,2003,rh_ancn_w_n01,anc1_old,percent,0.018,DHS Sub-national,ET2011DHS,household
+Ethiopia,Addis Ababa City Administration,2003,rh_ancn_w_n01,anc1_old,percent,0.006,DHS Sub-national,ET2011DHS,household
+Ethiopia,Dire Dawa City Administration,2003,rh_ancn_w_n01,anc1_old,percent,0.049,DHS Sub-national,ET2011DHS,household
+Ethiopia,Tigray Region,2003,rh_ancn_w_n4p,anc4,percent,0.281,DHS Sub-national,ET2011DHS,household
+Ethiopia,Afar Region,2003,rh_ancn_w_n4p,anc4,percent,0.097,DHS Sub-national,ET2011DHS,household
+Ethiopia,Amhara Region,2003,rh_ancn_w_n4p,anc4,percent,0.105,DHS Sub-national,ET2011DHS,household
+Ethiopia,Oromia Region,2003,rh_ancn_w_n4p,anc4,percent,0.178,DHS Sub-national,ET2011DHS,household
+Ethiopia,Somali Region,2003,rh_ancn_w_n4p,anc4,percent,0.071,DHS Sub-national,ET2011DHS,household
+Ethiopia,Benishangul Gumuz Region,2003,rh_ancn_w_n4p,anc4,percent,0.139,DHS Sub-national,ET2011DHS,household
+Ethiopia,SNNPR,2003,rh_ancn_w_n4p,anc4,percent,0.147,DHS Sub-national,ET2011DHS,household
+Ethiopia,Gambella Region,2003,rh_ancn_w_n4p,anc4,percent,0.277,DHS Sub-national,ET2011DHS,household
+Ethiopia,Harari Region,2003,rh_ancn_w_n4p,anc4,percent,0.307,DHS Sub-national,ET2011DHS,household
+Ethiopia,Addis Ababa City Administration,2003,rh_ancn_w_n4p,anc4,percent,0.867,DHS Sub-national,ET2011DHS,household
+Ethiopia,Dire Dawa City Administration,2003,rh_ancn_w_n4p,anc4,percent,0.317,DHS Sub-national,ET2011DHS,household
+Ethiopia,Tigray Region,2003,rh_delp_c_dhf,delivery,percent,0.161,DHS Sub-national,ET2011DHS,household
+Ethiopia,Afar Region,2003,rh_delp_c_dhf,delivery,percent,0.082,DHS Sub-national,ET2011DHS,household
+Ethiopia,Amhara Region,2003,rh_delp_c_dhf,delivery,percent,0.113,DHS Sub-national,ET2011DHS,household
+Ethiopia,Oromia Region,2003,rh_delp_c_dhf,delivery,percent,0.096,DHS Sub-national,ET2011DHS,household
+Ethiopia,Somali Region,2003,rh_delp_c_dhf,delivery,percent,0.082,DHS Sub-national,ET2011DHS,household
+Ethiopia,Benishangul Gumuz Region,2003,rh_delp_c_dhf,delivery,percent,0.104,DHS Sub-national,ET2011DHS,household
+Ethiopia,SNNPR,2003,rh_delp_c_dhf,delivery,percent,0.074,DHS Sub-national,ET2011DHS,household
+Ethiopia,Gambella Region,2003,rh_delp_c_dhf,delivery,percent,0.275,DHS Sub-national,ET2011DHS,household
+Ethiopia,Harari Region,2003,rh_delp_c_dhf,delivery,percent,0.359,DHS Sub-national,ET2011DHS,household
+Ethiopia,Addis Ababa City Administration,2003,rh_delp_c_dhf,delivery,percent,0.829,DHS Sub-national,ET2011DHS,household
+Ethiopia,Dire Dawa City Administration,2003,rh_delp_c_dhf,delivery,percent,0.418,DHS Sub-national,ET2011DHS,household
+Ethiopia,Tigray Region,2008,rh_ancp_w_skp,anc1,percent,0.928,DHS Sub-national,ET2016DHS,household
+Ethiopia,Afar Region,2008,rh_ancp_w_skp,anc1,percent,0.551,DHS Sub-national,ET2016DHS,household
+Ethiopia,Amhara Region,2008,rh_ancp_w_skp,anc1,percent,0.76,DHS Sub-national,ET2016DHS,household
+Ethiopia,Oromia Region,2008,rh_ancp_w_skp,anc1,percent,0.513,DHS Sub-national,ET2016DHS,household
+Ethiopia,Somali Region,2008,rh_ancp_w_skp,anc1,percent,0.463,DHS Sub-national,ET2016DHS,household
+Ethiopia,Benishangul Gumuz Region,2008,rh_ancp_w_skp,anc1,percent,0.729,DHS Sub-national,ET2016DHS,household
+Ethiopia,SNNPR,2008,rh_ancp_w_skp,anc1,percent,0.707,DHS Sub-national,ET2016DHS,household
+Ethiopia,Gambella Region,2008,rh_ancp_w_skp,anc1,percent,0.73,DHS Sub-national,ET2016DHS,household
+Ethiopia,Harari Region,2008,rh_ancp_w_skp,anc1,percent,0.736,DHS Sub-national,ET2016DHS,household
+Ethiopia,Addis Ababa City Administration,2008,rh_ancp_w_skp,anc1,percent,0.983,DHS Sub-national,ET2016DHS,household
+Ethiopia,Dire Dawa City Administration,2008,rh_ancp_w_skp,anc1,percent,0.874,DHS Sub-national,ET2016DHS,household
+Ethiopia,Tigray Region,2008,rh_ancn_w_n01,anc1_old,percent,0.056,DHS Sub-national,ET2016DHS,household
+Ethiopia,Afar Region,2008,rh_ancn_w_n01,anc1_old,percent,0.059,DHS Sub-national,ET2016DHS,household
+Ethiopia,Amhara Region,2008,rh_ancn_w_n01,anc1_old,percent,0.061,DHS Sub-national,ET2016DHS,household
+Ethiopia,Oromia Region,2008,rh_ancn_w_n01,anc1_old,percent,0.047,DHS Sub-national,ET2016DHS,household
+Ethiopia,Somali Region,2008,rh_ancn_w_n01,anc1_old,percent,0.084,DHS Sub-national,ET2016DHS,household
+Ethiopia,Benishangul Gumuz Region,2008,rh_ancn_w_n01,anc1_old,percent,0.044,DHS Sub-national,ET2016DHS,household
+Ethiopia,SNNPR,2008,rh_ancn_w_n01,anc1_old,percent,0.03,DHS Sub-national,ET2016DHS,household
+Ethiopia,Gambella Region,2008,rh_ancn_w_n01,anc1_old,percent,0.014,DHS Sub-national,ET2016DHS,household
+Ethiopia,Harari Region,2008,rh_ancn_w_n01,anc1_old,percent,0.098,DHS Sub-national,ET2016DHS,household
+Ethiopia,Addis Ababa City Administration,2008,rh_ancn_w_n01,anc1_old,percent,0.01,DHS Sub-national,ET2016DHS,household
+Ethiopia,Dire Dawa City Administration,2008,rh_ancn_w_n01,anc1_old,percent,0.039,DHS Sub-national,ET2016DHS,household
+Ethiopia,Tigray Region,2008,rh_ancn_w_n4p,anc4,percent,0.596,DHS Sub-national,ET2016DHS,household
+Ethiopia,Afar Region,2008,rh_ancn_w_n4p,anc4,percent,0.239,DHS Sub-national,ET2016DHS,household
+Ethiopia,Amhara Region,2008,rh_ancn_w_n4p,anc4,percent,0.379,DHS Sub-national,ET2016DHS,household
+Ethiopia,Oromia Region,2008,rh_ancn_w_n4p,anc4,percent,0.222,DHS Sub-national,ET2016DHS,household
+Ethiopia,Somali Region,2008,rh_ancn_w_n4p,anc4,percent,0.125,DHS Sub-national,ET2016DHS,household
+Ethiopia,Benishangul Gumuz Region,2008,rh_ancn_w_n4p,anc4,percent,0.44,DHS Sub-national,ET2016DHS,household
+Ethiopia,SNNPR,2008,rh_ancn_w_n4p,anc4,percent,0.405,DHS Sub-national,ET2016DHS,household
+Ethiopia,Gambella Region,2008,rh_ancn_w_n4p,anc4,percent,0.417,DHS Sub-national,ET2016DHS,household
+Ethiopia,Harari Region,2008,rh_ancn_w_n4p,anc4,percent,0.31,DHS Sub-national,ET2016DHS,household
+Ethiopia,Addis Ababa City Administration,2008,rh_ancn_w_n4p,anc4,percent,0.894,DHS Sub-national,ET2016DHS,household
+Ethiopia,Dire Dawa City Administration,2008,rh_ancn_w_n4p,anc4,percent,0.679,DHS Sub-national,ET2016DHS,household
+Ethiopia,Tigray Region,2008,rh_delp_c_dhf,delivery,percent,0.715,DHS Sub-national,ET2016DHS,household
+Ethiopia,Afar Region,2008,rh_delp_c_dhf,delivery,percent,0.21,DHS Sub-national,ET2016DHS,household
+Ethiopia,Amhara Region,2008,rh_delp_c_dhf,delivery,percent,0.378,DHS Sub-national,ET2016DHS,household
+Ethiopia,Oromia Region,2008,rh_delp_c_dhf,delivery,percent,0.271,DHS Sub-national,ET2016DHS,household
+Ethiopia,Somali Region,2008,rh_delp_c_dhf,delivery,percent,0.239,DHS Sub-national,ET2016DHS,household
+Ethiopia,Benishangul Gumuz Region,2008,rh_delp_c_dhf,delivery,percent,0.34,DHS Sub-national,ET2016DHS,household
+Ethiopia,SNNPR,2008,rh_delp_c_dhf,delivery,percent,0.384,DHS Sub-national,ET2016DHS,household
+Ethiopia,Gambella Region,2008,rh_delp_c_dhf,delivery,percent,0.507,DHS Sub-national,ET2016DHS,household
+Ethiopia,Harari Region,2008,rh_delp_c_dhf,delivery,percent,0.585,DHS Sub-national,ET2016DHS,household
+Ethiopia,Addis Ababa City Administration,2008,rh_delp_c_dhf,delivery,percent,0.979,DHS Sub-national,ET2016DHS,household
+Ethiopia,Dire Dawa City Administration,2008,rh_delp_c_dhf,delivery,percent,0.639,DHS Sub-national,ET2016DHS,household
+Ethiopia,Tigray Region,2011,rh_ancp_w_skp,anc1,percent,0.931,DHS Sub-national,ET2019DHS,household
+Ethiopia,Afar Region,2011,rh_ancp_w_skp,anc1,percent,0.638,DHS Sub-national,ET2019DHS,household
+Ethiopia,Amhara Region,2011,rh_ancp_w_skp,anc1,percent,0.828,DHS Sub-national,ET2019DHS,household
+Ethiopia,Oromia Region,2011,rh_ancp_w_skp,anc1,percent,0.71,DHS Sub-national,ET2019DHS,household
+Ethiopia,Somali Region,2011,rh_ancp_w_skp,anc1,percent,0.331,DHS Sub-national,ET2019DHS,household
+Ethiopia,Benishangul Gumuz Region,2011,rh_ancp_w_skp,anc1,percent,0.856,DHS Sub-national,ET2019DHS,household
+Ethiopia,SNNPR,2011,rh_ancp_w_skp,anc1,percent,0.681,DHS Sub-national,ET2019DHS,household
+Ethiopia,Gambella Region,2011,rh_ancp_w_skp,anc1,percent,0.853,DHS Sub-national,ET2019DHS,household
+Ethiopia,Harari Region,2011,rh_ancp_w_skp,anc1,percent,0.796,DHS Sub-national,ET2019DHS,household
+Ethiopia,Addis Ababa City Administration,2011,rh_ancp_w_skp,anc1,percent,0.99,DHS Sub-national,ET2019DHS,household
+Ethiopia,Dire Dawa City Administration,2011,rh_ancp_w_skp,anc1,percent,0.867,DHS Sub-national,ET2019DHS,household
+Ethiopia,Tigray Region,2011,rh_ancn_w_n01,anc1_old,percent,0.046,DHS Sub-national,ET2019DHS,household
+Ethiopia,Afar Region,2011,rh_ancn_w_n01,anc1_old,percent,0.05,DHS Sub-national,ET2019DHS,household
+Ethiopia,Amhara Region,2011,rh_ancn_w_n01,anc1_old,percent,0.051,DHS Sub-national,ET2019DHS,household
+Ethiopia,Oromia Region,2011,rh_ancn_w_n01,anc1_old,percent,0.031,DHS Sub-national,ET2019DHS,household
+Ethiopia,Somali Region,2011,rh_ancn_w_n01,anc1_old,percent,0.053,DHS Sub-national,ET2019DHS,household
+Ethiopia,Benishangul Gumuz Region,2011,rh_ancn_w_n01,anc1_old,percent,0.019,DHS Sub-national,ET2019DHS,household
+Ethiopia,SNNPR,2011,rh_ancn_w_n01,anc1_old,percent,0.035,DHS Sub-national,ET2019DHS,household
+Ethiopia,Gambella Region,2011,rh_ancn_w_n01,anc1_old,percent,0.003,DHS Sub-national,ET2019DHS,household
+Ethiopia,Harari Region,2011,rh_ancn_w_n01,anc1_old,percent,0.023,DHS Sub-national,ET2019DHS,household
+Ethiopia,Addis Ababa City Administration,2011,rh_ancn_w_n01,anc1_old,percent,0,DHS Sub-national,ET2019DHS,household
+Ethiopia,Dire Dawa City Administration,2011,rh_ancn_w_n01,anc1_old,percent,0.028,DHS Sub-national,ET2019DHS,household
+Ethiopia,Tigray Region,2011,rh_ancn_w_n4p,anc4,percent,0.65,DHS Sub-national,ET2019DHS,household
+Ethiopia,Afar Region,2011,rh_ancn_w_n4p,anc4,percent,0.318,DHS Sub-national,ET2019DHS,household
+Ethiopia,Amhara Region,2011,rh_ancn_w_n4p,anc4,percent,0.518,DHS Sub-national,ET2019DHS,household
+Ethiopia,Oromia Region,2011,rh_ancn_w_n4p,anc4,percent,0.432,DHS Sub-national,ET2019DHS,household
+Ethiopia,Somali Region,2011,rh_ancn_w_n4p,anc4,percent,0.114,DHS Sub-national,ET2019DHS,household
+Ethiopia,Benishangul Gumuz Region,2011,rh_ancn_w_n4p,anc4,percent,0.541,DHS Sub-national,ET2019DHS,household
+Ethiopia,SNNPR,2011,rh_ancn_w_n4p,anc4,percent,0.346,DHS Sub-national,ET2019DHS,household
+Ethiopia,Gambella Region,2011,rh_ancn_w_n4p,anc4,percent,0.242,DHS Sub-national,ET2019DHS,household
+Ethiopia,Harari Region,2011,rh_ancn_w_n4p,anc4,percent,0.337,DHS Sub-national,ET2019DHS,household
+Ethiopia,Addis Ababa City Administration,2011,rh_ancn_w_n4p,anc4,percent,0.816,DHS Sub-national,ET2019DHS,household
+Ethiopia,Dire Dawa City Administration,2011,rh_ancn_w_n4p,anc4,percent,0.626,DHS Sub-national,ET2019DHS,household
+Ethiopia,Tigray Region,2011,rh_delp_c_dhf,delivery,percent,0.754,DHS Sub-national,ET2019DHS,household
+Ethiopia,Afar Region,2011,rh_delp_c_dhf,delivery,percent,0.347,DHS Sub-national,ET2019DHS,household
+Ethiopia,Amhara Region,2011,rh_delp_c_dhf,delivery,percent,0.577,DHS Sub-national,ET2019DHS,household
+Ethiopia,Oromia Region,2011,rh_delp_c_dhf,delivery,percent,0.495,DHS Sub-national,ET2019DHS,household
+Ethiopia,Somali Region,2011,rh_delp_c_dhf,delivery,percent,0.272,DHS Sub-national,ET2019DHS,household
+Ethiopia,Benishangul Gumuz Region,2011,rh_delp_c_dhf,delivery,percent,0.653,DHS Sub-national,ET2019DHS,household
+Ethiopia,SNNPR,2011,rh_delp_c_dhf,delivery,percent,0.526,DHS Sub-national,ET2019DHS,household
+Ethiopia,Gambella Region,2011,rh_delp_c_dhf,delivery,percent,0.761,DHS Sub-national,ET2019DHS,household
+Ethiopia,Harari Region,2011,rh_delp_c_dhf,delivery,percent,0.693,DHS Sub-national,ET2019DHS,household
+Ethiopia,Addis Ababa City Administration,2011,rh_delp_c_dhf,delivery,percent,0.965,DHS Sub-national,ET2019DHS,household
+Ethiopia,Dire Dawa City Administration,2011,rh_delp_c_dhf,delivery,percent,0.746,DHS Sub-national,ET2019DHS,household
 Guinea,Lower Guinea,1999,rh_ancp_w_skp,anc1,percent,0.742,DHS Sub-national,GN1999DHS,household
 Guinea,Central Guinea,1999,rh_ancp_w_skp,anc1,percent,0.615,DHS Sub-national,GN1999DHS,household
 Guinea,Upper Guinea,1999,rh_ancp_w_skp,anc1,percent,0.615,DHS Sub-national,GN1999DHS,household
@@ -8047,64 +8047,64 @@ DRC,NATIONAL,2014,MNCH_INSTDEL,delivery,percent,0.799,MICS,Demographic and Healt
 DRC,NATIONAL,2018,MNCH_INSTDEL,delivery,percent,0.815,MICS,Multiple Indicator Cluster Survey 2017-2018,household
 DRC,NATIONAL,2014,MNCH_PNCMOM,pnc1,percent,0.438,MICS,Demographic and Health Survey 2013-2014,household
 DRC,NATIONAL,2018,MNCH_PNCMOM,pnc1,percent,0.495,MICS,Multiple Indicator Cluster Survey 2017-2018,household
-Ethiopia,NATIONAL,2010,IM_BCG,bcg,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2011,IM_BCG,bcg,percent,0.8,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2012,IM_BCG,bcg,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2002,IM_BCG,bcg,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2003,IM_BCG,bcg,percent,0.8,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2004,IM_BCG,bcg,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2005,IM_BCG,bcg,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2006,IM_BCG,bcg,percent,0.69,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2007,IM_BCG,bcg,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2008,IM_BCG,bcg,percent,0.72,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2009,IM_BCG,bcg,percent,0.73,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2010,IM_BCG,bcg,percent,0.71,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2011,IM_BCG,bcg,percent,0.69,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2012,IM_BCG,bcg,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Ethiopia,NATIONAL,2013,IM_BCG,bcg,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2014,IM_BCG,bcg,percent,0.69,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2015,IM_BCG,bcg,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2016,IM_BCG,bcg,percent,0.72,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2017,IM_BCG,bcg,percent,0.73,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2018,IM_BCG,bcg,percent,0.71,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2019,IM_BCG,bcg,percent,0.69,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2020,IM_BCG,bcg,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2021,IM_BCG,bcg,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2022,IM_BCG,bcg,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2023,IM_BCG,bcg,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2014,IM_BCG,bcg,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2015,IM_BCG,bcg,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2002,IM_DTP1,penta1,percent,0.77,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2003,IM_DTP1,penta1,percent,0.8,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2004,IM_DTP1,penta1,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2005,IM_DTP1,penta1,percent,0.67,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2006,IM_DTP1,penta1,percent,0.73,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2007,IM_DTP1,penta1,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2008,IM_DTP1,penta1,percent,0.75,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2009,IM_DTP1,penta1,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Ethiopia,NATIONAL,2010,IM_DTP1,penta1,percent,0.77,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2011,IM_DTP1,penta1,percent,0.8,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2012,IM_DTP1,penta1,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2013,IM_DTP1,penta1,percent,0.67,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2014,IM_DTP1,penta1,percent,0.73,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2015,IM_DTP1,penta1,percent,0.74,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2016,IM_DTP1,penta1,percent,0.75,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2017,IM_DTP1,penta1,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2018,IM_DTP1,penta1,percent,0.77,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2019,IM_DTP1,penta1,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2020,IM_DTP1,penta1,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2021,IM_DTP1,penta1,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2022,IM_DTP1,penta1,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2023,IM_DTP1,penta1,percent,0.77,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2010,IM_DTP3,penta3,percent,0.61,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2011,IM_DTP3,penta3,percent,0.65,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2012,IM_DTP3,penta3,percent,0.62,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2013,IM_DTP3,penta3,percent,0.59,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2014,IM_DTP3,penta3,percent,0.61,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2015,IM_DTP3,penta3,percent,0.63,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2016,IM_DTP3,penta3,percent,0.66,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2017,IM_DTP3,penta3,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2018,IM_DTP3,penta3,percent,0.67,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2019,IM_DTP3,penta3,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2020,IM_DTP3,penta3,percent,0.71,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2021,IM_DTP3,penta3,percent,0.65,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2022,IM_DTP3,penta3,percent,0.65,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2023,IM_DTP3,penta3,percent,0.72,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
-Ethiopia,NATIONAL,2011,MNCH_ANC1,anc1,percent,0.339,MICS,Demographic and Health Survey 2010-2011,household
-Ethiopia,NATIONAL,2014,MNCH_ANC1,anc1,percent,0.412,MICS,Mini Demographic and Health Survey 2014,household
-Ethiopia,NATIONAL,2016,MNCH_ANC1,anc1,percent,0.624,MICS,Demographic and Health Survey 2016,household
-Ethiopia,NATIONAL,2019,MNCH_ANC1,anc1,percent,0.736,MICS,Demographic and Health Survey (Mini) 2019,household
-Ethiopia,NATIONAL,2011,MNCH_ANC4,anc4,percent,0.191,MICS,Demographic and Health Survey 2010-2011,household
-Ethiopia,NATIONAL,2014,MNCH_ANC4,anc4,percent,0.321,MICS,Mini Demographic and Health Survey 2014,household
-Ethiopia,NATIONAL,2016,MNCH_ANC4,anc4,percent,0.318,MICS,Demographic and Health Survey 2016,household
-Ethiopia,NATIONAL,2019,MNCH_ANC4,anc4,percent,0.43,MICS,Demographic and Health Survey (Mini) 2019,household
-Ethiopia,NATIONAL,2011,MNCH_INSTDEL,delivery,percent,0.099,MICS,Demographic and Health Survey 2010-2011,household
-Ethiopia,NATIONAL,2014,MNCH_INSTDEL,delivery,percent,0.164,MICS,Mini Demographic and Health Survey 2014,household
-Ethiopia,NATIONAL,2016,MNCH_INSTDEL,delivery,percent,0.262,MICS,Demographic and Health Survey 2016,household
-Ethiopia,NATIONAL,2019,MNCH_INSTDEL,delivery,percent,0.475,MICS,Demographic and Health Survey (Mini) 2019,household
-Ethiopia,NATIONAL,2011,MNCH_PNCMOM,pnc1,percent,0.067,MICS,Demographic and Health Survey 2010-2011,household
-Ethiopia,NATIONAL,2014,MNCH_PNCMOM,pnc1,percent,0.132,MICS,Mini Demographic and Health Survey 2014,household
-Ethiopia,NATIONAL,2016,MNCH_PNCMOM,pnc1,percent,0.165,MICS,Demographic and Health Survey 2016,household
-Ethiopia,NATIONAL,2019,MNCH_PNCMOM,pnc1,percent,0.338,MICS,Demographic and Health Survey (Mini) 2019,household
+Ethiopia,NATIONAL,2011,IM_DTP1,penta1,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2012,IM_DTP1,penta1,percent,0.76,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2013,IM_DTP1,penta1,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2014,IM_DTP1,penta1,percent,0.7,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2015,IM_DTP1,penta1,percent,0.77,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2002,IM_DTP3,penta3,percent,0.61,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2003,IM_DTP3,penta3,percent,0.65,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2004,IM_DTP3,penta3,percent,0.62,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2005,IM_DTP3,penta3,percent,0.59,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2006,IM_DTP3,penta3,percent,0.61,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2007,IM_DTP3,penta3,percent,0.63,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2008,IM_DTP3,penta3,percent,0.66,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2009,IM_DTP3,penta3,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2010,IM_DTP3,penta3,percent,0.67,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2011,IM_DTP3,penta3,percent,0.68,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2012,IM_DTP3,penta3,percent,0.71,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2013,IM_DTP3,penta3,percent,0.65,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2014,IM_DTP3,penta3,percent,0.65,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2015,IM_DTP3,penta3,percent,0.72,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
+Ethiopia,NATIONAL,2003,MNCH_ANC1,anc1,percent,0.339,MICS,Demographic and Health Survey 2010-2011,household
+Ethiopia,NATIONAL,2006,MNCH_ANC1,anc1,percent,0.412,MICS,Mini Demographic and Health Survey 2014,household
+Ethiopia,NATIONAL,2008,MNCH_ANC1,anc1,percent,0.624,MICS,Demographic and Health Survey 2016,household
+Ethiopia,NATIONAL,2011,MNCH_ANC1,anc1,percent,0.736,MICS,Demographic and Health Survey (Mini) 2019,household
+Ethiopia,NATIONAL,2003,MNCH_ANC4,anc4,percent,0.191,MICS,Demographic and Health Survey 2010-2011,household
+Ethiopia,NATIONAL,2006,MNCH_ANC4,anc4,percent,0.321,MICS,Mini Demographic and Health Survey 2014,household
+Ethiopia,NATIONAL,2008,MNCH_ANC4,anc4,percent,0.318,MICS,Demographic and Health Survey 2016,household
+Ethiopia,NATIONAL,2011,MNCH_ANC4,anc4,percent,0.43,MICS,Demographic and Health Survey (Mini) 2019,household
+Ethiopia,NATIONAL,2003,MNCH_INSTDEL,delivery,percent,0.099,MICS,Demographic and Health Survey 2010-2011,household
+Ethiopia,NATIONAL,2006,MNCH_INSTDEL,delivery,percent,0.164,MICS,Mini Demographic and Health Survey 2014,household
+Ethiopia,NATIONAL,2008,MNCH_INSTDEL,delivery,percent,0.262,MICS,Demographic and Health Survey 2016,household
+Ethiopia,NATIONAL,2011,MNCH_INSTDEL,delivery,percent,0.475,MICS,Demographic and Health Survey (Mini) 2019,household
+Ethiopia,NATIONAL,2003,MNCH_PNCMOM,pnc1,percent,0.067,MICS,Demographic and Health Survey 2010-2011,household
+Ethiopia,NATIONAL,2006,MNCH_PNCMOM,pnc1,percent,0.132,MICS,Mini Demographic and Health Survey 2014,household
+Ethiopia,NATIONAL,2008,MNCH_PNCMOM,pnc1,percent,0.165,MICS,Demographic and Health Survey 2016,household
+Ethiopia,NATIONAL,2011,MNCH_PNCMOM,pnc1,percent,0.338,MICS,Demographic and Health Survey (Mini) 2019,household
 Ghana,NATIONAL,2010,IM_BCG,bcg,percent,0.99,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Ghana,NATIONAL,2011,IM_BCG,bcg,percent,0.98,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
 Ghana,NATIONAL,2012,IM_BCG,bcg,percent,0.98,MICS,"WHO/UNICEF estimates of national immunization coverage, 2023 revision",household
@@ -9044,12 +9044,12 @@ DRC,NATIONAL,2022,"Crude birth rate (births per 1,000 population)",crudebr,rate,
 DRC,NATIONAL,2023,"Crude birth rate (births per 1,000 population)",crudebr,rate,41.305,UNWPP,UNWPP,modeled
 DRC,NATIONAL,2024,"Crude birth rate (births per 1,000 population)",crudebr,rate,40.885,UNWPP,UNWPP,modeled
 DRC,NATIONAL,2025,"Crude birth rate (births per 1,000 population)",crudebr,rate,40.411,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2020,"Crude birth rate (births per 1,000 population)",crudebr,rate,33.31,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2021,"Crude birth rate (births per 1,000 population)",crudebr,rate,32.876,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2022,"Crude birth rate (births per 1,000 population)",crudebr,rate,32.413,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2023,"Crude birth rate (births per 1,000 population)",crudebr,rate,31.903,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2024,"Crude birth rate (births per 1,000 population)",crudebr,rate,31.469,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2025,"Crude birth rate (births per 1,000 population)",crudebr,rate,30.831,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2012,"Crude birth rate (births per 1,000 population)",crudebr,rate,33.31,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2013,"Crude birth rate (births per 1,000 population)",crudebr,rate,32.876,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2014,"Crude birth rate (births per 1,000 population)",crudebr,rate,32.413,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2015,"Crude birth rate (births per 1,000 population)",crudebr,rate,31.903,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2016,"Crude birth rate (births per 1,000 population)",crudebr,rate,31.469,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2017,"Crude birth rate (births per 1,000 population)",crudebr,rate,30.831,UNWPP,UNWPP,modeled
 Ghana,NATIONAL,2020,"Crude birth rate (births per 1,000 population)",crudebr,rate,27.43,UNWPP,UNWPP,modeled
 Ghana,NATIONAL,2021,"Crude birth rate (births per 1,000 population)",crudebr,rate,27.034,UNWPP,UNWPP,modeled
 Ghana,NATIONAL,2022,"Crude birth rate (births per 1,000 population)",crudebr,rate,26.596,UNWPP,UNWPP,modeled
@@ -9188,12 +9188,12 @@ DRC,NATIONAL,2022,Infant mortality rate (IMR),imr,rate,50.54777,UNWPP,UNWPP,mode
 DRC,NATIONAL,2023,Infant mortality rate (IMR),imr,rate,49.32985,UNWPP,UNWPP,modeled
 DRC,NATIONAL,2024,Infant mortality rate (IMR),imr,rate,48.6245,UNWPP,UNWPP,modeled
 DRC,NATIONAL,2025,Infant mortality rate (IMR),imr,rate,48.01668,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2020,Infant mortality rate (IMR),imr,rate,36.28968,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2021,Infant mortality rate (IMR),imr,rate,35.10982,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2022,Infant mortality rate (IMR),imr,rate,34.00464,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2023,Infant mortality rate (IMR),imr,rate,32.96183,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2024,Infant mortality rate (IMR),imr,rate,31.8888,UNWPP,UNWPP,modeled
-Ethiopia,NATIONAL,2025,Infant mortality rate (IMR),imr,rate,30.9197,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2012,Infant mortality rate (IMR),imr,rate,36.28968,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2013,Infant mortality rate (IMR),imr,rate,35.10982,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2014,Infant mortality rate (IMR),imr,rate,34.00464,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2015,Infant mortality rate (IMR),imr,rate,32.96183,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2016,Infant mortality rate (IMR),imr,rate,31.8888,UNWPP,UNWPP,modeled
+Ethiopia,NATIONAL,2017,Infant mortality rate (IMR),imr,rate,30.9197,UNWPP,UNWPP,modeled
 Ghana,NATIONAL,2020,Infant mortality rate (IMR),imr,rate,33.50861,UNWPP,UNWPP,modeled
 Ghana,NATIONAL,2021,Infant mortality rate (IMR),imr,rate,32.525,UNWPP,UNWPP,modeled
 Ghana,NATIONAL,2022,Infant mortality rate (IMR),imr,rate,31.5708,UNWPP,UNWPP,modeled
