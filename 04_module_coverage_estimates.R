@@ -878,13 +878,15 @@ combined_national_export_fixed <- combined_national_export %>%
     anchor_year <- max(df$year[!is.na(df$coverage_original_estimate)], na.rm = TRUE)
     anchor_idx <- which(df$year == anchor_year)[1]
     
-    # Patch: fill in coverage_cov at anchor if missing
+    # Fill forward coverage_cov from anchor year to next available non-NA
     if (is.na(df$coverage_cov[anchor_idx])) {
       next_cov_idx <- which(!is.na(df$coverage_cov) & df$year > anchor_year)
       if (length(next_cov_idx) > 0) {
-        df$coverage_cov[anchor_idx] <- df$coverage_cov[next_cov_idx[1]]
+        fill_value <- df$coverage_cov[next_cov_idx[1]]
+        df$coverage_cov[anchor_idx:next_cov_idx[1]] <- fill_value
       }
     }
+    
     
     # Recalculate delta
     df <- df %>%
