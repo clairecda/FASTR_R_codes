@@ -1,15 +1,15 @@
 OUTLIER_PROPORTION_THRESHOLD <- 0.8  # Proportion threshold for outlier detection
 MINIMUM_COUNT_THRESHOLD <- 100       # Minimum count threshold for consideration
 MADS <- 10                           # Number of MADs
-GEOLEVEL <- "admin_area_4"           # Admin level used to join facilities to corresponding geo-consistency
+GEOLEVEL <- "admin_area_3"           # Admin level used to join facilities to corresponding geo-consistency
 DQA_INDICATORS <- c("penta1", "anc1")
 CONSISTENCY_PAIRS_USED <- c("penta", "anc")  # current options: "penta", "anc", "delivery", "malaria"
 
-PROJECT_DATA_HMIS <- "hmis_ghana.csv"
+PROJECT_DATA_HMIS <- "somalia_hmis_data.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 May 14
+# Last edit: 2025 June 10
 # Module: DATA QUALITY ASSESSMENT
 
 # This script is designed to evaluate the reliability of HMIS data by
@@ -18,9 +18,6 @@ PROJECT_DATA_HMIS <- "hmis_ghana.csv"
 # Ce script est conçu pour évaluer la fiabilité des données du HMIS en analysant 
 # trois éléments clés : la détection des valeurs aberrantes, l’évaluation de la complétude et la mesure de la cohérence.
 
-
-
-# DATA: data_nigeria_full.csv
 
 # ------------------------------------- PARAMETERS -----------------------------------------------------------
 # Outlier Analysis Parameters
@@ -107,6 +104,14 @@ load_and_preprocess_data <- function(file_path) {
   
   return(list(data = data, geo_cols = geo_cols))
 }
+# Function to validate admin areas for result objects
+detect_admin_cols <- function(data) {
+  geo_cols_export <- grep("^admin_area_[2-9]$", colnames(data), value = TRUE)
+  
+  print(paste("Detected admin area columns for export:", paste(geo_cols_export, collapse = ", ")))
+  return(geo_cols_export)
+}
+
 
 # Function to validate consistency pairs
 validate_consistency_pairs <- function(consistency_params, data) {
@@ -573,6 +578,7 @@ inputs <- load_and_preprocess_data(PROJECT_DATA_HMIS)
 data <- inputs$data
 geo_cols <- inputs$geo_cols
 
+geo_columns_export <- detect_admin_cols(data)
 
 # Validate Consistency Pairs
 consistency_params <- validate_consistency_pairs(consistency_params, data)
@@ -669,8 +675,7 @@ print("Preparing and saving results from outlier analysis...")
 outlier_data_export <- outlier_data_main %>%
   select(
     facility_id,
-    admin_area_3,
-    admin_area_2,
+    all_of(geo_columns_export),
     period_id,
     quarter_id,
     year,
@@ -678,7 +683,7 @@ outlier_data_export <- outlier_data_main %>%
     outlier_flag
   )
 
-write.csv(outlier_data_export, "M1_output_outliers.csv", row.names = FALSE)                          # Facility-level outlier data
+write.csv(outlier_data_export, "M1_output_outliers.csv", row.names = FALSE)   # Facility-level outlier data
 
 if (length(consistency_params$consistency_pairs) > 0) {
   print("Preparing and saving all data outputs from consistency analysis...")
@@ -690,7 +695,8 @@ if (length(consistency_params$consistency_pairs) > 0) {
   # Prepare geo-level output
   geo_consistency_export <- geo_consistency_results %>%
     select(
-      all_of(lowest_geo_col),
+      admin_area_3,
+      admin_area_2,
       period_id,
       quarter_id,
       year,
@@ -702,14 +708,14 @@ if (length(consistency_params$consistency_pairs) > 0) {
   facility_consistency_export <- facility_consistency_results %>%
     select(
       facility_id,
-      admin_area_3,
-      admin_area_2,
+      all_of(geo_columns_export),
       period_id,
       quarter_id,
       year,
       ratio_type,
       sconsistency
     )
+  
   
   # Write both outputs
   write.csv(geo_consistency_export, "M1_output_consistency_geo.csv", row.names = FALSE)
@@ -721,8 +727,7 @@ print("Preparing and saving results from completeness analysis...")
 completeness_export <- completeness_results %>%
   select(
     facility_id,
-    admin_area_3,
-    admin_area_2,
+    all_of(geo_columns_export),
     indicator_common_id,
     period_id,
     quarter_id,
@@ -732,13 +737,11 @@ completeness_export <- completeness_results %>%
 
 write.csv(completeness_export, "M1_output_completeness.csv", row.names = FALSE)
 
-
 print("Preparing and saving results from DQA analysis...")
 dqa_export <- dqa_results %>%
   select(
     facility_id,
-    admin_area_3,
-    admin_area_2,
+    all_of(geo_columns_export),
     period_id,
     quarter_id,
     year,
@@ -749,3 +752,82 @@ dqa_export <- dqa_results %>%
 write.csv(dqa_export, "M1_output_dqa.csv", row.names = FALSE)
 
 print("DQA Analysis completed. All outputs saved.")
+
+
+# -------------------------------- Generate SQL Schemas for M1 Outputs --------------------------------
+
+# Function to generate CREATE TABLE SQL
+generate_sql_schema <- function(table_name, columns) {
+  sql_lines <- paste0("  ", columns)
+  sql <- c(
+    paste0("CREATE TABLE ", table_name, " ("),
+    paste(sql_lines, collapse = ",\n"),
+    ");\n"
+  )
+  return(paste(sql, collapse = "\n"))
+}
+
+
+geo_cols_sql <- paste0(geo_columns_export, " TEXT NOT NULL")  # turn into SQL types
+geo_fixed_geo_cols <- c("admin_area_3 TEXT NOT NULL", "admin_area_2 TEXT NOT NULL")
+
+
+outlier_cols <- c(
+  "facility_id TEXT NOT NULL",
+  geo_cols_sql,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "indicator_common_id TEXT NOT NULL",
+  "outlier_flag INTEGER NOT NULL"
+)
+
+completeness_cols <- c(
+  "facility_id TEXT NOT NULL",
+  geo_cols_sql,
+  "indicator_common_id TEXT NOT NULL",
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "completeness_flag INTEGER NOT NULL"
+)
+
+dqa_cols <- c(
+  "facility_id TEXT NOT NULL",
+  geo_cols_sql,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "dqa_mean NUMERIC NOT NULL",
+  "dqa_score NUMERIC NOT NULL"
+)
+
+consistency_fac_cols <- c(
+  "facility_id TEXT NOT NULL",
+  geo_cols_sql,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "ratio_type TEXT NOT NULL",
+  "sconsistency INTEGER NOT NULL"
+)
+
+consistency_geo_cols <- c(
+  geo_fixed_geo_cols,
+  "period_id INTEGER NOT NULL",
+  "quarter_id INTEGER NOT NULL",
+  "year INTEGER NOT NULL",
+  "ratio_type TEXT NOT NULL",
+  "sconsistency INTEGER"
+)
+
+
+sql_output <- c(
+  generate_sql_schema("ro_m1_output_outliers_csv", outlier_cols),
+  generate_sql_schema("ro_m1_completeness_csv", completeness_cols),
+  generate_sql_schema("ro_m1_dqa_csv", dqa_cols),
+  generate_sql_schema("ro_m1_consistency_facility_csv", consistency_fac_cols),
+  generate_sql_schema("ro_m1_consistency_geo_csv", consistency_geo_cols)
+)
+
+writeLines(sql_output, "M1_sql_schema_output.txt")
