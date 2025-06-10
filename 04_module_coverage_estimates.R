@@ -66,7 +66,8 @@ name_replacements <- c(
   "Guinea" = "Guinée",
   "Sierra Leone" = "SierraLeone",
   "Nigeria" = "ng Federal Government",
-  "Somalia" = "Federal Govt of Somalia"
+  "Somalia" = "Federal Govt of Somalia",
+  "Ethiopia" = "Federal Ministry of Health"
 )
 
 province_name_replacements <- c(
