@@ -1,9 +1,9 @@
 
-PROJECT_DATA_HMIS <- "ethiopia_hmis_data.csv"
+PROJECT_DATA_HMIS <- "guinea_hmis_data_AA4.csv"
 
 # CB - R code FASTR PROJECT
 # Module: DATA QUALITY ADJUSTMENT
-# Last edit: 2025 May 5
+# Last edit: 2025 June 10
 
 # This script dynamically adjusts raw data for:
 #   1. Outliers: Replaces flagged outliers with 12-month rolling averages (excluding outliers).
@@ -241,7 +241,16 @@ period_lookup <- completeness_data %>%
 adjusted_data_export <- adjusted_data_final %>%
   as.data.frame() %>%
   dplyr::left_join(geo_lookup, by = "facility_id") %>%
-  dplyr::left_join(period_lookup, by = "period_id")
+  dplyr::left_join(period_lookup, by = "period_id") %>%
+  dplyr::select(
+    facility_id,
+    dplyr::all_of(geo_admin_area_sub),
+    period_id, 
+    quarter_id, 
+    year, 
+    indicator_common_id,
+    dplyr::everything()
+  )
 
 # Detect admin area columns
 geo_cols <- grep("^admin_area_[0-9]+$", names(adjusted_data_export), value = TRUE)
@@ -263,7 +272,10 @@ adjusted_data_admin_area_final <- adjusted_data_export %>%
   dplyr::left_join(period_lookup, by = "period_id") %>%
   dplyr::select(
     dplyr::all_of(geo_admin_area_sub),
-    period_id, quarter_id, year, indicator_common_id,
+    period_id, 
+    quarter_id, 
+    year, 
+    indicator_common_id,
     dplyr::everything()
   )
 
@@ -279,7 +291,11 @@ adjusted_data_national_final <- adjusted_data_export %>%
   ) %>%
   dplyr::left_join(period_lookup, by = "period_id") %>%
   dplyr::select(
-    admin_area_1, period_id, quarter_id, year, indicator_common_id,
+    admin_area_1, 
+    period_id, 
+    quarter_id, 
+    year, 
+    indicator_common_id,
     dplyr::everything()
   )
 
