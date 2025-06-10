@@ -17,7 +17,7 @@ PROJECT_DATA_POPULATION <- "population_estimates_only.csv"
 
 #-------------------------------------------------------------------------------------------------------------
 # CB - R code FASTR PROJECT
-# Last edit: 2025 June 5
+# Last edit: 2025 June 10
 # Module: COVERAGE ESTIMATES
 #
 # ------------------------------ Load Required Libraries -----------------------------------------------------
@@ -988,6 +988,13 @@ write.csv(combined_national_export_fixed, "M4_coverage_estimation.csv", row.name
 if (exists("combined_province_export") && nrow(combined_province_export) > 0) {
   write.csv(combined_province_export, "M4_coverage_estimation_admin_area_2.csv", row.names = FALSE, fileEncoding = "UTF-8")
 } else {
+  dummy_data <- data.frame(
+    admin_area_2= character(),
+    indicator_common_id=character(),
+    year = numeric(),
+    coverage_cov=numeric()
+  )
+  write.csv(dummy_data, "M4_coverage_estimation_admin_area_2.csv")
   message("Skipping export: `combined_province_export` does not exist or is empty.")
 }
 
