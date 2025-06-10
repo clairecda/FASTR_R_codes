@@ -241,7 +241,14 @@ period_lookup <- completeness_data %>%
 adjusted_data_export <- adjusted_data_final %>%
   as.data.frame() %>%
   dplyr::left_join(geo_lookup, by = "facility_id") %>%
-  dplyr::left_join(period_lookup, by = "period_id") %>%
+  dplyr::left_join(period_lookup, by = "period_id") 
+
+# Detect admin area columns
+geo_cols <- grep("^admin_area_[0-9]+$", names(adjusted_data_export), value = TRUE)
+geo_admin_area_sub <- setdiff(geo_cols, "admin_area_1")
+
+# Re-order columns 
+adjusted_data_export <- adjusted_data_export %>%
   dplyr::select(
     facility_id,
     dplyr::all_of(geo_admin_area_sub),
@@ -251,10 +258,6 @@ adjusted_data_export <- adjusted_data_final %>%
     indicator_common_id,
     dplyr::everything()
   )
-
-# Detect admin area columns
-geo_cols <- grep("^admin_area_[0-9]+$", names(adjusted_data_export), value = TRUE)
-geo_admin_area_sub <- setdiff(geo_cols, "admin_area_1")
 
 message("Detected admin area columns: ", paste(geo_cols, collapse = ", "))
 message("Using for subnational aggregation: ", paste(geo_admin_area_sub, collapse = ", "))
