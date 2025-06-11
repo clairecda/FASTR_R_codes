@@ -67,7 +67,7 @@ name_replacements <- c(
   "Sierra Leone" = "SierraLeone",
   "Nigeria" = "ng Federal Government",
   "Somalia" = "Federal Govt of Somalia",
-  "Ethiopia" = "Federal Ministry of Health"
+  "Ethiopia" = "Federal Ministry Of Health"
 )
 
 province_name_replacements <- c(
@@ -933,11 +933,20 @@ best_denom_summary <- best_denom_per_indicator %>%
 
 # Check if subnational survey data exists for this country
 has_subnational_survey <- survey_data_unified %>%
+  mutate(admin_area_1 = dplyr::recode(admin_area_1, !!!name_replacements)) %>%
   filter(admin_area_1 %in% hmis_processed$hmis_countries, admin_area_2 != "NATIONAL") %>%
   nrow() > 0
 
 if (has_subnational_survey) {
   message("Subnational survey data found. Running province-level pipeline...")
+  
+  admin_area_1_value <- adjusted_volume_data %>%
+    distinct(admin_area_1) %>%
+    pull(admin_area_1)
+  
+  
+  adjusted_volume_data_subnational <- adjusted_volume_data_subnational %>%
+    mutate(admin_area_1 = admin_area_1_value)
   
   hmis_processed_subnational <- process_hmis_adjusted_volume(
     adjusted_volume_data = adjusted_volume_data_subnational,
@@ -947,11 +956,13 @@ if (has_subnational_survey) {
   
   survey_processed_province <- process_survey_data(
     survey_data = survey_data_unified %>%
+      mutate(admin_area_1 = dplyr::recode(admin_area_1, !!!name_replacements)) %>%
       filter(admin_area_1 %in% hmis_processed_subnational$hmis_countries,
              admin_area_2 != "NATIONAL"),
     name_replacements = name_replacements,
     hmis_countries = hmis_processed_subnational$hmis_countries
   )
+  
   
   denominators_province <- calculate_denominators(
     hmis_data = hmis_processed_subnational$annual_hmis,
@@ -961,9 +972,9 @@ if (has_subnational_survey) {
   subnational_coverage_eval <- evaluate_coverage_by_denominator(denominators_province)
   
   subnational_coverage_projected <- project_coverage_from_all(
-    ranked_coverage = subnational_coverage_eval$full_ranking,
-    raw_survey_wide = survey_processed_province$raw
+    ranked_coverage = subnational_coverage_eval$full_ranking
   )
+  
   
   combined_province <- prepare_combined_coverage_from_projected(
     projected_data = subnational_coverage_projected,
@@ -977,13 +988,9 @@ if (has_subnational_survey) {
     ungroup() %>%
     select(admin_area_2, indicator_common_id, year, coverage_cov)
   
-  write_csv(combined_province_export, "coverage_combined_province.csv")
-  
 } else {
   message("No subnational survey data found for this country. Skipping province-level pipeline.")
 }
-
-
 
 
 # Write cleaned CSVs
