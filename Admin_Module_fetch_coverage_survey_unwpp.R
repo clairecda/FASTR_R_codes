@@ -6,7 +6,7 @@
 # FETCH FROM DHS AND MICS
 # FETCH POPULATION DATA FROM UNWPP AND WB
 
-readRenviron("~/Desktop/FASTR/R codes/.Renviron")  
+readRenviron("~/Desktop/modules/.Renviron")
 
 
 # ----------------------------------------
